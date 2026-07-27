@@ -1,0 +1,1029 @@
+<title>Atlas — Daily Agent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ATLAS — night-instrument screen. Deliberately single-theme: the page is a
+     lit console in a dark room, like the boot screen of a ship's computer. */
+  :root{
+    color-scheme: dark;
+    --bg0:#070d11; --bg1:#0c151b; --bg2:#122028;
+    --line:rgba(232,241,239,.08); --line2:rgba(232,241,239,.14);
+    --ink:#e8f1ef; --ink2:#9db2b5; --ink3:#5f757b;
+    --teal:#45e0be; --teal-dim:#2fa68a; --peri:#8b93ff;
+    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  html,body{height:100%}
+  body{margin:0;background:var(--bg0);color:var(--ink);font-family:var(--sans);
+       font-size:15px;line-height:1.45;overflow:hidden}
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+  :focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  /* ---------- shell grid ---------- */
+  #app{display:grid;height:100dvh;
+       grid-template-rows:auto minmax(0,1fr);
+       grid-template-columns:minmax(290px,350px) minmax(380px,1fr) minmax(290px,350px);
+       grid-template-areas:"top top top" "left mid right";gap:0 14px;padding:0 14px 14px}
+  #topbar{grid-area:top;display:flex;align-items:center;gap:18px;padding:12px 4px 10px;
+          border-bottom:1px solid var(--line)}
+  .col{display:flex;flex-direction:column;gap:14px;min-height:0;padding-top:14px}
+  #left{grid-area:left}#right{grid-area:right}
+  #mid{grid-area:mid;display:flex;flex-direction:column;min-height:0;padding-top:6px}
+
+  @media (max-width:1080px){
+    body{overflow:auto}
+    #app{height:auto;grid-template-columns:1fr 1fr;
+         grid-template-areas:"top top" "mid mid" "left right"}
+    #mid{min-height:70dvh}
+  }
+  @media (max-width:660px){
+    #app{grid-template-columns:1fr;grid-template-areas:"top" "mid" "left" "right"}
+  }
+
+  /* ---------- top bar ---------- */
+  #wordmark{font-family:var(--mono);font-size:17px;letter-spacing:.55em;
+            padding-left:.55em;color:var(--ink);user-select:none}
+  #wordmark b{color:var(--teal);font-weight:600}
+  #clock{font-family:var(--mono);font-size:12.5px;color:var(--ink2);letter-spacing:.08em}
+  #pills{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;
+        letter-spacing:.1em;color:var(--ink2);border:1px solid var(--line);
+        border-radius:999px;padding:4px 10px;background:var(--bg1)}
+  .pill i{width:7px;height:7px;border-radius:50%;background:var(--ink3);flex:none}
+  .pill[data-s="ok"] i{background:var(--teal);box-shadow:0 0 6px var(--teal)}
+  .pill[data-s="stale"] i{background:var(--warn)}
+  .pill[data-s="err"] i{background:var(--crit)}
+
+  #condition{display:none;grid-area:top;/* replaced dynamically */}
+  .banner{margin:10px 4px 0;background:var(--bg2);border:1px solid var(--line2);
+          border-radius:10px;padding:10px 14px;display:flex;gap:12px;align-items:center;
+          font-size:13.5px;color:var(--ink2)}
+  .banner button{color:var(--teal);font-family:var(--mono);font-size:12px;letter-spacing:.08em}
+
+  /* ---------- panels ---------- */
+  .panel{background:var(--bg1);border:1px solid var(--line);border-radius:14px;
+         display:flex;flex-direction:column;min-height:0;flex:1}
+  .panel header{display:flex;align-items:baseline;gap:8px;padding:12px 14px 8px;
+                border-bottom:1px solid var(--line)}
+  .panel h2{margin:0;font-family:var(--mono);font-size:11px;font-weight:600;
+            letter-spacing:.22em;color:var(--ink)}
+  .panel .src{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--ink3)}
+  .panel .upd{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+  .panel .body{padding:10px 14px 12px;overflow-y:auto;min-height:0;flex:1}
+  .empty{color:var(--ink3);font-size:13px;padding:14px 2px}
+  .degraded{display:flex;gap:10px;align-items:flex-start;padding:12px 2px;color:var(--ink2);font-size:13px}
+  .degraded .ic{color:var(--warn);font-size:15px;line-height:1.3}
+
+  /* calendar */
+  .ev{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:7px 0;
+      border-bottom:1px solid var(--line)}
+  .ev:last-child{border-bottom:none}
+  .ev .t{font-family:var(--mono);font-size:12px;color:var(--ink2);padding-top:2px}
+  .ev .name{font-size:14px}
+  .ev .loc{font-size:12px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ev.next .name{color:var(--teal)}
+  .ev.next .t{color:var(--teal)}
+  .ev.past{opacity:.42}
+  .chip{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+        border:1px solid var(--line2);border-radius:999px;padding:1px 8px;color:var(--ink2);
+        margin-left:6px;vertical-align:1px}
+  .chip.now{color:var(--teal);border-color:rgba(69,224,190,.4)}
+  .daylabel{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink3);
+            padding:10px 0 4px}
+
+  /* tasks */
+  .task{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line)}
+  .task:last-child{border-bottom:none}
+  .task .tick{flex:none;width:17px;height:17px;margin-top:2px;border:1.5px solid var(--ink3);
+              border-radius:50%;transition:all .15s}
+  .task .tick:hover{border-color:var(--teal)}
+  .task.done{opacity:.35}
+  .task.done .tick{background:var(--teal);border-color:var(--teal)}
+  .task .c{font-size:13.5px;min-width:0}
+  .task .meta{font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+  .task .meta .od{color:var(--serious)}
+  .pri{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;border-radius:4px;
+       padding:0 5px;margin-right:6px;vertical-align:1px}
+  .pri.p1{color:var(--crit);border:1px solid rgba(208,59,59,.5)}
+  .pri.p2{color:var(--serious);border:1px solid rgba(236,131,90,.5)}
+  .pri.p3{color:var(--warn);border:1px solid rgba(250,178,25,.45)}
+  #addtask{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+  #addtask input{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:8px;
+                 color:var(--ink);font:13px var(--sans);padding:7px 10px}
+  #addtask input::placeholder{color:var(--ink3)}
+  #addtask button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--teal);
+                  border:1px solid rgba(69,224,190,.35);border-radius:8px;padding:0 12px}
+  #addtask button:hover{background:rgba(69,224,190,.08)}
+
+  /* inbox */
+  .mailstat{display:flex;gap:16px;padding:4px 0 10px}
+  .mailstat .n{font-size:22px;font-weight:600}
+  .mailstat .l{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink3)}
+  .mail{padding:7px 0;border-bottom:1px solid var(--line);min-width:0}
+  .mail:last-child{border-bottom:none}
+  .mail .row1{display:flex;gap:8px;align-items:baseline}
+  .mail .from{font-family:var(--mono);font-size:11px;color:var(--ink2);
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mail .when{margin-left:auto;flex:none;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+  .mail .subj{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mail .snip{font-size:12px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mail.unread .subj{color:var(--ink)}
+  .mail.unread .from::before{content:"";display:inline-block;width:6px;height:6px;margin-right:6px;
+      border-radius:50%;background:var(--teal);box-shadow:0 0 5px var(--teal);vertical-align:1px}
+  .mail:not(.unread) .subj{color:var(--ink2)}
+
+  /* training */
+  .stats{display:flex;gap:10px;padding:2px 0 12px}
+  .stat{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .stat .n{font-size:19px;font-weight:600}
+  .stat .n small{font-size:11px;color:var(--ink2);font-weight:400}
+  .stat .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--ink3)}
+  .chart{display:flex;align-items:flex-end;gap:3px;height:74px;padding:2px 0 0}
+  .bar{flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;
+       align-items:center;gap:3px;height:100%}
+  .bar i{width:100%;background:var(--teal-dim);border-radius:3px 3px 0 0;min-height:2px}
+  .bar.hot i{background:var(--teal)}
+  .bar.zero i{background:var(--line2);height:2px}
+  .bar .v{font-family:var(--mono);font-size:9px;color:var(--ink2)}
+  .xlab{display:flex;gap:3px;padding-top:4px;border-top:1px solid var(--line);margin-top:4px}
+  .xlab span{flex:1;text-align:center;font-family:var(--mono);font-size:9px;color:var(--ink3)}
+  .lastact{padding-top:10px;font-size:12.5px;color:var(--ink2)}
+  .lastact b{color:var(--ink);font-weight:600}
+
+  /* ---------- center: the entity ---------- */
+  #stage{position:relative;flex:1;min-height:220px}
+  #orb{position:absolute;inset:0;width:100%;height:100%}
+  #transcript{height:148px;overflow-y:auto;padding:6px 10px;display:flex;
+              flex-direction:column;gap:8px;mask-image:linear-gradient(transparent,#000 18px)}
+  .msg{max-width:78%;border-radius:12px;padding:7px 12px;font-size:13.5px}
+  .msg.atlas{align-self:flex-start;background:var(--bg2);border:1px solid var(--line);
+             border-bottom-left-radius:4px}
+  .msg.user{align-self:flex-end;background:rgba(69,224,190,.1);
+            border:1px solid rgba(69,224,190,.25);border-bottom-right-radius:4px}
+  .msg .who{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--ink3);
+            display:block;padding-bottom:2px}
+  .msg.atlas .who{color:var(--teal-dim)}
+  #interim{align-self:flex-end;color:var(--ink3);font-size:13px;font-style:italic;padding:0 6px}
+
+  #dock{display:flex;gap:10px;align-items:center;padding:12px 6px 2px}
+  #mic{flex:none;width:52px;height:52px;border-radius:50%;border:1.5px solid var(--line2);
+       background:var(--bg1);display:grid;place-items:center;transition:all .2s;position:relative}
+  #mic svg{width:21px;height:21px;fill:var(--ink2);transition:fill .2s}
+  #mic:hover{border-color:var(--teal)}
+  #mic.on{border-color:var(--teal);background:rgba(69,224,190,.1);
+          box-shadow:0 0 22px rgba(69,224,190,.35)}
+  #mic.on svg{fill:var(--teal)}
+  #mic[disabled]{opacity:.35;cursor:not-allowed}
+  #mic.on::after{content:"";position:absolute;inset:-6px;border-radius:50%;
+       border:1px solid rgba(69,224,190,.4);animation:pulse 1.6s ease-out infinite}
+  @keyframes pulse{from{transform:scale(.85);opacity:1}to{transform:scale(1.25);opacity:0}}
+  #say{flex:1;background:var(--bg1);border:1px solid var(--line);border-radius:26px;
+       color:var(--ink);font:14px var(--sans);padding:13px 18px}
+  #say::placeholder{color:var(--ink3)}
+  #say:focus{border-color:rgba(69,224,190,.4)}
+  .dockbtn{flex:none;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+           color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:8px 12px}
+  .dockbtn.on{color:var(--teal);border-color:rgba(69,224,190,.4)}
+  #hint{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+        color:var(--ink3);padding:8px 0 0}
+
+  /* ---------- boot overlay ---------- */
+  #boot{position:fixed;inset:0;z-index:50;background:var(--bg0);display:grid;
+        place-items:center;transition:opacity .7s}
+  #boot.gone{opacity:0;pointer-events:none}
+  #bootbox{text-align:center;max-width:420px;padding:24px}
+  #bootmark{font-family:var(--mono);font-size:34px;letter-spacing:.6em;padding-left:.6em;
+            color:var(--ink)}
+  #bootmark b{color:var(--teal);font-weight:600;text-shadow:0 0 18px rgba(69,224,190,.6)}
+  #boottag{font-family:var(--mono);font-size:11px;letter-spacing:.28em;color:var(--ink3);
+           padding:10px 0 26px}
+  #bootlog{font-family:var(--mono);font-size:11.5px;text-align:left;color:var(--ink3);
+           min-height:96px;letter-spacing:.05em}
+  #bootlog div{opacity:0;animation:in .4s forwards}
+  #bootlog .ok{color:var(--teal-dim)}
+  @keyframes in{to{opacity:1}}
+  #wake{margin-top:26px;font-family:var(--mono);font-size:13px;letter-spacing:.3em;
+        padding:14px 34px 14px calc(34px + .3em);color:var(--teal);border:1px solid rgba(69,224,190,.5);
+        border-radius:999px;background:rgba(69,224,190,.06);transition:all .2s;
+        animation:wakeglow 2.4s ease-in-out infinite}
+  #wake:hover{background:rgba(69,224,190,.16);box-shadow:0 0 30px rgba(69,224,190,.35)}
+  @keyframes wakeglow{50%{box-shadow:0 0 26px rgba(69,224,190,.25)}}
+
+  @media (prefers-reduced-motion:reduce){
+    #mic.on::after,#wake{animation:none}
+  }
+</style>
+
+<div id="boot">
+  <div id="bootbox">
+    <div id="bootmark">ATL<b>A</b>S</div>
+    <div id="boottag">PERSONAL OPERATIONS AGENT</div>
+    <div id="bootlog" aria-hidden="true"></div>
+    <button id="wake">WAKE ATLAS</button>
+  </div>
+</div>
+
+<div id="app">
+  <div id="topbar">
+    <div id="wordmark">ATL<b>A</b>S</div>
+    <div id="clock">—</div>
+    <div id="pills">
+      <span class="pill" id="pill-cal"><i></i>CALENDAR</span>
+      <span class="pill" id="pill-gmail"><i></i>GMAIL</span>
+      <span class="pill" id="pill-todo"><i></i>TODOIST</span>
+      <span class="pill" id="pill-strava"><i></i>STRAVA</span>
+    </div>
+  </div>
+
+  <div class="col" id="left">
+    <section class="panel" id="p-cal">
+      <header><h2>TODAY</h2><span class="src">Google Calendar</span><span class="upd"></span></header>
+      <div class="body"><div class="empty">Waiting for calendar…</div></div>
+    </section>
+    <section class="panel" id="p-todo">
+      <header><h2>TASKS</h2><span class="src">Todoist</span><span class="upd"></span></header>
+      <div class="body"><div class="empty">Waiting for tasks…</div></div>
+      <form id="addtask"><input id="newtask" placeholder="Capture a task… (or say “add task …”)"
+        autocomplete="off"><button type="submit">ADD</button></form>
+    </section>
+  </div>
+
+  <div id="mid">
+    <div id="stage"><canvas id="orb"></canvas></div>
+    <div id="transcript" aria-live="polite"></div>
+    <div id="dock">
+      <button id="mic" aria-label="Toggle voice input" title="Talk to Atlas">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+      </button>
+      <input id="say" placeholder="Ask Atlas anything — “brief me”, “what’s next”, “add task…”"
+             autocomplete="off">
+      <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
+      <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
+    </div>
+    <div id="hint">BRIEF ME · WHAT’S NEXT · INBOX · TASKS · TRAINING · ADD TASK …</div>
+  </div>
+
+  <div class="col" id="right">
+    <section class="panel" id="p-gmail">
+      <header><h2>INBOX</h2><span class="src">Gmail</span><span class="upd"></span></header>
+      <div class="body"><div class="empty">Waiting for inbox…</div></div>
+    </section>
+    <section class="panel" id="p-strava">
+      <header><h2>TRAINING</h2><span class="src">Strava</span><span class="upd"></span></header>
+      <div class="body"><div class="empty">Waiting for training data…</div></div>
+    </section>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   ATLAS — daily support agent.
+   Connector access runs through window.claude.mcp (claude.ai
+   artifact runtime); outside that shell the page degrades to a
+   voice/text agent with unlinked panels.
+   ================================================================ */
+
+const $  = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MCP = () => window.claude?.mcp;
+
+/* ---------------- shared state ---------------- */
+const S = {
+  awake: false,
+  data:   { cal:null, gmail:null, todo:null, strava:null, profile:null },
+  meta:   {},           // per section: {status:'ok'|'stale'|'err'|'off', code, storedAt}
+  voiceOn: true,
+  flowOn:  false,
+  listening: false,
+  unsubs: [],
+};
+["cal","gmail","todo","strava"].forEach(k => S.meta[k] = {status:"off"});
+
+/* ================================================================
+   THE ENTITY — a particle aurora with eyes. Moods: idle, listening,
+   thinking, speaking. `level` (0..1) drives the speech ring + glow.
+   ================================================================ */
+const Entity = (() => {
+  const cv = $("#orb"), cx2 = cv.getContext("2d");
+  let W=0, H=0, DPR=1, t=0;
+  let mood="asleep", level=0, levelTarget=0, boost=0, hueMix=.25, hueTarget=.25;
+  let wake=0;                       // 0 asleep → 1 awake (scale-in)
+  let blink=1, blinkNext=2.5, gaze={x:0,y:0}, gazeT={x:0,y:0};
+  let bob=0;
+
+  const N = REDUCED ? 260 : 620;
+  const parts = [];
+  for (let i=0;i<N;i++){
+    const u=Math.random();
+    parts.push({
+      r: .55 + .45*Math.pow(Math.random(), .65),
+      th: Math.random()*Math.PI*2,
+      incl: Math.acos(2*Math.random()-1),
+      sp: (0.12 + Math.random()*0.35) * (Math.random()<.82 ? 1 : -1),
+      sz: .8 + Math.random()*2.4,
+      hue: Math.random(),            // 0 teal → 1 periwinkle
+      tw: Math.random()*Math.PI*2,
+    });
+  }
+  function glowSprite(color){
+    const c=document.createElement("canvas"); c.width=c.height=64;
+    const g=c.getContext("2d"), r=g.createRadialGradient(32,32,0,32,32,32);
+    r.addColorStop(0,"rgba(255,255,255,.9)");
+    r.addColorStop(.25,color);
+    r.addColorStop(1,"rgba(0,0,0,0)");
+    g.fillStyle=r; g.fillRect(0,0,64,64); return c;
+  }
+  const spTeal = glowSprite("rgba(69,224,190,.55)");
+  const spPeri = glowSprite("rgba(139,147,255,.55)");
+
+  function resize(){
+    DPR = Math.min(devicePixelRatio||1, 2);
+    const b = cv.parentElement.getBoundingClientRect();
+    W = b.width; H = b.height;
+    cv.width = W*DPR; cv.height = H*DPR;
+    cx2.setTransform(DPR,0,0,DPR,0,0);
+  }
+  new ResizeObserver(resize).observe(cv.parentElement);
+  resize();
+
+  addEventListener("pointermove", e=>{
+    const b=cv.getBoundingClientRect();
+    gazeT.x = Math.max(-1,Math.min(1,(e.clientX-b.left-W/2)/(W/2)));
+    gazeT.y = Math.max(-1,Math.min(1,(e.clientY-b.top-H/2)/(H/2)));
+  }, {passive:true});
+
+  const MOODS = {
+    asleep:    {speed:.12, lvl:.02, hue:.25, eye:0.05},
+    idle:      {speed:1,   lvl:.06, hue:.25, eye:1},
+    listening: {speed:1.35,lvl:.16, hue:.08, eye:1.18},
+    thinking:  {speed:2.6, lvl:.14, hue:.85, eye:.45},
+    speaking:  {speed:1.6, lvl:.5,  hue:.45, eye:1},
+  };
+
+  let last=performance.now();
+  function frame(now){
+    requestAnimationFrame(frame);
+    if (document.hidden) { last=now; return; }
+    const dt = Math.min(.05,(now-last)/1000); last=now;
+    const M = MOODS[mood] || MOODS.idle;
+    t += dt * (REDUCED ? .25 : 1);
+
+    wake += ((mood==="asleep"?0:1) - wake) * dt*2.2;
+    hueTarget = M.hue;
+    hueMix += (hueTarget-hueMix)*dt*2.5;
+    if (mood==="speaking" && !REDUCED){
+      // random-walk mouth energy while TTS is running
+      if (Math.random()<.12) levelTarget = .25+Math.random()*.65;
+    } else levelTarget = M.lvl;
+    boost -= boost*dt*3.5;
+    level += (Math.min(1, levelTarget+boost)-level)*dt*8;
+    gaze.x += (gazeT.x-gaze.x)*dt*3; gaze.y += (gazeT.y-gaze.y)*dt*3;
+
+    // blink scheduling: close over the final 140ms of the countdown, snap open
+    blinkNext -= dt;
+    if (blinkNext<=0) blinkNext = 2.2+Math.random()*4.5;
+    blink = blinkNext<.14 ? Math.max(.05, blinkNext/.14) : 1;
+
+    bob = REDUCED ? 0 : Math.sin(t*1.4)*4 + (mood==="speaking"?Math.sin(t*18)*level*2.5:0);
+
+    /* ---- draw ---- */
+    cx2.clearRect(0,0,W,H);
+    const cxm=W/2, cym=H/2 + bob;
+    const R = Math.min(W,H)*.21 * (0.2+0.8*wake) * (1+ .035*Math.sin(t*1.6)) * (1+level*.12);
+
+    // halo particles (additive)
+    cx2.globalCompositeOperation="lighter";
+    const rot = t * .5;
+    for (const p of parts){
+      p.th += p.sp * dt * M.speed * (REDUCED?.3:1);
+      const sr = p.r * R*2.35;
+      let x = sr*Math.sin(p.incl)*Math.cos(p.th+rot),
+          z = sr*Math.sin(p.incl)*Math.sin(p.th+rot),
+          y = sr*Math.cos(p.incl)*.8;
+      const persp = 1/(1 - z/(R*9));
+      const px = cxm + x*persp, py = cym + y*persp;
+      const a = (.18+.5*((z/(sr||1))*.5+.5)) * (0.55+0.45*Math.sin(t*2+p.tw)) * wake;
+      const violet = Math.min(1, p.hue*.55 + hueMix*.75);
+      const sz = p.sz * persp * (1+level*.5);
+      cx2.globalAlpha = a * (violet>.5?.8:1);
+      cx2.drawImage(violet>.5?spPeri:spTeal, px-sz*2, py-sz*2, sz*4, sz*4);
+    }
+    cx2.globalAlpha=1;
+
+    // core blob
+    const g1 = cx2.createRadialGradient(cxm,cym,R*.1, cxm,cym,R*1.55);
+    g1.addColorStop(0, `rgba(230,255,248,${.85*wake})`);
+    g1.addColorStop(.35,`rgba(69,224,190,${.5*wake})`);
+    g1.addColorStop(.7, `rgba(${Math.round(69+70*hueMix)},${Math.round(224-80*hueMix)},${Math.round(190+65*hueMix)},${.18*wake})`);
+    g1.addColorStop(1, "rgba(0,0,0,0)");
+    cx2.beginPath();
+    for (let i=0;i<=44;i++){
+      const a=i/44*Math.PI*2;
+      const rr = R*(1 + .05*Math.sin(3*a+t*1.3) + .035*Math.sin(5*a - t*1.1));
+      const x=cxm+Math.cos(a)*rr, y=cym+Math.sin(a)*rr;
+      i?cx2.lineTo(x,y):cx2.moveTo(x,y);
+    }
+    cx2.closePath(); cx2.fillStyle=g1; cx2.fill();
+
+    // speech / listening ring
+    const ringA = mood==="listening" ? .35 : level;
+    if (ringA>.03 && wake>.5){
+      cx2.beginPath();
+      const RR=R*1.6;
+      for (let i=0;i<=90;i++){
+        const a=i/90*Math.PI*2;
+        const w = Math.sin(a*7+t*9)*.5 + Math.sin(a*11 - t*7)*.5;
+        const rr = RR + w * (REDUCED? 3 : 4+22*level);
+        const x=cxm+Math.cos(a)*rr, y=cym+Math.sin(a)*rr;
+        i?cx2.lineTo(x,y):cx2.moveTo(x,y);
+      }
+      cx2.closePath();
+      cx2.strokeStyle = `rgba(${mood==="thinking"?"139,147,255":"69,224,190"},${(.12+.55*ringA)*wake})`;
+      cx2.lineWidth = 1.5; cx2.stroke();
+    }
+
+    // eyes — glowing slits
+    cx2.globalCompositeOperation="source-over";
+    const eyeOpen = M.eye * blink * wake;
+    if (eyeOpen > .02){
+      const eh = R*.34*Math.min(eyeOpen,1.25), ew = Math.max(2.5, eh*.34);
+      const ex = R*.42, gy = gaze.y*R*.08, gx = gaze.x*R*.1;
+      cx2.save();
+      cx2.shadowColor = "rgba(69,224,190,.9)"; cx2.shadowBlur = 14;
+      cx2.fillStyle = "rgba(234,255,248,.95)";
+      for (const s of [-1,1]){
+        const x=cxm+s*ex+gx, y=cym-R*.08+gy;
+        cx2.beginPath();
+        cx2.roundRect ? cx2.roundRect(x-ew/2,y-eh/2,ew,eh,ew/2)
+                      : cx2.rect(x-ew/2,y-eh/2,ew,eh);
+        cx2.fill();
+      }
+      cx2.restore();
+    }
+  }
+  requestAnimationFrame(frame);
+
+  return {
+    set mood(m){ mood=m; },
+    get mood(){ return mood; },
+    pulse(v){ boost=Math.max(boost, v); },
+  };
+})();
+
+/* ================================================================
+   TRANSCRIPT + SPEECH (the "whisper flow" loop)
+   ================================================================ */
+const transcript = $("#transcript");
+function addMsg(who, text){
+  const d=document.createElement("div");
+  d.className="msg "+who;
+  d.innerHTML = `<span class="who">${who==="atlas"?"ATLAS":"YOU"}</span>${esc(text)}`;
+  transcript.appendChild(d);
+  while (transcript.children.length>24) transcript.firstChild.remove();
+  transcript.scrollTop = transcript.scrollHeight;
+}
+
+let voice=null;
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  if (!vs.length) return;
+  voice = vs.find(v=>/en[-_]GB/i.test(v.lang) && /google|neural|natural/i.test(v.name))
+       || vs.find(v=>/en[-_]GB/i.test(v.lang))
+       || vs.find(v=>/^en/i.test(v.lang)) || vs[0];
+}
+if ("speechSynthesis" in window){
+  pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+function speak(text, then){
+  addMsg("atlas", text);
+  if (!S.voiceOn || !("speechSynthesis" in window)){ Entity.mood="idle"; then?.(); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  if (voice) u.voice = voice;
+  u.rate = 1.02; u.pitch = 1.0;
+  u.onstart = ()=> Entity.mood="speaking";
+  u.onboundary = ()=> Entity.pulse(.7);
+  u.onend = u.onerror = ()=>{
+    Entity.mood = S.listening ? "listening" : "idle";
+    then?.();
+    if (S.flowOn && !S.listening) startListening();
+  };
+  speechSynthesis.speak(u);
+}
+
+/* ---- speech recognition ---- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec=null, interimEl=null;
+function startListening(){
+  if (!SR || S.listening) return;
+  rec = new SR();
+  rec.lang = "en-GB"; rec.interimResults = true; rec.continuous = false;
+  S.listening = true; $("#mic").classList.add("on"); Entity.mood="listening";
+  interimEl?.remove(); interimEl=null;
+  rec.onresult = e=>{
+    let fin="", inter="";
+    for (const r of e.results){ if (r.isFinal) fin += r[0].transcript; else inter += r[0].transcript; }
+    if (inter){
+      Entity.pulse(.4);
+      if (!interimEl){ interimEl=document.createElement("div"); interimEl.id="interim";
+        transcript.appendChild(interimEl); }
+      interimEl.textContent = inter+"…";
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+    if (fin){ interimEl?.remove(); interimEl=null; handleUtterance(fin.trim()); }
+  };
+  rec.onend = ()=>{
+    S.listening=false; $("#mic").classList.remove("on");
+    if (Entity.mood==="listening") Entity.mood="idle";
+  };
+  rec.onerror = ev=>{
+    S.listening=false; $("#mic").classList.remove("on"); Entity.mood="idle";
+    if (ev.error==="not-allowed")
+      addMsg("atlas","I need microphone permission for voice — or just type below.");
+  };
+  try{ rec.start(); }catch(_){ S.listening=false; $("#mic").classList.remove("on"); }
+}
+function stopListening(){ try{ rec?.stop(); }catch(_){} }
+
+$("#mic").addEventListener("click", ()=> S.listening ? stopListening() : startListening());
+if (!SR){ $("#mic").disabled = true; $("#mic").title = "Voice input needs Chrome or Edge — type instead"; }
+
+$("#voicebtn").addEventListener("click", e=>{
+  S.voiceOn=!S.voiceOn; e.currentTarget.classList.toggle("on",S.voiceOn);
+  if (!S.voiceOn) window.speechSynthesis?.cancel();
+});
+$("#flowbtn").addEventListener("click", e=>{
+  S.flowOn=!S.flowOn; e.currentTarget.classList.toggle("on",S.flowOn);
+  if (S.flowOn && !S.listening) startListening();
+});
+$("#say").addEventListener("keydown", e=>{
+  if (e.key==="Enter" && e.target.value.trim()){
+    handleUtterance(e.target.value.trim()); e.target.value="";
+  }
+});
+
+/* ================================================================
+   CONNECTORS — window.claude.mcp watch/call layer
+   ================================================================ */
+const SERVERS = { cal:"Google Calendar", gmail:"Gmail", todo:"Todoist", strava:"Strava" };
+
+function errCopy(code, server){
+  switch(code){
+    case "needs_reauth":        return `Reconnect ${server} in claude.ai Settings → Connectors.`;
+    case "server_not_connected":return `Add ${server} in claude.ai Settings → Connectors.`;
+    case "selection_required":  return `Choose which ${server} connector to use when claude.ai prompts you.`;
+    case "blocked_by_policy":   return `${server} is blocked by your organisation's policy.`;
+    case "approval_required":   return `${server} needs per-call approval from your organisation.`;
+    case "not_in_manifest":     return `${server} isn't in this page's approved scope.`;
+    default:                    return `${server} didn't answer just now — keeping the last good data.`;
+  }
+}
+const AUTHZ = new Set(["needs_reauth","server_not_connected","selection_required",
+                       "blocked_by_policy","approval_required","not_in_manifest"]);
+
+function setMeta(key, patch){
+  Object.assign(S.meta[key], patch);
+  const pill = $("#pill-"+key);
+  const s = S.meta[key].status;
+  pill.dataset.s = s==="ok" ? "ok" : s==="stale" ? "stale" : s==="err" ? "err" : "";
+  renderUpdated(key);
+  checkPageCondition();
+}
+function renderUpdated(key){
+  const el = $("#p-"+key+" .upd"); if (!el) return;
+  const m = S.meta[key];
+  if (m.status==="err"){ el.textContent="OFFLINE"; return; }
+  if (!m.storedAt){ el.textContent=""; return; }
+  const mins = Math.round((Date.now()-m.storedAt)/60000);
+  el.textContent = mins<1 ? "LIVE" : `${mins}M AGO`;
+}
+setInterval(()=>Object.keys(S.meta).forEach(renderUpdated), 30000);
+
+function checkPageCondition(){
+  const ms = Object.values(S.meta);
+  const codes = ms.map(m=>m.status==="err"?m.code:null);
+  const allSame = codes.every(c=>c && c===codes[0]);
+  let b = $("#pagebanner");
+  if (allSame && codes[0]){
+    if (!b){
+      b=document.createElement("div"); b.className="banner"; b.id="pagebanner";
+      b.innerHTML=`<span></span><button>RELOAD</button>`;
+      b.querySelector("button").onclick=()=>location.reload();
+      $("#mid").prepend(b);
+    }
+    b.querySelector("span").textContent =
+      "All connectors are unavailable — " + errCopy(codes[0], "each connector");
+  } else b?.remove();
+}
+
+function watchSection(key, tool, input, render, opts={}){
+  const mcp = MCP();
+  if (!mcp){
+    setMeta(key,{status:"off"});
+    $("#p-"+key+" .body").innerHTML =
+      `<div class="degraded"><span class="ic">◌</span><span>Connector link needs the claude.ai artifact viewer. Open this page from your Claude artifacts to go live.</span></div>`;
+    return;
+  }
+  const unsub = mcp.watchTool(SERVERS[key], tool, input, ev=>{
+    if (ev.type==="data"){
+      const res = ev.result;
+      S.data[key] = res.payload;
+      setMeta(key,{status: res.cache && !res.cache.revalidating &&
+                   (Date.now()-res.cache.storedAt > 10*60000) ? "stale" : "ok",
+                   code:null,
+                   storedAt: res.cache ? res.cache.storedAt : Date.now()});
+      render(res.payload);
+    } else {
+      const code = ev.error?.code || "upstream_error";
+      if (AUTHZ.has(code)){
+        S.data[key]=null;                      // retract on authz denial
+        setMeta(key,{status:"err", code});
+        $("#p-"+key+" .body").innerHTML =
+          `<div class="degraded"><span class="ic">⚠</span><span>${esc(errCopy(code, SERVERS[key]))}</span></div>`;
+      } else {
+        // transient: keep last-good data, mark stale
+        setMeta(key,{status: S.data[key] ? "stale" : "err", code});
+        if (!S.data[key])
+          $("#p-"+key+" .body").innerHTML =
+            `<div class="degraded"><span class="ic">◌</span><span>${esc(errCopy(code, SERVERS[key]))}</span></div>`;
+      }
+    }
+  }, {cache:{staleTime:60000}, refetchInterval: opts.refetch || 300000});
+  S.unsubs.push(unsub);
+}
+
+/* ---------------- section renderers ---------------- */
+const fmtT = d => d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+const dayKey = d =>   // local-time date key (toISOString would shift BST evenings)
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const todayKey = () => dayKey(new Date());
+
+/* --- calendar --- */
+function calEvents(){
+  const evs = S.data.cal?.events || [];
+  return evs.map(e=>{
+    const allday = !e.start?.dateTime;
+    const start = new Date(e.start?.dateTime || (e.start?.date+"T00:00:00"));
+    const end   = new Date(e.end?.dateTime   || (e.end?.date  +"T23:59:59"));
+    return {title:e.summary||"(untitled)", loc:e.location, allday, start, end};
+  }).sort((a,b)=>a.start-b.start);
+}
+function renderCal(){
+  const body = $("#p-cal .body");
+  const now = new Date(), tk = new Date().toDateString();
+  const evs = calEvents();
+  if (!evs.length){ body.innerHTML=`<div class="empty">Clear calendar — nothing scheduled.</div>`; return; }
+  const next = evs.find(e=>e.start>now);
+  let html="", lastDay="";
+  for (const e of evs){
+    const dstr = e.start.toDateString();
+    if (dstr!==lastDay){
+      lastDay=dstr;
+      html += `<div class="daylabel">${dstr===tk?"TODAY":e.start.toLocaleDateString([], {weekday:"long"}).toUpperCase()}</div>`;
+    }
+    const isNow  = e.start<=now && e.end>now;
+    const isPast = e.end<=now;
+    let chip="";
+    if (isNow) chip=`<span class="chip now">NOW</span>`;
+    else if (e===next){
+      const m=Math.round((e.start-now)/60000);
+      chip=`<span class="chip">${m<60?`IN ${m}M`:`IN ${Math.round(m/60)}H`}</span>`;
+    }
+    html += `<div class="ev${e===next?" next":""}${isPast?" past":""}">
+      <div class="t">${e.allday?"ALL DAY":fmtT(e.start)}</div>
+      <div><div class="name">${esc(e.title)}${chip}</div>
+      ${e.loc?`<div class="loc">${esc(e.loc)}</div>`:""}</div></div>`;
+  }
+  body.innerHTML = html;
+}
+
+/* --- todoist --- */
+function taskBuckets(){
+  const ts = (S.data.todo?.tasks || []).filter(t=>!t.checked);
+  const tk = todayKey();
+  const due = t => (t.dueDate || t.deadlineDate || "").slice(0,10);
+  return {
+    overdue: ts.filter(t=>due(t) && due(t) < tk),
+    today:   ts.filter(t=>due(t) === tk),
+    all: ts,
+  };
+}
+function renderTodo(){
+  const body = $("#p-todo .body");
+  const {overdue, today, all} = taskBuckets();
+  if (!all.length){ body.innerHTML=`<div class="empty">All clear — no open tasks due.</div>`; return; }
+  const row = (t, od) => `
+    <div class="task" data-id="${esc(t.id)}">
+      <button class="tick" aria-label="Complete: ${esc(t.content)}"></button>
+      <div class="c">
+        ${t.priority && t.priority!=="p4" ? `<span class="pri ${t.priority}">${t.priority.toUpperCase()}</span>`:""}
+        ${esc(t.content)}
+        <div class="meta">${od?`<span class="od">overdue · ${esc((t.dueDate||t.deadlineDate||"").slice(0,10))}</span>`
+                             :(t.dueDate&&t.dueDate.length>10?fmtT(new Date(t.dueDate)):"today")}${t.recurring&&t.recurring!==false?" · ↻":""}</div>
+      </div>
+    </div>`;
+  let html="";
+  if (overdue.length){
+    html += `<div class="daylabel">OVERDUE · ${overdue.length}</div>` + overdue.map(t=>row(t,true)).join("");
+  }
+  html += `<div class="daylabel">DUE TODAY · ${today.length}</div>`;
+  html += today.length ? today.map(t=>row(t,false)).join("") : `<div class="empty">Nothing due today.</div>`;
+  body.innerHTML = html;
+  body.querySelectorAll(".task .tick").forEach(btn=>{
+    btn.addEventListener("click", ()=> completeTask(btn.closest(".task")));
+  });
+}
+async function completeTask(el){
+  const mcp=MCP(); if (!mcp) return;
+  const id = el.dataset.id;
+  el.classList.add("done");
+  try{
+    await mcp.callTool("Todoist","complete-tasks",{ids:[id]});
+    await mcp.invalidate("Todoist","find-tasks-by-date").catch(()=>{});
+    Entity.pulse(.6);
+  }catch(err){
+    el.classList.remove("done");
+    addMsg("atlas", "Couldn't tick that off — " + errCopy(err?.code, "Todoist"));
+  }
+}
+async function addTask(content, dueString){
+  const mcp=MCP();
+  if (!mcp){ addMsg("atlas","Task capture needs the claude.ai artifact viewer with Todoist linked."); return; }
+  Entity.mood="thinking";
+  try{
+    const t = {content, projectId:"inbox"};
+    if (dueString) t.dueString = dueString;
+    await mcp.callTool("Todoist","add-tasks",{tasks:[t]});
+    await mcp.invalidate("Todoist","find-tasks-by-date").catch(()=>{});
+    speak(`Captured: ${content}${dueString?`, due ${dueString}`:""}.`);
+  }catch(err){
+    speak("I couldn't save that task. " + errCopy(err?.code, "Todoist"));
+  }
+}
+$("#addtask").addEventListener("submit", e=>{
+  e.preventDefault();
+  const v=$("#newtask").value.trim();
+  if (v){ addTask(v); $("#newtask").value=""; }
+});
+
+/* --- gmail --- */
+function mailItems(){
+  const th = S.data.gmail?.threads || [];
+  return th.map(t=>{
+    const m = t.messages?.[t.messages.length-1] || {};
+    return {
+      from: (m.sender||"").replace(/<.*>/,"").trim(),
+      subj: m.subject || "(no subject)",
+      snip: (m.snippet||"").replace(/&#?\w+;/g," ").replace(/\s+/g," ").trim(),
+      unread: (m.labelIds||[]).includes("UNREAD"),
+      important: (m.labelIds||[]).includes("IMPORTANT"),
+      date: m.date ? new Date(m.date) : null,
+    };
+  });
+}
+function renderGmail(){
+  const body = $("#p-gmail .body");
+  const items = mailItems();
+  const unread = items.filter(m=>m.unread).length;
+  if (!items.length){ body.innerHTML=`<div class="empty">Inbox quiet — nothing in the last 48 hours.</div>`; return; }
+  const when = d => !d ? "" :
+    (d.toDateString()===new Date().toDateString() ? fmtT(d) : d.toLocaleDateString([], {weekday:"short"}));
+  body.innerHTML = `
+    <div class="mailstat">
+      <div><div class="n">${unread}</div><div class="l">UNREAD</div></div>
+      <div><div class="n">${items.length}</div><div class="l">LAST 48H</div></div>
+      <div><div class="n">${items.filter(m=>m.important).length}</div><div class="l">FLAGGED</div></div>
+    </div>` +
+    items.map(m=>`<div class="mail${m.unread?" unread":""}">
+      <div class="row1"><span class="from">${esc(m.from)}</span><span class="when">${when(m.date)}</span></div>
+      <div class="subj">${esc(m.subj)}</div>
+      <div class="snip">${esc(m.snip.slice(0,110))}</div></div>`).join("");
+}
+
+/* --- strava --- */
+function trainingDigest(){
+  const acts = S.data.strava?.activities || [];
+  const now = new Date();
+  const days=[];   // last 14 days, oldest first
+  for (let i=13;i>=0;i--){
+    const d=new Date(now); d.setDate(d.getDate()-i);
+    days.push({key:dayKey(d), lab:"SMTWTFS"[d.getDay()], effort:0, mins:0});
+  }
+  const wk = {km:0, mins:0, n:0};
+  for (const a of acts){
+    const d = new Date(a.start_local);
+    const k = dayKey(d);
+    const day = days.find(x=>x.key===k);
+    const eff = a.summary?.relative_effort || Math.round((a.summary?.moving_time||0)/120);
+    if (day){ day.effort += eff; day.mins += Math.round((a.summary?.moving_time||0)/60); }
+    if ((now-d)/86400000 <= 7){
+      wk.km += (a.summary?.distance||0)/1000; wk.mins += (a.summary?.moving_time||0)/60; wk.n++;
+    }
+  }
+  return {days, wk, last: acts[0]||null};
+}
+function renderStrava(){
+  const body = $("#p-strava .body");
+  const acts = S.data.strava?.activities || [];
+  if (!acts.length){ body.innerHTML=`<div class="empty">No recent activities.</div>`; return; }
+  const {days, wk, last} = trainingDigest();
+  const max = Math.max(...days.map(d=>d.effort), 1);
+  const tk = todayKey();
+  const focus = S.data.profile?.current_focus?.focus_type;
+  const bars = days.map(d=>{
+    const h = Math.round(d.effort/max*100);
+    const hot = d.key===tk || d.effort===max;
+    return `<div class="bar${d.effort? (hot?" hot":""):" zero"}" title="${d.key}: effort ${d.effort}, ${d.mins} min">
+      ${hot&&d.effort?`<span class="v">${d.effort}</span>`:""}
+      <i style="height:${Math.max(h,2)}%"></i></div>`;
+  }).join("");
+  const lastLine = last ? `<div class="lastact">Last: <b>${esc(last.name)}</b> — ${
+    last.summary?.distance ? (last.summary.distance/1000).toFixed(1)+" km, " : ""}${
+    Math.round((last.summary?.moving_time||0)/60)} min${
+    last.summary?.pr_count?`, ${last.summary.pr_count} PRs 🏅`:""}</div>` : "";
+  body.innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="n">${wk.km.toFixed(0)}<small> km</small></div><div class="l">7-DAY DIST</div></div>
+      <div class="stat"><div class="n">${(wk.mins/60).toFixed(1)}<small> h</small></div><div class="l">7-DAY TIME</div></div>
+      <div class="stat"><div class="n">${wk.n}</div><div class="l">SESSIONS</div></div>
+    </div>
+    <div class="daylabel">RELATIVE EFFORT · 14 DAYS${focus?` · FOCUS: ${esc(String(focus).toUpperCase())}`:""}</div>
+    <div class="chart" role="img" aria-label="Daily relative training effort, last 14 days">${bars}</div>
+    <div class="xlab">${days.map(d=>`<span>${d.lab}</span>`).join("")}</div>
+    ${lastLine}`;
+}
+
+/* ---------------- boot the watches ---------------- */
+function startWatches(){
+  const d0=new Date(); d0.setHours(0,0,0,0);
+  const d1=new Date(d0); d1.setDate(d1.getDate()+2);
+  watchSection("cal","list_events",
+    {startTime:d0.toISOString(), endTime:d1.toISOString(), orderBy:"startTime", pageSize:50},
+    renderCal, {refetch:300000});
+  watchSection("gmail","search_threads",
+    {query:"in:inbox newer_than:2d", pageSize:20}, renderGmail, {refetch:180000});
+  watchSection("todo","find-tasks-by-date",
+    {startDate:"today", limit:100}, renderTodo, {refetch:180000});
+  watchSection("strava","list_activities", {first:30}, renderStrava, {refetch:600000});
+  // one-shot profile read (name + training focus flavour the briefings)
+  MCP()?.callTool("Strava","get_athlete_profile",{}, {cache:{staleTime:300000}})
+    .then(r=>{ S.data.profile=r.payload; renderStrava(); })
+    .catch(()=>{});
+}
+addEventListener("pagehide", ()=> S.unsubs.forEach(u=>{ try{u()}catch(_){} }));
+
+/* ================================================================
+   THE BRAIN — intent routing over live snapshots
+   ================================================================ */
+function firstName(){ return S.data.profile?.first_name || ""; }
+function partOfDay(){
+  const h=new Date().getHours();
+  return h<12?"morning":h<18?"afternoon":"evening";
+}
+function briefInbox(){
+  if (S.meta.gmail.status==="err"||!S.data.gmail) return "I can't reach your inbox right now.";
+  const items = mailItems(); const un=items.filter(m=>m.unread);
+  if (!items.length) return "Your inbox is quiet — nothing new in the last two days.";
+  let s = `You have ${un.length} unread of ${items.length} recent emails.`;
+  if (un.length) s += " Newest: " + un.slice(0,3).map(m=>`${m.subj}, from ${m.from}`).join("; ") + ".";
+  return s;
+}
+function briefCal(){
+  if (S.meta.cal.status==="err"||!S.data.cal) return "I can't see your calendar right now.";
+  const now=new Date(), evs=calEvents();
+  const today = evs.filter(e=>e.start.toDateString()===now.toDateString());
+  const left  = today.filter(e=>e.end>now);
+  if (!today.length) return "Your calendar is clear today.";
+  if (!left.length)  return `That's it for today — all ${today.length} events are done.`;
+  const nxt = left.find(e=>e.start>now);
+  let s = `${left.length} of ${today.length} events left today.`;
+  const cur = left.find(e=>e.start<=now&&e.end>now);
+  if (cur) s += ` Right now: ${cur.title}.`;
+  if (nxt){
+    const m=Math.round((nxt.start-now)/60000);
+    s += ` Next: ${nxt.title} ${m<60?`in ${m} minutes`:`at ${fmtT(nxt.start)}`}.`;
+  }
+  return s;
+}
+function briefTasks(){
+  if (S.meta.todo.status==="err"||!S.data.todo) return "I can't reach your tasks right now.";
+  const {overdue, today} = taskBuckets();
+  if (!overdue.length && !today.length) return "Task list is clear for today.";
+  let s = "";
+  if (overdue.length) s += `${overdue.length} overdue task${overdue.length>1?"s":""}. `;
+  s += today.length ? `${today.length} due today.` : "Nothing else due today.";
+  const p1 = [...overdue,...today].find(t=>t.priority==="p1");
+  if (p1) s += ` Top priority: ${p1.content}.`;
+  else if (overdue[0]) s += ` Oldest: ${overdue[0].content}.`;
+  return s;
+}
+function briefTraining(){
+  if (S.meta.strava.status==="err"||!S.data.strava) return "I can't reach Strava right now.";
+  const {wk, last} = trainingDigest();
+  let s = `Last 7 days: ${wk.n} session${wk.n===1?"":"s"}, ${wk.km.toFixed(0)} kilometres, ${(wk.mins/60).toFixed(1)} hours.`;
+  if (last){
+    s += ` Most recent: ${last.name}`;
+    if (last.summary?.distance) s += `, ${(last.summary.distance/1000).toFixed(1)} kilometres`;
+    if (last.summary?.pr_count) s += `, with ${last.summary.pr_count} personal records`;
+    s += ".";
+  }
+  const f = S.data.profile?.current_focus?.focus_type;
+  if (f) s += ` Current training focus: ${f}.`;
+  return s;
+}
+function fullBrief(){
+  const n = firstName();
+  if (!MCP())
+    return `Good ${partOfDay()}. My connector bridge is offline here — open this page from your claude.ai artifacts and I'll pull your calendar, inbox, tasks and training live.`;
+  return `Good ${partOfDay()}${n?`, ${n}`:""}. ${briefCal()} ${briefTasks()} ${briefInbox()} ${briefTraining()}`;
+}
+
+function handleUtterance(text){
+  addMsg("user", text);
+  Entity.mood="thinking";
+  const q = text.toLowerCase().replace(/[?!.]/g,"").trim();
+
+  // task capture: "add task X", "remind me to X", "new task X"
+  const add = q.match(/^(?:add(?: a)? task|new task|create(?: a)? task|remind me to)\s+(.+)$/);
+  if (add){
+    let content = add[1], due=null;
+    const dm = content.match(/\s+(today|tomorrow|tonight|next week|on \w+)$/);
+    if (dm){ due=dm[1]; content=content.slice(0,dm.index); }
+    addTask(content.trim(), due);
+    return;
+  }
+  setTimeout(()=>{   // brief thinking beat before the reply lands
+    let reply;
+    if (/\b(brief|briefing|my day|good (morning|afternoon|evening)|status|report|catch me up|debrief)\b/.test(q))
+      reply = fullBrief();
+    else if (/\b(what'?s next|next (up|event|meeting)|upcoming)\b/.test(q))
+      reply = briefCal();
+    else if (/\b(calendar|schedule|meeting|event|agenda|today)\b/.test(q))
+      reply = briefCal();
+    else if (/\b(email|inbox|mail|gmail)\b/.test(q))
+      reply = briefInbox();
+    else if (/\b(task|todo|to-do|todoist|due|overdue)\b/.test(q))
+      reply = briefTasks();
+    else if (/\b(train|run|running|workout|strava|fitness|effort|exercise)\b/.test(q))
+      reply = briefTraining();
+    else if (/\b(hello|hi|hey|yo)\b/.test(q))
+      reply = `Hey${firstName()?" "+firstName():""}. Ready when you are — ask for your briefing.`;
+    else if (/\b(thanks|thank you|cheers|nice one)\b/.test(q))
+      reply = "Any time.";
+    else if (/\b(who are you|what are you|your name)\b/.test(q))
+      reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training, and I can capture tasks for you.";
+    else if (/\b(help|what can you do|commands)\b/.test(q))
+      reply = "Try: brief me. What's next. How's my inbox. What's due today. How's training. Or: add task, then anything you want captured.";
+    else
+      reply = "Not sure I caught that. Try 'brief me', 'what's next', 'inbox', 'tasks', 'training', or 'add task…'.";
+    speak(reply);
+  }, 350);
+}
+
+/* ================================================================
+   CLOCK + BOOT SEQUENCE
+   ================================================================ */
+function tickClock(){
+  const d=new Date();
+  $("#clock").textContent = d.toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"})
+    .toUpperCase() + "  ·  " + fmtT(d);
+}
+tickClock(); setInterval(tickClock, 15000);
+
+(function bootLog(){
+  const lines = MCP()
+    ? ["◦ core systems … online","◦ speech engine … ready",
+       "◦ linking calendar · gmail · todoist · strava …","◦ awaiting wake command"]
+    : ["◦ core systems … online","◦ speech engine … ready",
+       "◦ connector bridge … not detected (open via claude.ai artifacts)","◦ awaiting wake command"];
+  const log=$("#bootlog");
+  lines.forEach((l,i)=> setTimeout(()=>{
+    const d=document.createElement("div");
+    d.innerHTML = esc(l).replace("online","<span class='ok'>online</span>")
+                        .replace("ready","<span class='ok'>ready</span>");
+    d.style.animationDelay="0s"; log.appendChild(d);
+  }, 350+i*420));
+})();
+
+$("#wake").addEventListener("click", ()=>{
+  if (S.awake) return; S.awake=true;
+  // user gesture: prime TTS so later speech is allowed
+  if ("speechSynthesis" in window){
+    const u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); pickVoice();
+  }
+  $("#boot").classList.add("gone");
+  setTimeout(()=>$("#boot").remove(), 800);
+  Entity.mood="idle";
+  startWatches();
+  setTimeout(()=>{
+    speak(`Good ${partOfDay()}. Systems linked and watching your day. Ask me for your briefing whenever you're ready.`);
+  }, 900);
+});
+</script>
