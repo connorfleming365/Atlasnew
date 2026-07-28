@@ -8,7 +8,7 @@
     --bg0:#070d11; --bg1:#0c151b; --bg2:#122028;
     --line:rgba(232,241,239,.08); --line2:rgba(232,241,239,.16);
     --ink:#e8f1ef; --ink2:#9db2b5; --ink3:#5f757b;
-    --teal:#45e0be; --peri:#8b93ff; --amber:#f0a44a;
+    --teal:#45e0be; --peri:#8b93ff;
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
     --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
   }
@@ -37,45 +37,35 @@
            background:rgba(69,224,190,.1)}
 
   main{max-width:1180px;margin:0 auto;padding:26px 24px 70px}
-  #grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+  #grid{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
   .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;overflow:hidden;
-        display:flex;flex-direction:column;transition:border-color .2s,transform .2s}
-  .card:hover{border-color:var(--line2);transform:translateY(-2px)}
+        display:flex;flex-direction:column;transition:border-color .2s}
+  .card:hover{border-color:var(--line2)}
   .stage{position:relative;aspect-ratio:1/1;width:100%;background:
          radial-gradient(circle at 50% 45%,rgba(255,255,255,.028),transparent 62%)}
   .stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-  .meta{padding:15px 17px 18px;border-top:1px solid var(--line)}
-  .num{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--ink3)}
-  .name{font-family:var(--mono);font-size:14.5px;letter-spacing:.12em;margin:5px 0 7px;color:var(--ink)}
+  .meta{padding:17px 19px 20px;border-top:1px solid var(--line)}
+  .cross{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--peri)}
+  .name{font-family:var(--mono);font-size:16px;letter-spacing:.14em;margin:6px 0 9px;color:var(--ink)}
   .desc{font-size:13.5px;color:var(--ink2);margin:0 0 12px}
-  .tags{display:flex;gap:6px;flex-wrap:wrap}
-  .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink3);
-       border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+  .states{margin:0 0 12px;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+  .states li{font-size:12.5px;color:var(--ink2);display:flex;gap:9px}
+  .states b{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--ink3);
+            min-width:74px;padding-top:2px;font-weight:500}
   .verdict{margin:12px 0 0;padding-top:11px;border-top:1px solid var(--line);
            font-size:12.5px;color:var(--ink3)}
   .verdict b{color:var(--ink2);font-weight:600}
 
-  .sectionhead{grid-column:1/-1;padding:26px 0 2px}
-  .sectionhead .rule{height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
-  .sectionhead h2{margin:16px 0 6px;font-family:var(--mono);font-size:13px;font-weight:500;
-                  letter-spacing:.22em;color:var(--ink)}
-  .sectionhead p{margin:0;max-width:62ch;color:var(--ink2);font-size:13.5px}
-  .sectionhead .words{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
-  .word{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--peri);
-        border:1px solid rgba(139,147,255,.3);border-radius:999px;padding:3px 10px}
-
   footer{max-width:1180px;margin:0 auto;padding:0 24px 70px;color:var(--ink3);font-size:13px}
   footer p{max-width:64ch}
-  @media (prefers-reduced-motion:reduce){ .card{transition:none} }
 </style>
 
 <header>
   <div class="eyebrow">ATLAS · CHARACTER DIRECTIONS</div>
-  <h1>Ten ways for <b>Atlas</b> to be alive</h1>
-  <p class="lede">Each is a working sketch, not a mockup — the same four states the real
-    agent uses drive every one of them. Switch the state below and watch how each
-    personality carries it; a few only reveal themselves in one state, so try all four.
-    Direction 1 is what's in the dashboard today.</p>
+  <h1>Two crossings for <b>Atlas</b></h1>
+  <p class="lede">Each takes the body of one direction and the behaviour of another. The same four
+    states the real agent uses drive both, so switch between them below — these two differ most in
+    <em>thinking</em>, where each shows its parent temperament.</p>
 </header>
 
 <div id="controls">
@@ -91,10 +81,9 @@
 <main><div id="grid"></div></main>
 
 <footer>
-  <p>All ten render on canvas at the same cost as the current character, respect
-    reduced-motion, and track the pointer so they appear to notice you. Say which
-    direction you want and I'll swap it into the dashboard — or name two and I'll
-    cross them.</p>
+  <p>Both render on canvas at the cost of the current character, respect reduced-motion, and track
+    the pointer so they appear to notice you. Say which one to build and I'll swap it into the
+    dashboard with the lighting intact.</p>
 </footer>
 
 <script>
@@ -115,88 +104,8 @@ const ENV = {
   speaking:  {energy:.70, pace:1.45, attn:.85},
 };
 
-const CHARACTERS = [
-  {
-    name:"AURORA CORE",
-    desc:"A soft particle nebula with two eyes. Reads as a creature — warm, watchful, slightly uncanny in a good way.",
-    tags:["current","organic","warm"],
-    verdict:"<b>Best for companionship.</b> The eyes do the heavy lifting; the risk is it reads cute rather than capable.",
-    draw: auroraCore, bloom: 0.5,
-  },
-  {
-    name:"APERTURE",
-    desc:"A camera iris in machined rings. It dilates when you speak and spins its blades while it thinks. No face — pure attention.",
-    tags:["instrument","precise","cool"],
-    verdict:"<b>Best for authority.</b> Feels like equipment you trust. Keep the amber warm or it turns menacing.",
-    draw: aperture, bloom: 0.5,
-  },
-  {
-    name:"SIGNAL",
-    desc:"The character is the waveform. A phosphor Lissajous figure that tightens, scatters and blooms — an oscilloscope that happens to be alive.",
-    tags:["abstract","technical","fast"],
-    verdict:"<b>Best for restraint.</b> Never competes with the widgets. Least characterful when idle — it's a trace, not a being.",
-    draw: signal, bloom: 0.9,
-  },
-  {
-    name:"SENTINEL",
-    desc:"A faceted crystal that turns to face you. Solid, deliberate, expensive-looking; it tilts to acknowledge rather than emote.",
-    tags:["solid","premium","calm"],
-    verdict:"<b>Best for gravity.</b> Reads as an object rather than a mind — strong presence, quieter personality.",
-    draw: sentinel, bloom: 0.6,
-  },
-  {
-    name:"MERCURY",
-    desc:"Liquid metal under surface tension. It pools when resting, splits into orbiting droplets while thinking, ripples as it speaks.",
-    tags:["fluid","playful","tactile"],
-    verdict:"<b>Best for delight.</b> The most alive of the five, and the most likely to distract you from the data.",
-    draw: mercury, bloom: 0.45,
-  },
-  {
-    round:2,
-    name:"SYNAPSE",
-    desc:"A neural net you can watch fire. Charge travels visibly along the edges — a trickle at rest, a cascade when it's working, waves rolling outward as it speaks.",
-    tags:["neural","legible","alive"],
-    verdict:"<b>Best for showing thought.</b> The only one where 'thinking' is literal rather than decorative — you see the work happen.",
-    draw: synapse, bloom: 1,
-  },
-  {
-    round:2,
-    name:"ORRERY",
-    desc:"A brass astrolabe: nested rings on different tilts, bodies orbiting a lit core. It spins up to think and brings its rings into alignment when it answers.",
-    tags:["navigation","crafted","warm"],
-    verdict:"<b>Best name fit.</b> Atlas is a book of maps and a figure holding the heavens — this is the only direction that earns the name.",
-    draw: orrery, bloom: 1,
-  },
-  {
-    round:2,
-    name:"NEBULA",
-    desc:"Not an object but weather: layered gas, embedded stars, lightning buried in the cloud. It has no edge and no face — it simply gets brighter when it has something to say.",
-    tags:["space","atmospheric","soft"],
-    verdict:"<b>Best atmosphere.</b> Gorgeous as a backdrop; hardest to read at a glance, because a cloud has no obvious 'awake'.",
-    draw: nebula, bloom: 0.85,
-  },
-  {
-    round:2,
-    name:"SINGULARITY",
-    desc:"An accretion disc around a dark core, bright on the side rushing toward you. Matter spirals in as it listens; jets fire from the poles when it speaks.",
-    tags:["space","dramatic","striking"],
-    verdict:"<b>Most memorable.</b> Unmistakable at any size — though a black hole at the centre of your morning is a bold mood.",
-    draw: singularity, bloom: 0.9,
-  },
-  {
-    round:2,
-    name:"LATENT",
-    desc:"The shape of the machine's own thinking: a manifold folding under invisible attractors. Smooth when calm, creased and rippling when it works.",
-    tags:["intelligence","abstract","modern"],
-    verdict:"<b>Most conceptually honest.</b> Depicts what the thing actually is, rather than dressing it as a creature or a device.",
-    draw: latent, bloom: 1,
-  },
-];
-
-/* ---------------------------------------------------------------- */
-/* Point-light sprite. Rendered at 160px with an inverse-square-ish
-   falloff — the old 64px linear ramp went visibly blocky wherever a
-   glow was scaled up, which was most of them. */
+/* Point-light sprite at 160px with an inverse-square-ish falloff — a small
+   linear ramp goes visibly blocky wherever a glow is scaled up. */
 const glow = (()=>{
   const cache = {}, S = 160;
   return (color) => cache[color] || (cache[color] = (() => {
@@ -212,324 +121,75 @@ const glow = (()=>{
   })());
 })();
 
-/* Fine luminance noise. Two jobs: it dithers away the banding that dark
-   radial gradients show on cheap panels, and it gives the whole thing a
-   little photographic tooth. */
+/* Fine luminance noise: dithers the banding dark radial gradients show, and
+   gives the whole thing a little photographic tooth. */
 const NOISE = (() => {
   const S = 128, c = document.createElement("canvas");
   c.width = c.height = S;
   const g = c.getContext("2d"), img = g.createImageData(S, S), d = img.data;
   for (let i=0;i<d.length;i+=4){
-    const v = Math.random()*255;
     d[i] = d[i+1] = d[i+2] = 255;
-    d[i+3] = v;
+    d[i+3] = Math.random()*255;
   }
   g.putImageData(img, 0, 0);
   return c;
 })();
 
-/* Bloom needs canvas filters; everything degrades to the flat render. */
 const BLOOM = (() => {
   const g = document.createElement("canvas").getContext("2d");
   return typeof g.filter === "string";
 })();
 
-/* ---- 1. AURORA CORE ---- */
-const auroraParts = Array.from({length: REDUCED ? 130 : 420}, () => ({
-  r:.55 + .45*Math.pow(Math.random(),.65), th:Math.random()*Math.PI*2,
+const lerp = (a,b,u) => a + (b-a)*u;
+
+/* ================================================================
+   1. QUICKSILVER — Aurora's creature, Mercury's material.
+   A liquid-metal body that pools and splits under surface tension,
+   carrying Aurora's eyes and vapour halo.
+   ================================================================ */
+const QS_HALO = Array.from({length: REDUCED ? 90 : 300}, () => ({
+  r:.55 + .45*Math.pow(Math.random(), .65), th:Math.random()*Math.PI*2,
   incl:Math.acos(2*Math.random()-1), sp:(.12+Math.random()*.35)*(Math.random()<.82?1:-1),
-  sz:.7+Math.random()*2.1, hue:Math.random(), tw:Math.random()*Math.PI*2,
+  sz:.7+Math.random()*2.0, hue:Math.random(), tw:Math.random()*Math.PI*2,
 }));
-function auroraCore(g, w, h, t, e, blink){
-  const cx = w/2, cy = h/2 + (REDUCED?0:Math.sin(t*1.4)*w*.012);
-  const R = w*.17 * (1 + .04*Math.sin(t*1.6)) * (1 + e.energy*.14);
+const QS_DROPS = Array.from({length:7}, (_,i)=>({
+  a: i/7*Math.PI*2, sp:.5+Math.random()*.7, r:.40+Math.random()*.28, ph:Math.random()*6,
+}));
+
+function quicksilver(g, w, h, t, e, blink, idx, off){
+  const bob = REDUCED ? 0 : Math.sin(t*1.4)*w*.010;
+  const cx = w/2, cy = h/2 + bob, R = w*.185;
   const violet = e.mood==="thinking" ? .8 : .25;
+
+  /* --- vapour halo (Aurora) --- */
   g.globalCompositeOperation = "lighter";
-  for (const p of auroraParts){
+  for (const p of QS_HALO){
     p.th += p.sp * .016 * e.pace;
-    const sr = p.r * R*2.4;
+    const sr = p.r * R*2.5;
     const x = sr*Math.sin(p.incl)*Math.cos(p.th+t*.5),
           z = sr*Math.sin(p.incl)*Math.sin(p.th+t*.5),
           y = sr*Math.cos(p.incl)*.8;
     const persp = 1/(1 - z/(R*9));
-    const a = (.16+.5*((z/(sr||1))*.5+.5)) * (.55+.45*Math.sin(t*2+p.tw));
+    const a = (.13+.42*((z/(sr||1))*.5+.5)) * (.55+.45*Math.sin(t*2+p.tw));
     const sz = p.sz*persp*(1+e.energy*.5)*(w/340);
     g.globalAlpha = a;
-    g.drawImage(glow(p.hue*.55+violet*.7 > .5 ? "rgba(139,147,255,.55)" : "rgba(69,224,190,.55)"),
+    g.drawImage(glow(p.hue*.55 + violet*.7 > .5 ? "rgba(150,158,255,.5)" : "rgba(120,225,215,.5)"),
                 cx + x*persp - sz*2, cy + y*persp - sz*2, sz*4, sz*4);
   }
   g.globalAlpha = 1;
-  const gr = g.createRadialGradient(cx,cy,R*.1, cx,cy,R*1.5);
-  gr.addColorStop(0,"rgba(214,250,242,.62)");
-  gr.addColorStop(.35,"rgba(69,224,190,.42)");
-  gr.addColorStop(.7,`rgba(${69+70*violet|0},${224-80*violet|0},${190+60*violet|0},.18)`);
-  gr.addColorStop(1,"rgba(0,0,0,0)");
-  // soft halo first, so the body's silhouette sits in light rather than
-  // cutting off hard against the background
-  const halo = g.createRadialGradient(cx,cy,R*.75, cx,cy,R*1.7);
-  halo.addColorStop(0,"rgba(69,224,190,.16)");
-  halo.addColorStop(.5,"rgba(69,224,190,.06)");
-  halo.addColorStop(1,"rgba(69,224,190,0)");
-  g.fillStyle = halo; g.beginPath(); g.arc(cx,cy,R*1.7,0,Math.PI*2); g.fill();
-  g.beginPath();
-  for (let i=0;i<=44;i++){
-    const a = i/44*Math.PI*2;
-    const rr = R*(1 + .05*Math.sin(3*a+t*1.3) + .035*Math.sin(5*a-t*1.1));
-    const x = cx+Math.cos(a)*rr, y = cy+Math.sin(a)*rr;
-    i ? g.lineTo(x,y) : g.moveTo(x,y);
-  }
-  g.closePath();
-  g.fillStyle = gr; g.fill();
-  // rim light: a bright crescent on the lower-right edge of the body, which
-  // is what stops the blob reading as a flat disc of colour
-  g.save(); g.clip();
-  const rim = g.createRadialGradient(cx - R*.5, cy - R*.55, R*.2, cx - R*.5, cy - R*.55, R*2.2);
-  rim.addColorStop(0,   "rgba(0,0,0,0)");
-  rim.addColorStop(.66, "rgba(120,255,225,.03)");
-  rim.addColorStop(.88, "rgba(170,255,238,.16)");
-  rim.addColorStop(1,   "rgba(210,255,246,.30)");
-  g.fillStyle = rim; g.fillRect(cx-R*1.6, cy-R*1.6, R*3.2, R*3.2);
-  g.restore();
   g.globalCompositeOperation = "source-over";
-  // eyes
-  const eh = R*.36*blink*(e.mood==="thinking"?.45:1), ew = Math.max(2.5, eh*.34);
-  if (eh > 1){
-    g.save(); g.shadowColor="rgba(69,224,190,.9)"; g.shadowBlur=14;
-    g.fillStyle="rgba(234,255,248,.95)";
-    for (const s of [-1,1]){
-      const x = cx + s*R*.42 + pointer.x*R*.1, y = cy - R*.08 + pointer.y*R*.08;
-      g.beginPath(); g.roundRect(x-ew/2, y-eh/2, ew, eh, ew/2); g.fill();
-    }
-    g.restore();
-  }
-}
 
-/* ---- 2. APERTURE ---- */
-function aperture(g, w, h, t, e){
-  const cx = w/2, cy = h/2, R = w*.26;
-  const look = {x: pointer.x*R*.05*e.attn, y: pointer.y*R*.05*e.attn};
-  g.translate(look.x, look.y);
-  // outer machined ring + ticks
-  g.strokeStyle = "rgba(232,241,239,.14)"; g.lineWidth = Math.max(1, w*.004);
-  g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.stroke();
-  g.beginPath(); g.arc(cx,cy,R*.92,0,Math.PI*2); g.stroke();
-  const spin = t*.35*e.pace;
-  for (let i=0;i<48;i++){
-    const a = i/48*Math.PI*2 + spin*.3;
-    const long = i%4===0, r1 = R*.93, r2 = R*(long?1.02:.985);
-    g.globalAlpha = long ? .55 : .25;
-    g.beginPath();
-    g.moveTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
-    g.lineTo(cx+Math.cos(a)*r2, cy+Math.sin(a)*r2);
-    g.strokeStyle = "rgba(240,164,74,.8)"; g.stroke();
-  }
-  g.globalAlpha = 1;
-  // Blade plate: a disc with a rotating polygonal hole punched through it
-  // (even-odd winding). The hole widens with energy — the iris opening.
-  const open = .30 + e.energy*.42;
-  const blades = 6, rIn = R*.22 + R*.36*open;
-  const bladeSpin = spin*.8;
-  g.beginPath();
-  g.arc(cx, cy, R*.9, 0, Math.PI*2);
-  g.moveTo(cx + Math.cos(bladeSpin)*rIn, cy + Math.sin(bladeSpin)*rIn);
-  for (let i=blades; i>=0; i--){                       // reverse winding = hole
-    const a = bladeSpin + i/blades*Math.PI*2;
-    g.lineTo(cx + Math.cos(a)*rIn, cy + Math.sin(a)*rIn);
-  }
-  const plate = g.createRadialGradient(cx-R*.3, cy-R*.35, R*.1, cx, cy, R);
-  plate.addColorStop(0,"rgba(46,74,86,.97)");
-  plate.addColorStop(.55,"rgba(26,44,54,.97)");
-  plate.addColorStop(1,"rgba(14,26,33,.99)");
-  g.fillStyle = plate; g.fill("evenodd");
-  // brushed-metal sheen: narrow angular highlights swept across the plate,
-  // clipped to the blade region so the opening stays clean
-  g.save(); g.clip("evenodd");
-  g.globalCompositeOperation = "lighter";
-  for (let s2=0;s2<3;s2++){
-    const a = spin*.5 + s2*2.09;
-    const sg = g.createLinearGradient(cx + Math.cos(a)*R, cy + Math.sin(a)*R,
-                                      cx - Math.cos(a)*R, cy - Math.sin(a)*R);
-    sg.addColorStop(0,   "rgba(190,205,200,0)");
-    sg.addColorStop(.44, "rgba(190,205,200,.035)");
-    sg.addColorStop(.5,  "rgba(225,230,220,.075)");
-    sg.addColorStop(.56, "rgba(190,205,200,.035)");
-    sg.addColorStop(1,   "rgba(190,205,200,0)");
-    g.fillStyle = sg; g.fillRect(cx-R, cy-R, R*2, R*2);
-  }
-  g.restore();
-  // blade seams, from each opening vertex out to the rim
-  g.lineWidth = Math.max(1, w*.0035);
-  for (let i=0;i<blades;i++){
-    const a = bladeSpin + i/blades*Math.PI*2;
-    const lead = a + Math.PI*2/blades*.55;
-    g.beginPath();
-    g.moveTo(cx + Math.cos(a)*rIn, cy + Math.sin(a)*rIn);
-    g.quadraticCurveTo(cx + Math.cos(lead)*(rIn+R*.3), cy + Math.sin(lead)*(rIn+R*.3),
-                       cx + Math.cos(lead)*R*.9,       cy + Math.sin(lead)*R*.9);
-    g.strokeStyle = "rgba(140,190,205,.20)"; g.stroke();
-  }
-  // lit inner edge of the opening
-  g.beginPath();
-  for (let i=0;i<=blades;i++){
-    const a = bladeSpin + i/blades*Math.PI*2;
-    const x = cx + Math.cos(a)*rIn, y = cy + Math.sin(a)*rIn;
-    i ? g.lineTo(x,y) : g.moveTo(x,y);
-  }
-  g.strokeStyle = `rgba(240,180,120,${.35+e.energy*.4})`;
-  g.lineWidth = Math.max(1.2, w*.005); g.stroke();
-  // pupil, sitting inside the opening
-  const pr = rIn*.72 * (1 + Math.sin(t*3*e.pace)*.03);
-  const pg = g.createRadialGradient(cx,cy,0, cx,cy,pr);
-  pg.addColorStop(0,"rgba(255,246,232,.98)");
-  pg.addColorStop(.22,"rgba(240,164,74,.95)");
-  pg.addColorStop(.62,"rgba(180,86,20,.5)");
-  pg.addColorStop(1,"rgba(10,18,22,.95)");
-  g.beginPath(); g.arc(cx,cy,pr,0,Math.PI*2); g.fillStyle = pg; g.fill();
-  g.save(); g.globalCompositeOperation="lighter";
-  g.beginPath(); g.arc(cx,cy,pr*(.3+e.energy*.5),0,Math.PI*2);
-  g.fillStyle = `rgba(255,232,200,${.25+e.energy*.5})`; g.fill();
-  g.restore();
-  // scanning arc while thinking
-  if (e.mood==="thinking"){
-    g.beginPath(); g.arc(cx,cy,R*.72, spin*3, spin*3+1.1);
-    g.strokeStyle="rgba(69,224,190,.75)"; g.lineWidth=Math.max(1.5,w*.006); g.stroke();
-  }
-  g.translate(-look.x, -look.y);
-}
-
-/* ---- 3. SIGNAL ---- */
-const trails = [];
-function signal(g, w, h, t, e, _b, idx){
-  const cx = w/2, cy = h/2, R = w*.30;
-  if (!trails[idx]) trails[idx] = [];
-  const tr = trails[idx];
-  const a = e.mood==="thinking" ? 5 : e.mood==="speaking" ? 3 : 2;
-  const b = e.mood==="thinking" ? 4 : e.mood==="listening" ? 3 : 2;
-  const amp = .35 + e.energy*.62;
-  const ph = t*e.pace;
-  // baseline grid
-  g.strokeStyle="rgba(232,241,239,.05)"; g.lineWidth=1;
-  for (const f of [-1,-.5,0,.5,1]){
-    g.beginPath(); g.moveTo(cx-R*1.2, cy+f*R); g.lineTo(cx+R*1.2, cy+f*R); g.stroke();
-  }
-  const pts=[];
-  for (let i=0;i<=220;i++){
-    const u = i/220*Math.PI*2;
-    pts.push([cx + Math.sin(a*u + ph)*R*amp*(1+pointer.x*.06),
-              cy + Math.sin(b*u)*R*amp*.78*(1+pointer.y*.06)]);
-  }
-  tr.push(pts); if (tr.length > (REDUCED?2:7)) tr.shift();
-  g.globalCompositeOperation="lighter";
-  g.lineCap = "round"; g.lineJoin = "round";
-  tr.forEach((p,k)=>{
-    const age = (k+1)/tr.length;
-    const path = () => { g.beginPath();
-      p.forEach(([x,y],i)=> i?g.lineTo(x,y):g.moveTo(x,y)); g.stroke(); };
-    // neon tube: wide soft envelope, saturated body, white-hot filament
-    g.strokeStyle = `rgba(40,190,175,${.035 + age*age*.16})`;
-    g.lineWidth = Math.max(3, w*.020*age); path();
-    g.strokeStyle = `rgba(69,224,190,${.05 + age*age*.42})`;
-    g.lineWidth = Math.max(1.4, w*.0062*age); path();
-    if (k === tr.length-1){
-      g.strokeStyle = "rgba(226,255,248,.75)";
-      g.lineWidth = Math.max(.7, w*.0016); path();
-    }
-  });
-  g.lineCap = "butt"; g.lineJoin = "miter";
-  // bright head + endpoint (index guarded: pace/time can go non-finite mid-resize)
-  const hi = Math.floor((t*90*(e.pace||1)) % pts.length);
-  const head = pts[Number.isFinite(hi) ? Math.max(0, Math.min(pts.length-1, hi)) : 0];
-  g.drawImage(glow("rgba(140,255,225,.8)"), head[0]-w*.05, head[1]-w*.05, w*.1, w*.1);
-  g.globalCompositeOperation="source-over";
-  // readout
-  g.fillStyle="rgba(93,117,123,.85)";
-  g.font = `${Math.max(8, w*.032)}px ui-monospace,monospace`;
-  g.fillText(`${a}:${b}  AMP ${(amp*100).toFixed(0)}`, w*.07, h*.93);
-}
-
-/* ---- 4. SENTINEL ---- */
-const V=[], F=[];
-(function buildSolid(){
-  const p = (1+Math.sqrt(5))/2;
-  const raw = [[-1,p,0],[1,p,0],[-1,-p,0],[1,-p,0],[0,-1,p],[0,1,p],[0,-1,-p],[0,1,-p],
-               [p,0,-1],[p,0,1],[-p,0,-1],[-p,0,1]];
-  const n = Math.hypot(1,p);
-  raw.forEach(v => V.push(v.map(c=>c/n)));
-  [[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
-   [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]]
-   .forEach(f=>F.push(f));
-})();
-function sentinel(g, w, h, t, e){
-  const cx = w/2, cy = h/2, R = w*.26 * (1 + e.energy*.05);
-  const ry = t*.35*e.pace + pointer.x*.5*e.attn;
-  const rx = Math.sin(t*.4)*.25 + pointer.y*.35*e.attn;
-  const cosY=Math.cos(ry), sinY=Math.sin(ry), cosX=Math.cos(rx), sinX=Math.sin(rx);
-  const proj = V.map(([x,y,z])=>{
-    let X = x*cosY - z*sinY, Z = x*sinY + z*cosY;
-    let Y = y*cosX - Z*sinX; Z = y*sinX + Z*cosX;
-    const p = 1/(1 - Z*.28);
-    return {x:cx + X*R*p, y:cy + Y*R*p, z:Z};
-  });
-  // inner light
-  const cg = g.createRadialGradient(cx,cy,0, cx,cy,R*1.5);
-  cg.addColorStop(0,`rgba(200,220,255,${.18+e.energy*.26})`);
-  cg.addColorStop(.5,"rgba(139,147,255,.10)");
-  cg.addColorStop(1,"rgba(0,0,0,0)");
-  g.fillStyle = cg; g.beginPath(); g.arc(cx,cy,R*1.5,0,Math.PI*2); g.fill();
-  const faces = F.map(f=>({f, z:(proj[f[0]].z+proj[f[1]].z+proj[f[2]].z)/3}))
-                 .sort((a,b)=>a.z-b.z);
-  // key light from upper-left; each facet gets its own diffuse term and a
-  // tight specular, so the solid reads as cut crystal rather than flat polys
-  const L = [-.55, -.62, .56];
-  for (const {f,z} of faces){
-    const [A,B,C] = f.map(i=>proj[i]);
-    // screen-space normal is enough at this scale
-    const ux = B.x-A.x, uy = B.y-A.y, vx = C.x-A.x, vy = C.y-A.y;
-    const nz = (ux*vy - uy*vx);
-    const nl = Math.hypot(ux,uy) * Math.hypot(vx,vy) || 1;
-    const facing = Math.min(1, Math.abs(nz)/nl);
-    const cxf = (A.x+B.x+C.x)/3 - cx, cyf = (A.y+B.y+C.y)/3 - cy;
-    const dl = Math.max(0, -(cxf*L[0] + cyf*L[1]) / (Math.hypot(cxf,cyf)*R || 1));
-    const lit = (z+1)/2, diff = .25 + .55*lit + .35*dl;
-    const spec = Math.pow(Math.max(0, dl) * facing, 3.2);
-    g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(B.x,B.y); g.lineTo(C.x,C.y); g.closePath();
-    const fg = g.createLinearGradient(A.x, A.y, C.x, C.y);
-    fg.addColorStop(0, `rgba(${20+96*diff|0},${38+120*diff|0},${64+150*diff|0},${.22+lit*.42})`);
-    fg.addColorStop(1, `rgba(${14+70*diff|0},${28+92*diff|0},${52+126*diff|0},${.16+lit*.36})`);
-    g.fillStyle = fg; g.fill();
-    if (spec > .02){
-      g.fillStyle = `rgba(225,238,255,${spec*.5*(.4+lit)})`;
-      g.fill();
-    }
-    g.strokeStyle = `rgba(${170+50*spec|0},${190+45*spec|0},255,${.09+lit*.6})`;
-    g.lineWidth = Math.max(.8, w*.003*(lit+.35));
-    g.stroke();
-  }
-  // vertex sparks
-  g.globalCompositeOperation="lighter";
-  proj.filter(p=>p.z>.35).forEach(p=>{
-    const s = w*.05*(p.z);
-    g.drawImage(glow("rgba(180,190,255,.6)"), p.x-s, p.y-s, s*2, s*2);
-  });
-  g.globalCompositeOperation="source-over";
-}
-
-/* ---- 5. MERCURY ---- */
-const drops = Array.from({length:7}, (_,i)=>({
-  a: i/7*Math.PI*2, sp:.5+Math.random()*.7, r:.42+Math.random()*.3, ph:Math.random()*6,
-}));
-function mercury(g, w, h, t, e, _b, idx, off){
-  const cx = w/2, cy = h/2, R = w*.20;
+  /* --- liquid body (Mercury) ---
+     Blobs are laid down as a white ALPHA matte and the metal is painted into
+     that shape afterwards; thresholding a coloured gradient separates the
+     channels and fringes every edge. The ramp holds full alpha almost to the
+     rim so the silhouette stays crisp, and the blur only knits droplets into
+     the necks that read as surface tension. */
   const o = off.ctx, ow = off.el.width, oh = off.el.height, k = ow/w;
   o.setTransform(1,0,0,1,0,0);
   o.globalCompositeOperation = "source-over";
   o.filter = "none";
   o.clearRect(0,0,ow,oh);
-  // Blobs go down as a white ALPHA matte, and the metal is painted into that
-  // shape afterwards — thresholding a coloured gradient instead would separate
-  // the channels and fringe every edge blue. The ramp holds full alpha almost
-  // to the rim so the silhouette stays crisp; the blur below only knits
-  // neighbouring droplets into necks.
   const paint = (x,y,r)=>{
     const gr = o.createRadialGradient(x*k,y*k,0, x*k,y*k,r*k);
     gr.addColorStop(0,  "rgba(255,255,255,1)");
@@ -538,47 +198,35 @@ function mercury(g, w, h, t, e, _b, idx, off){
     gr.addColorStop(1,  "rgba(255,255,255,0)");
     o.fillStyle = gr; o.beginPath(); o.arc(x*k,y*k,r*k,0,Math.PI*2); o.fill();
   };
-  // core pools, splits apart while thinking
-  // droplets stay tethered — past ~.6 they read as separate objects, not one being
   const spread = e.mood==="thinking" ? .58 : e.mood==="speaking" ? .34 : .14;
-  paint(cx + pointer.x*R*.12, cy + pointer.y*R*.1, R*(1.05 - spread*.3 + e.energy*.12));
-  for (const d of drops){
+  const bx = cx + pointer.x*R*.12*e.attn, by = cy + pointer.y*R*.10*e.attn;
+  paint(bx, by, R*(1.05 - spread*.28 + e.energy*.12));
+  for (const d of QS_DROPS){
     const a = d.a + t*d.sp*.6*e.pace;
-    const dist = R*(.55 + spread*1.5) * (1 + .12*Math.sin(t*2+d.ph));
-    paint(cx + Math.cos(a)*dist, cy + Math.sin(a)*dist*.85,
-          R*d.r*(.42 + e.energy*.3));
+    const dist = R*(.62 + spread*1.35) * (1 + .12*Math.sin(t*2 + d.ph));
+    paint(bx + Math.cos(a)*dist, by + Math.sin(a)*dist*.85, R*d.r*(.40 + e.energy*.26));
   }
-  // Fuse the droplets: heavy blur then hard contrast gives one surface with
-  // the pinched necks that read as surface tension. Done in place on the matte.
   o.globalCompositeOperation = "copy";
   o.filter = `blur(${Math.max(2, ow*.010)}px)`;
   o.drawImage(off.el, 0, 0);
   o.filter = "none";
-  // paint metal into the silhouette: sky above, dark equator, warm bounce below
+  // Metal into the silhouette: sky above, dark equator, cool bounce below.
+  // Anchored to the body rather than the canvas, so the full ramp lands across
+  // it whatever size it has pooled to — otherwise a large body sits entirely
+  // in the bright half of the ramp and reads as a glowing bubble.
   o.globalCompositeOperation = "source-in";
-  const mg = o.createLinearGradient(0, oh*.16, 0, oh*.9);
-  mg.addColorStop(0,   "#e6fbf6");
-  mg.addColorStop(.24, "#8fd2cf");
-  mg.addColorStop(.52, "#2e7480");
+  const mg = o.createLinearGradient(0, (by - R*1.15)*k, 0, (by + R*1.25)*k);
+  mg.addColorStop(0,   "#e9fcf7");
+  mg.addColorStop(.24, "#93d6d2");
+  mg.addColorStop(.52, "#2f7681");
   mg.addColorStop(.76, "#17454e");
-  mg.addColorStop(1,   "#55a29c");
+  mg.addColorStop(1,   "#58a7a0");
   o.fillStyle = mg; o.fillRect(0, 0, ow, oh);
   o.globalCompositeOperation = "source-over";
   g.drawImage(off.el, 0, 0, w, h);
-  // surface ripple travelling out on speech
-  if (e.energy > .4){
-    const ph = t*1.6 % 1, rr = R*(.95 + ph*.65);
-    g.save();
-    g.globalCompositeOperation = "lighter";
-    g.strokeStyle = `rgba(150,225,220,${.16*(1-ph)})`;
-    g.lineWidth = Math.max(1.2, w*.005*(1-ph*.5));
-    g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI*2); g.stroke();
-    g.restore();
-  }
-  // metal needs two lights: a tight specular where the key hits, and a cool
-  // rim wrapping the far side. Both track the body so they sit on the surface.
+
+  /* --- lighting: tight specular where the key hits, cool rim on the far side --- */
   g.globalCompositeOperation = "lighter";
-  const bx = cx + pointer.x*R*.12, by = cy + pointer.y*R*.1;
   const hx = bx - R*.34, hy = by - R*.42;
   const sg = g.createRadialGradient(hx, hy, 0, hx, hy, R*.5);
   sg.addColorStop(0,"rgba(255,255,255,.42)");
@@ -590,412 +238,264 @@ function mercury(g, w, h, t, e, _b, idx, off){
   rg.addColorStop(.62,"rgba(120,180,225,.20)");
   rg.addColorStop(1,  "rgba(90,150,190,0)");
   g.fillStyle = rg; g.beginPath(); g.arc(bx, by, R*1.16, 0, Math.PI*2); g.fill();
-  g.globalCompositeOperation = "source-over";
-}
-
-/* ---- 6. SYNAPSE ---- */
-const NET = (() => {
-  const n = REDUCED ? 26 : 46, nodes = [], edges = [];
-  for (let i=0;i<n;i++){
-    // golden-angle disc scatter keeps density even without clumping
-    const a = i*2.399963, r = Math.sqrt(i/n);
-    nodes.push({x:Math.cos(a)*r, y:Math.sin(a)*r*.92, z:Math.random(),
-                fire:0, ph:Math.random()*6});
-  }
-  for (let i=0;i<n;i++){
-    const d = nodes.map((p,j)=>({j, d:Math.hypot(p.x-nodes[i].x, p.y-nodes[i].y)}))
-                   .filter(o=>o.j!==i).sort((a,b)=>a.d-b.d).slice(0,3);
-    for (const o of d) if (!edges.some(e=>(e[0]===o.j&&e[1]===i)||(e[0]===i&&e[1]===o.j)))
-      edges.push([i, o.j]);
-  }
-  return {nodes, edges};
-})();
-let pulses = [];
-function synapse(g, w, h, t, e){
-  const cx = w/2, cy = h/2, R = w*.33;
-  const P = ([x,y]) => [cx + x*R + pointer.x*R*.05, cy + y*R + pointer.y*R*.05];
-  // spawn charge: outward waves when speaking, inward when listening, storms when thinking
-  const rate = e.mood==="thinking" ? .55 : e.mood==="speaking" ? .34 : e.mood==="listening" ? .2 : .07;
-  if (pulses.length < 90 && Math.random() < rate){
-    const k = Math.floor(Math.random()*NET.edges.length);
-    const [a,b] = NET.edges[k];
-    const outward = e.mood!=="listening";
-    const ra = Math.hypot(NET.nodes[a].x, NET.nodes[a].y);
-    const rb = Math.hypot(NET.nodes[b].x, NET.nodes[b].y);
-    const flip = outward ? ra > rb : ra < rb;
-    pulses.push({a: flip?b:a, b: flip?a:b, p:0, sp:.5+Math.random()*.7, e: NET.edges[k]});
-  }
-  // edges — each keeps a little heat after a charge has run through it,
-  // so the net shows the path thought just took rather than only where it is
-  for (const ed of NET.edges){
-    ed[2] = (ed[2] || 0) * .965;
-    const A = P([NET.nodes[ed[0]].x, NET.nodes[ed[0]].y]);
-    const B = P([NET.nodes[ed[1]].x, NET.nodes[ed[1]].y]);
-    g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(B[0],B[1]);
-    const ht = ed[2];
-    g.strokeStyle = `rgba(${86+34*ht|0},${190+55*ht|0},${186+45*ht|0},${.10 + ht*.34})`;
-    g.lineWidth = Math.max(.8, w*(.0021 + ht*.0016));
-    g.stroke();
-  }
-  // travelling charge
-  g.globalCompositeOperation = "lighter";
-  pulses = pulses.filter(pu => {
-    pu.p += pu.sp * .022 * e.pace * (REDUCED?.4:1);
-    const A = NET.nodes[pu.a], B = NET.nodes[pu.b];
-    if (pu.e) pu.e[2] = Math.max(pu.e[2]||0, pu.p);
-    if (pu.p >= 1){ B.fire = 1; return false; }
-    const x = A.x + (B.x-A.x)*pu.p, y = A.y + (B.y-A.y)*pu.p;
-    const [px,py] = P([x,y]);
-    // short comet tail along the edge
-    const tx = A.x + (B.x-A.x)*Math.max(0,pu.p-.16), ty = A.y + (B.y-A.y)*Math.max(0,pu.p-.16);
-    const [qx,qy] = P([tx,ty]);
-    const lg = g.createLinearGradient(qx,qy,px,py);
-    lg.addColorStop(0,"rgba(69,224,190,0)"); lg.addColorStop(1,"rgba(120,255,225,.75)");
-    g.beginPath(); g.moveTo(qx,qy); g.lineTo(px,py);
-    g.strokeStyle = lg; g.lineWidth = Math.max(1.2, w*.005); g.stroke();
-    const s = w*.028;
-    g.drawImage(glow("rgba(120,255,225,.75)"), px-s, py-s, s*2, s*2);
-    return true;
-  });
-  // nodes, brightening as they receive; depth read from the scatter's z
-  for (const n of NET.nodes){
-    n.fire *= .93;
-    const [px,py] = P([n.x, n.y]);
-    const depth = .55 + n.z*.45;
-    const base = (.16 + .12*Math.sin(t*2 + n.ph)) * depth;
-    const s = w*(.011 + .03*n.fire)*depth;
-    g.drawImage(glow(n.fire > .25 ? "rgba(180,255,240,.9)" : "rgba(69,224,190,.5)"),
-                px-s, py-s, s*2, s*2);
-    g.globalAlpha = base + n.fire*.85;
-    g.beginPath(); g.arc(px, py, Math.max(1, w*.0048*depth), 0, Math.PI*2);
-    g.fillStyle = "rgba(232,255,252,.96)"; g.fill();
-    g.globalAlpha = 1;
+  // ripple travelling out on speech
+  if (e.energy > .4){
+    const ph = t*1.6 % 1;
+    g.strokeStyle = `rgba(150,225,220,${.16*(1-ph)})`;
+    g.lineWidth = Math.max(1.2, w*.005*(1-ph*.5));
+    g.beginPath(); g.arc(bx, by, R*(.95 + ph*.65), 0, Math.PI*2); g.stroke();
   }
   g.globalCompositeOperation = "source-over";
-}
 
-/* ---- 7. ORRERY ---- */
-const RINGS = [
-  {r:.96, tilt:-0.5, sp:.20, bodies:1, hue:"rgba(240,190,120,"},
-  {r:.76, tilt: 0.7, sp:-.31, bodies:2, hue:"rgba(69,224,190,"},
-  {r:.56, tilt:-1.1, sp:.46, bodies:1, hue:"rgba(139,147,255,"},
-  {r:.37, tilt: 0.25, sp:-.68, bodies:2, hue:"rgba(240,164,74,"},
-];
-function orrery(g, w, h, t, e){
-  const cx = w/2, cy = h/2, R = w*.30;
-  const tilt = pointer.y*.25*e.attn;
-  // graduated outer bezel
-  g.save(); g.translate(cx, cy);
-  g.strokeStyle="rgba(240,190,120,.22)"; g.lineWidth=Math.max(1,w*.003);
-  g.beginPath(); g.arc(0,0,R*1.06,0,Math.PI*2); g.stroke();
-  for (let i=0;i<72;i++){
-    const a = i/72*Math.PI*2, long = i%6===0;
-    g.globalAlpha = long?.5:.2;
-    g.beginPath();
-    g.moveTo(Math.cos(a)*R*1.06, Math.sin(a)*R*1.06);
-    g.lineTo(Math.cos(a)*R*(long?1.14:1.10), Math.sin(a)*R*(long?1.14:1.10));
-    g.stroke();
-  }
-  g.globalAlpha = 1;
-  // rings — thinking spins them up and folds them toward a common plane
-  const align = e.mood==="thinking" ? .22 : e.mood==="speaking" ? .82 : 1;
-  RINGS.forEach((ring, i) => {
-    const rot = t*ring.sp*e.pace*1.4;
-    // exaggerated foreshortening so the rings read as nested planes, not circles
-    const squash = Math.pow(Math.abs(Math.cos(ring.tilt*align*1.5 + tilt)), 1.8)*.9 + .08;
-    g.save(); g.rotate(ring.tilt*align*.85 + t*ring.sp*.15);
-    // segmented ring: the half swinging toward the viewer is drawn heavier
-    // and brighter, which is what sells the tilt as a plane rather than a circle
-    const SEG = 64, rw = R*ring.r, rh = R*ring.r*squash;
-    for (let s2=0; s2<SEG; s2++){
-      const a0 = s2/SEG*Math.PI*2, a1 = (s2+1.02)/SEG*Math.PI*2;
-      const near = (Math.sin(a0)+1)/2;                  // 1 at the front of the ellipse
-      g.beginPath(); g.ellipse(0, 0, rw, rh, 0, a0, a1);
-      g.strokeStyle = ring.hue + (.14 + near*.46).toFixed(3) + ")";
-      g.lineWidth = Math.max(.8, w*(.0022 + near*.0032));
-      g.stroke();
+  /* --- eyes (Aurora), sunk into the metal --- */
+  const eyeOpen = (e.mood==="thinking" ? .45 : e.mood==="listening" ? 1.18 : 1) * blink;
+  if (eyeOpen > .04){
+    const eh = R*.40*Math.min(eyeOpen,1.3), ew = Math.max(2.5, eh*.34);
+    const gx = pointer.x*R*.11*e.attn, gy = pointer.y*R*.09*e.attn;
+    for (const s of [-1,1]){
+      const x = bx + s*R*.40 + gx, y = by - R*.06 + gy;
+      // a shallow socket so the eye sits in the surface rather than on it
+      const sock = g.createRadialGradient(x, y, 0, x, y, eh*1.5);
+      sock.addColorStop(0,"rgba(6,20,24,.62)");
+      sock.addColorStop(1,"rgba(6,20,24,0)");
+      g.fillStyle = sock; g.beginPath(); g.arc(x, y, eh*1.5, 0, Math.PI*2); g.fill();
     }
-    for (let b=0;b<ring.bodies;b++){
-      const a = rot + b/ring.bodies*Math.PI*2;
-      const bx = Math.cos(a)*R*ring.r, by = Math.sin(a)*R*ring.r*squash;
-      const front = Math.sin(a) > 0;
-      // short trail behind each body, along its own orbit
-      g.globalCompositeOperation = "lighter";
-      for (let k=1;k<=6;k++){
-        const ta = a - k*.055, f = 1 - k/7;
-        g.globalAlpha = f*f*(front?.34:.16);
-        const ts = w*.012*f;
-        g.drawImage(glow(ring.hue + ".7)"),
-                    Math.cos(ta)*R*ring.r - ts, Math.sin(ta)*R*ring.r*squash - ts, ts*2, ts*2);
-      }
-      g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
-      const s = w*(front?.032:.024);
-      g.globalCompositeOperation="lighter";
-      g.drawImage(glow(ring.hue + ".85)"), bx-s, by-s, s*2, s*2);
-      g.globalCompositeOperation="source-over";
-      g.beginPath(); g.arc(bx, by, Math.max(1.5, w*(front?.010:.007)), 0, Math.PI*2);
-      g.fillStyle = ring.hue + (front?".95)":".6)"); g.fill();
+    g.save();
+    g.shadowColor = "rgba(120,255,232,.9)"; g.shadowBlur = 16;
+    g.fillStyle = "rgba(238,255,250,.97)";
+    for (const s of [-1,1]){
+      const x = bx + s*R*.40 + gx, y = by - R*.06 + gy;
+      g.beginPath(); g.roundRect(x-ew/2, y-eh/2, ew, eh, ew/2); g.fill();
     }
     g.restore();
-  });
-  // lit core
-  const cr = R*.085*(1 + e.energy*.3);
-  const cg2 = g.createRadialGradient(0,0,0, 0,0,cr*3.4);
-  cg2.addColorStop(0,"rgba(255,248,232,.98)");
-  cg2.addColorStop(.28,`rgba(250,205,140,${.6+e.energy*.3})`);
-  cg2.addColorStop(.62,"rgba(230,150,60,.16)");
-  cg2.addColorStop(1,"rgba(0,0,0,0)");
-  g.beginPath(); g.arc(0,0,cr*3.4,0,Math.PI*2); g.fillStyle=cg2; g.fill();
-  g.restore();
+  }
 }
 
-/* ---- 8. NEBULA ---- */
-const PUFFS = Array.from({length: REDUCED?9:16}, (_,i)=>({
-  a:Math.random()*6.28, d:.1+Math.random()*.62, r:.32+Math.random()*.5,
-  sp:(.05+Math.random()*.13)*(i%2?1:-1), ph:Math.random()*6,
-  hue:[ "rgba(69,224,190,", "rgba(139,147,255,", "rgba(214,110,190,", "rgba(90,170,255," ][i%4],
+/* ================================================================
+   2. MAELSTROM — Singularity's gravity, Nebula's matter.
+   Gas and dust spiralling into a dark core, heating from violet
+   through cyan to white as it falls in.
+   ================================================================ */
+const MS_STOPS = [
+  [0,   [255,248,235]], [.18, [255,196,120]], [.42, [110,215,230]],
+  [.70, [130,140,235]], [1,   [86,68,155]],
+];
+function temp(u, a){
+  u = Math.max(0, Math.min(1, u));
+  let i = 0; while (i < MS_STOPS.length-2 && u > MS_STOPS[i+1][0]) i++;
+  const [p0,c0] = MS_STOPS[i], [p1,c1] = MS_STOPS[i+1];
+  const f = (u - p0) / (p1 - p0 || 1);
+  return `rgba(${lerp(c0[0],c1[0],f)|0},${lerp(c0[1],c1[1],f)|0},${lerp(c0[2],c1[2],f)|0},${a})`;
+}
+const MS_INFALL = Array.from({length: REDUCED?20:52}, ()=>({
+  a:Math.random()*6.28, r:.62+Math.random()*.9, sp:.4+Math.random()*.8,
 }));
-const DUST = Array.from({length: REDUCED?3:6}, (_,i)=>({
-  a: i*1.9 + Math.random(), d:.18+Math.random()*.5, r:.16+Math.random()*.22,
-  sp:(.04+Math.random()*.08)*(i%2?1:-1),
+const MS_DUST = Array.from({length: REDUCED?2:5}, (_,i)=>({
+  r:.75+Math.random()*.75, w:.5+Math.random()*.9, a:i*1.3, sp:.4+Math.random()*.5,
 }));
-const STARS = Array.from({length: REDUCED?18:44}, ()=>({
-  x:(Math.random()*2-1)*.95, y:(Math.random()*2-1)*.95,
-  s:.25+Math.random()*.85, ph:Math.random()*6,
+const MS_STARS = Array.from({length: REDUCED?14:34}, ()=>({
+  x:(Math.random()*2-1)*.98, y:(Math.random()*2-1)*.98, s:.3+Math.random()*.8,
+  ph:Math.random()*6,
 }));
-function nebula(g, w, h, t, e){
-  const cx = w/2, cy = h/2, R = w*.34;
+
+function maelstrom(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.235;
+  const squash = .30 + pointer.y*.05*e.attn;
+  const HOR = R*.44;                       // event horizon radius
+
+  /* background field, partly swallowed */
   g.globalCompositeOperation = "lighter";
-  for (const p of PUFFS){
-    const a = p.a + t*p.sp*e.pace*.5;
-    const x = cx + Math.cos(a)*p.d*R + pointer.x*R*.04;
-    const y = cy + Math.sin(a)*p.d*R*.85 + pointer.y*R*.04;
-    const rr = p.r*R*(1 + .12*Math.sin(t*.7 + p.ph) + e.energy*.18);
-    const gr = g.createRadialGradient(x,y,0, x,y,rr);
-    gr.addColorStop(0, p.hue + (.16 + e.energy*.18) + ")");
-    gr.addColorStop(.45, p.hue + (.07 + e.energy*.07) + ")");
-    gr.addColorStop(1, p.hue + "0)");
-    g.fillStyle = gr; g.beginPath(); g.arc(x,y,rr,0,Math.PI*2); g.fill();
-  }
-  // dust lanes — opaque cold cloud in front of the gas. Real nebulae read as
-  // deep because of what's blocked, not only what glows.
-  g.globalCompositeOperation = "source-over";
-  for (const d of DUST){
-    const a = d.a + t*d.sp*e.pace*.3;
-    const x = cx + Math.cos(a)*d.d*R, y = cy + Math.sin(a)*d.d*R*.8;
-    const rr = d.r*R;
-    const dg = g.createRadialGradient(x,y,0, x,y,rr);
-    dg.addColorStop(0,   "rgba(6,10,16,.82)");
-    dg.addColorStop(.55, "rgba(6,10,16,.42)");
-    dg.addColorStop(1,   "rgba(6,10,16,0)");
-    g.fillStyle = dg; g.beginPath(); g.arc(x,y,rr,0,Math.PI*2); g.fill();
-  }
-  g.globalCompositeOperation = "lighter";
-  // dense bright heart
-  const core = g.createRadialGradient(cx,cy,0, cx,cy,R*.5);
-  core.addColorStop(0, `rgba(240,255,252,${.28+e.energy*.5})`);
-  core.addColorStop(.35, `rgba(150,220,255,${.14+e.energy*.2})`);
-  core.addColorStop(1, "rgba(90,120,220,0)");
-  g.fillStyle = core; g.beginPath(); g.arc(cx,cy,R*.5,0,Math.PI*2); g.fill();
-  // embedded stars
-  for (const s of STARS){
-    const tw = .35 + .65*Math.abs(Math.sin(t*1.4 + s.ph));
-    const x = cx + s.x*R, y = cy + s.y*R*.9, sz = w*.0045*s.s*(1+tw);
-    g.globalAlpha = tw*.75;
-    g.drawImage(glow("rgba(235,250,255,.8)"), x-sz*3.5, y-sz*3.5, sz*7, sz*7);
-    // a hard point on top, so stars read as stars and not as more gas
-    g.globalAlpha = tw;
-    g.beginPath(); g.arc(x, y, Math.max(.7, w*.0016*s.s*(1+tw*.6)), 0, Math.PI*2);
+  for (const s of MS_STARS){
+    const tw = .3 + .7*Math.abs(Math.sin(t*1.3 + s.ph));
+    const x = cx + s.x*R*1.5, y = cy + s.y*R*1.2;
+    if (Math.hypot(x-cx, y-cy) < HOR*1.25) continue;
+    const sz = w*.0035*s.s*(1+tw);
+    g.globalAlpha = tw*.6;
+    g.drawImage(glow("rgba(225,240,255,.75)"), x-sz*3.5, y-sz*3.5, sz*7, sz*7);
+    g.globalAlpha = tw*.9;
+    g.beginPath(); g.arc(x, y, Math.max(.6, w*.0013*s.s), 0, Math.PI*2);
     g.fillStyle = "rgba(255,255,255,.95)"; g.fill();
-    g.globalAlpha = 1;
   }
-  // lightning buried in the cloud — fires on speech
-  if (e.energy > .38 && Math.sin(t*9) > .965 && !REDUCED){
-    // a discharge buried in the gas: soft halo first, hairline core on top,
-    // so it glows through the cloud rather than sitting on it like a decal
-    const a0 = t*3 % 6.28, dir = a0 + (Math.random()-.5);
-    const pts = [[cx + Math.cos(a0)*R*.1, cy + Math.sin(a0)*R*.1]];
-    for (let i=0;i<6;i++){
+  g.globalAlpha = 1;
+
+  /* far side of the disc, lensed up over the top */
+  const far = g.createLinearGradient(cx-R, cy, cx+R, cy);
+  far.addColorStop(0,   temp(.55,.10));
+  far.addColorStop(.5,  temp(.28,.42));
+  far.addColorStop(1,   temp(.55,.10));
+  g.beginPath(); g.ellipse(cx, cy-R*.05, R*1.05, R*.40, 0, Math.PI, Math.PI*2);
+  g.strokeStyle = far; g.lineWidth = Math.max(2, w*.020); g.stroke();
+
+  /* volumetric gas: soft cloud squashed into the disc plane */
+  g.save();
+  g.translate(cx, cy); g.scale(1, squash*2.1); g.translate(-cx, -cy);
+  for (let i=0;i<4;i++){
+    const a = t*.12*e.pace + i*1.57;
+    const gx = cx + Math.cos(a)*R*.42, gy = cy + Math.sin(a)*R*.42;
+    const rr = R*(.85 + .18*Math.sin(t*.6+i));
+    const gg = g.createRadialGradient(gx,gy,0, gx,gy,rr);
+    gg.addColorStop(0,  temp(.55 + .2*Math.sin(i), .13 + e.energy*.08));
+    gg.addColorStop(.5, temp(.7, .05));
+    gg.addColorStop(1,  "rgba(0,0,0,0)");
+    g.fillStyle = gg; g.beginPath(); g.arc(gx,gy,rr,0,Math.PI*2); g.fill();
+  }
+  g.restore();
+
+  /* The disc: a continuous temperature gradient with fine gas streaks over it.
+     Drawn in circular space and squashed by the transform, so nothing has to
+     be described as an ellipse. (Stroking thick arc segments instead tiles the
+     disc into visible rectangles — the streaks have to stay thin.) */
+  g.save();
+  g.translate(cx, cy); g.scale(1, squash*2); g.translate(-cx, -cy);
+
+  const disc = g.createRadialGradient(cx, cy, HOR*.92, cx, cy, R*1.5);
+  disc.addColorStop(0,   temp(.02, .80));
+  disc.addColorStop(.10, temp(.14, .62));
+  disc.addColorStop(.30, temp(.38, .38));
+  disc.addColorStop(.62, temp(.66, .20));
+  disc.addColorStop(1,   temp(1,   0));
+  g.fillStyle = disc;
+  g.beginPath(); g.arc(cx, cy, R*1.5, 0, Math.PI*2);
+  g.arc(cx, cy, HOR*.92, 0, Math.PI*2, true);      // keep the throat clear
+  g.fill("evenodd");
+
+  g.lineCap = "round";
+  const NS = REDUCED ? 26 : 90;
+  for (let i=0;i<NS;i++){
+    const u  = (i*0.6180339887) % 1;                 // stable, evenly spread
+    const rr = HOR*1.02 + u*(R*1.42 - HOR);
+    const ur = (rr - HOR) / (R*1.42 - HOR);          // 0 inner … 1 outer
+    const spin = t * e.pace * (1.5 / Math.pow(.45 + ur, 1.35));
+    const a0 = (i*2.399963 + spin) % (Math.PI*2);
+    const len = .35 + .75*((i*7919 % 100)/100);
+    const turb = .45 + .55*Math.sin(a0*2.5 + t*1.6 + i);
+    const doppler = .40 + .60*(1 - (Math.cos(a0)+1)/2);
+    g.beginPath(); g.arc(cx, cy, rr, a0, a0 + len);
+    g.strokeStyle = temp(ur*.9 + .04, (.10 + .34*turb) * doppler * (.7 + e.energy*.55));
+    g.lineWidth = Math.max(1, w*(.0075 - ur*.003));
+    g.stroke();
+  }
+  g.lineCap = "butt";
+
+  /* dust lanes: cold cloud crossing in front of the disc. Round caps and a
+     soft falloff — a butt-capped thick arc reads as a dark slab. */
+  g.globalCompositeOperation = "source-over";
+  g.lineCap = "round";
+  for (const d of MS_DUST){
+    const rot = -t*d.sp*.28*e.pace;
+    for (let pass=0; pass<3; pass++){
+      const f = 1 - pass/3;
+      g.beginPath();
+      g.arc(cx, cy, R*d.r, d.a + rot + pass*.05, d.a + rot + d.w - pass*.05);
+      g.strokeStyle = `rgba(6,10,16,${.16*f})`;
+      g.lineWidth = Math.max(2, w*(.010 + pass*.010));
+      g.stroke();
+    }
+  }
+  g.lineCap = "butt";
+  g.restore();
+  g.globalCompositeOperation = "lighter";
+
+  /* matter falling in, heating as it goes */
+  g.globalCompositeOperation = "lighter";
+  for (const p of MS_INFALL){
+    p.a += p.sp*.02*e.pace / Math.max(.4, p.r);
+    p.r -= .0018*p.sp*e.pace*(e.mood==="listening" ? 1.7 : 1);
+    if (p.r < .52){ p.r = 1.55; p.a = Math.random()*6.28; }
+    const x = cx + Math.cos(p.a)*R*p.r, y = cy + Math.sin(p.a)*R*p.r*squash;
+    const u = (p.r - .52) / 1.03;
+    const s = w*.010*(1.5-p.r);
+    g.globalAlpha = Math.min(1, (1.55-p.r)*1.6);
+    g.drawImage(glow(temp(u*.9, .8)), x-s*2.2, y-s*2.2, s*4.4, s*4.4);
+  }
+  g.globalAlpha = 1;
+
+  /* discharge arcing off the inner edge when it speaks (Nebula's lightning) */
+  if (e.energy > .38 && Math.sin(t*9) > .955 && !REDUCED){
+    const a0 = t*3 % 6.28;
+    const pts = [[cx + Math.cos(a0)*HOR*1.15, cy + Math.sin(a0)*HOR*1.15*squash*2]];
+    for (let i=0;i<5;i++){
       const [px,py] = pts[pts.length-1];
-      pts.push([px + Math.cos(dir)*R*.11 + (Math.random()-.5)*R*.13,
-                py + Math.sin(dir)*R*.11 + (Math.random()-.5)*R*.13]);
+      pts.push([px + Math.cos(a0)*R*.13 + (Math.random()-.5)*R*.16,
+                py + Math.sin(a0)*R*.10 + (Math.random()-.5)*R*.16]);
     }
     const path = () => { g.beginPath();
       pts.forEach(([x,y],i)=> i?g.lineTo(x,y):g.moveTo(x,y)); g.stroke(); };
     g.lineCap = "round";
-    g.strokeStyle = "rgba(150,205,255,.30)"; g.lineWidth = Math.max(3, w*.016); path();
-    g.strokeStyle = "rgba(205,235,255,.55)"; g.lineWidth = Math.max(1.4, w*.005); path();
-    g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = Math.max(.7, w*.0016); path();
+    g.strokeStyle = temp(.35,.30); g.lineWidth = Math.max(3, w*.014); path();
+    g.strokeStyle = temp(.15,.55); g.lineWidth = Math.max(1.3, w*.0045); path();
+    g.strokeStyle = "rgba(255,255,255,.8)"; g.lineWidth = Math.max(.7, w*.0015); path();
     g.lineCap = "butt";
   }
-  g.globalCompositeOperation = "source-over";
-}
 
-/* ---- 9. SINGULARITY ---- */
-const INFALL = Array.from({length: REDUCED?24:60}, ()=>({
-  a:Math.random()*6.28, r:.7+Math.random()*.6, sp:.4+Math.random()*.8,
-}));
-function singularity(g, w, h, t, e){
-  const cx = w/2, cy = h/2, R = w*.27;
-  const squash = .30 + pointer.y*.06;      // disc seen near edge-on
-  const spin = t*e.pace;
-  // far side of the disc, lensed up over the top
-  g.globalCompositeOperation = "lighter";
-  const far = g.createLinearGradient(cx-R, cy, cx+R, cy);
-  far.addColorStop(0,"rgba(255,170,80,.10)");
-  far.addColorStop(.5,"rgba(255,225,190,.5)");
-  far.addColorStop(1,"rgba(255,170,80,.10)");
-  g.beginPath(); g.ellipse(cx, cy-R*.06, R*1.06, R*.42, 0, Math.PI, Math.PI*2);
-  g.strokeStyle = far; g.lineWidth = Math.max(2, w*.022); g.stroke();
-  // accretion disc, doppler-bright on the approaching (left) side
-  for (let i=0;i<3;i++){
-    const rr = R*(1.02 + i*.14);
-    const dg = g.createLinearGradient(cx-rr, cy, cx+rr, cy);
-    dg.addColorStop(0, `rgba(255,240,220,${.62-i*.16})`);
-    dg.addColorStop(.35,`rgba(255,175,90,${.34-i*.09})`);
-    dg.addColorStop(.72,`rgba(200,90,40,${.16-i*.04})`);
-    dg.addColorStop(1, `rgba(150,60,30,${.08-i*.02})`);
-    g.beginPath(); g.ellipse(cx, cy, rr, rr*squash, 0, 0, Math.PI*2);
-    g.strokeStyle = dg; g.lineWidth = Math.max(2, w*(.03-i*.007)); g.stroke();
-  }
-  // matter spiralling in
-  for (const p of INFALL){
-    p.a += p.sp*.02*e.pace;
-    const draw = e.mood==="listening" ? .55 : 1;      // listening draws matter inward
-    p.r -= .0016*p.sp*e.pace*draw;
-    if (p.r < .62){ p.r = 1.35; p.a = Math.random()*6.28; }
-    const x = cx + Math.cos(p.a)*R*p.r, y = cy + Math.sin(p.a)*R*p.r*squash;
-    const s = w*.012*(1.4-p.r);
-    g.globalAlpha = Math.min(1, (1.35-p.r)*1.8);
-    g.drawImage(glow("rgba(255,215,170,.8)"), x-s*2, y-s*2, s*4, s*4);
-    g.globalAlpha = 1;
-  }
-  // polar jets on speech
+  /* polar jets, in gas colours */
   if (e.energy > .3){
-    const jl = R*(.9 + e.energy*.85);
+    const jl = R*(.75 + e.energy*.6);
     for (const dir of [-1, 1]){
       const jg = g.createLinearGradient(cx, cy, cx, cy + dir*jl);
-      jg.addColorStop(0, `rgba(225,245,255,${.85*e.energy})`);
-      jg.addColorStop(.35,`rgba(150,205,255,${.4*e.energy})`);
-      jg.addColorStop(1, "rgba(110,170,255,0)");
+      jg.addColorStop(0,   temp(.04, .95*e.energy));
+      jg.addColorStop(.18, temp(.22, .45*e.energy));
+      jg.addColorStop(.55, temp(.5,  .12*e.energy));
+      jg.addColorStop(1,   "rgba(110,170,255,0)");
       g.beginPath();
-      g.moveTo(cx - R*.022, cy);
-      g.lineTo(cx + R*.022, cy);
-      g.lineTo(cx + R*.075, cy + dir*jl);
-      g.lineTo(cx - R*.075, cy + dir*jl);
+      g.moveTo(cx - R*.012, cy); g.lineTo(cx + R*.012, cy);
+      g.lineTo(cx + R*.042, cy + dir*jl); g.lineTo(cx - R*.042, cy + dir*jl);
       g.closePath(); g.fillStyle = jg; g.fill();
     }
   }
   g.globalCompositeOperation = "source-over";
-  // photon ring + event horizon
-  g.beginPath(); g.arc(cx, cy, R*.44, 0, Math.PI*2);
+
+  /* event horizon + photon ring */
+  g.beginPath(); g.arc(cx, cy, HOR, 0, Math.PI*2);
   g.fillStyle = "#03070a"; g.fill();
-  g.beginPath(); g.arc(cx, cy, R*.455, 0, Math.PI*2);
-  g.strokeStyle = `rgba(255,230,200,${.55+e.energy*.4})`;
-  g.lineWidth = Math.max(1.2, w*.005); g.stroke();
-  void spin;
+  g.beginPath(); g.arc(cx, cy, HOR*1.035, 0, Math.PI*2);
+  g.strokeStyle = temp(.05, .5 + e.energy*.4);
+  g.lineWidth = Math.max(1.2, w*.0045); g.stroke();
 }
 
-/* ---- 10. LATENT ---- */
-function latent(g, w, h, t, e){
-  const cx = w/2, cy = h/2, R = w*.33, N = REDUCED ? 11 : 17;
-  // two roaming attractors fold the sheet; they move with the state's pace
-  const at = [
-    {x:Math.sin(t*.7*e.pace)*.55, y:Math.cos(t*.53*e.pace)*.45, s: 1},
-    {x:Math.cos(t*.41*e.pace+2)*.6, y:Math.sin(t*.62*e.pace+1)*.5, s:-.8},
-  ];
-  const tiltX = .55 + pointer.y*.12*e.attn, rotY = pointer.x*.35*e.attn + Math.sin(t*.2)*.12;
-  const height = (u,v) => {
-    let z = 0;
-    for (const a of at){
-      const d2 = (u-a.x)**2 + (v-a.y)**2;
-      z += a.s * Math.exp(-d2*4.5) * (.55 + e.energy*.9);
-    }
-    z += Math.sin(u*5 + t*2.4*e.pace) * .05 * (1 + e.energy*2.6);  // speech ripple
-    return z;
-  };
-  const proj = (u,v) => {
-    const z = height(u,v);
-    const x =  u*Math.cos(rotY) - z*Math.sin(rotY)*.4;
-    const y =  v*tiltX - z*.52;
-    return [cx + x*R, cy + y*R*.92, z];
-  };
-  const line = (pts) => {
-    g.beginPath();
-    pts.forEach(([x,y],i)=> i?g.lineTo(x,y):g.moveTo(x,y));
-    g.stroke();
-  };
-  // faint fill under the sheet first, so it reads as a surface with a
-  // near and far edge instead of graph paper floating in space
-  const rows = [];
-  for (let i=0;i<N;i++){
-    const u = -1 + 2*i/(N-1), row = [];
-    for (let j=0;j<N;j++) row.push(proj(u, -1 + 2*j/(N-1)));
-    rows.push(row);
-  }
-  for (let i=0;i<N-1;i++){
-    const near = i/(N-1);                       // far rows recede into the dark
-    g.beginPath();
-    rows[i].forEach(([x,y],j)=> j?g.lineTo(x,y):g.moveTo(x,y));
-    for (let j=N-1;j>=0;j--) g.lineTo(rows[i+1][j][0], rows[i+1][j][1]);
-    g.closePath();
-    const z = (rows[i][N>>1][2] + rows[i+1][N>>1][2])/2;
-    const k = Math.min(1, Math.abs(z)*.9);
-    g.fillStyle = `rgba(${16+40*k|0},${34+60*k|0},${48+80*k|0},${.10 + near*.16})`;
-    g.fill();
-  }
-  g.lineWidth = Math.max(.9, w*.0026);
-  for (let i=0;i<N;i++){
-    const u = -1 + 2*i/(N-1);
-    const rowA = rows[i], rowB = [];
-    let hi = 0;
-    for (let j=0;j<N;j++){
-      rowB.push(proj(-1 + 2*j/(N-1), u));
-      hi = Math.max(hi, Math.abs(rowA[j][2]));
-    }
-    // colour by how creased this line is: calm teal → strained periwinkle,
-    // dimmed by depth so the far side of the sheet falls away
-    const k = Math.min(1, hi*.9), fog = .45 + .55*(i/(N-1));
-    g.strokeStyle = `rgba(${69+70*k|0},${224-77*k|0},${190+65*k|0},${(.14+.52*k)*fog})`;
-    line(rowA);
-    g.strokeStyle = `rgba(${69+70*k|0},${224-77*k|0},${190+65*k|0},${(.12+.44*k)*.8})`;
-    line(rowB);
-  }
-  // crest highlights where the manifold peaks
-  g.globalCompositeOperation = "lighter";
-  for (const a of at){
-    const [x,y,z] = proj(a.x, a.y);
-    const s = w*.06*Math.min(1.4, Math.abs(z)+.3);
-    g.drawImage(glow(a.s>0 ? "rgba(120,255,225,.55)" : "rgba(150,155,255,.5)"),
-                x-s, y-s, s*2, s*2);
-  }
-  g.globalCompositeOperation = "source-over";
-}
+/* ---------------------------------------------------------------- */
+const CHARACTERS = [
+  {
+    cross:"AURORA × MERCURY",
+    name:"QUICKSILVER",
+    desc:"Aurora's creature rebuilt in Mercury's material: a liquid-metal body under surface tension, with eyes sunk into the surface and a vapour halo coming off it.",
+    states:[
+      ["IDLE","pooled and softly bobbing, halo drifting"],
+      ["LISTENING","droplets draw in tight, eyes widen"],
+      ["THINKING","the body splits into orbiting droplets, eyes narrow, halo turns violet"],
+      ["SPEAKING","surface ripples outward, eyes steady"],
+    ],
+    verdict:"<b>Warm but substantial.</b> Keeps the companionable face that made Aurora work, and answers its weakness — it now reads as something made, not something cute.",
+    draw: quicksilver, bloom: .42,
+  },
+  {
+    cross:"SINGULARITY × NEBULA",
+    name:"MAELSTROM",
+    desc:"Singularity's gravity given Nebula's matter. Gas and dust spiral into a dark core, heating from violet through cyan to white as they fall — dust lanes crossing in front, stars swallowed at the edge.",
+    states:[
+      ["IDLE","slow differential rotation, cool outer gas"],
+      ["LISTENING","matter is pulled inward noticeably faster"],
+      ["THINKING","the whole disc spins up and the turbulence sharpens"],
+      ["SPEAKING","discharge arcs off the inner edge, jets fire from the poles"],
+    ],
+    verdict:"<b>Unmistakable and warmer than its parent.</b> The colour temperature does the work a black hole alone couldn't — it looks alive rather than merely destructive.",
+    draw: maelstrom, bloom: .85,
+  },
+];
 
 /* ---------------- harness ---------------- */
 const grid = document.getElementById("grid");
 const tiles = CHARACTERS.map((ch, i) => {
-  if (ch.round === 2 && CHARACTERS[i-1]?.round !== 2){
-    const head = document.createElement("div");
-    head.className = "sectionhead";
-    head.innerHTML = `<div class="rule"></div>
-      <h2>ROUND TWO</h2>
-      <p>Five more, worked up from your words. These lean further from
-         “creature with a face” and further into instruments, cosmology and
-         the shape of thinking itself.</p>
-      <div class="words">${["SPACE","NEBULA","INTELLIGENCE","NEURAL","NETWORK"]
-        .map(x=>`<span class="word">${x}</span>`).join("")}</div>`;
-    grid.appendChild(head);
-  }
   const card = document.createElement("article");
   card.className = "card";
   card.innerHTML = `
     <div class="stage"><canvas></canvas></div>
     <div class="meta">
-      <div class="num">DIRECTION ${String(i+1).padStart(2,"0")}</div>
+      <div class="cross">${ch.cross}</div>
       <div class="name">${ch.name}</div>
       <p class="desc">${ch.desc}</p>
-      <div class="tags">${ch.tags.map(t=>`<span class="tag">${t}</span>`).join("")}</div>
+      <ul class="states">${ch.states.map(([s,d]) =>
+        `<li><b>${s}</b><span>${d}</span></li>`).join("")}</ul>
       <p class="verdict">${ch.verdict}</p>
     </div>`;
   grid.appendChild(card);
@@ -1004,15 +504,13 @@ const tiles = CHARACTERS.map((ch, i) => {
                       return {el:c, ctx:c.getContext("2d")}; };
   return {ch, el, ctx: el.getContext("2d"),
           scene: buf(),      // characters draw here, then get composited
-          bloomBuf: buf(),   // half-res blur target
-          off: buf(),        // mercury's metaball buffer
+          bloomBuf: buf(),   // quarter-res blur target
+          off: buf(),        // quicksilver's metaball buffer
           blinkT: 2 + Math.random()*3, blink: 1, visible: true,
           gx: Math.random()*128|0, gy: Math.random()*128|0};
 });
 
-/* Ten animated canvases is a real budget. Three things keep it cheap:
-   these are decorative so 1.5× is plenty of resolution, offscreen cards
-   don't render at all, and the bloom runs at quarter res. */
+/* Offscreen cards don't render at all. */
 const VIS = new IntersectionObserver(es => {
   for (const en of es){
     const t = tiles.find(x => x.el === en.target);
@@ -1023,7 +521,7 @@ tiles.forEach(t => VIS.observe(t.el));
 
 let DPR = 1;
 function resize(){
-  DPR = Math.min(devicePixelRatio||1, 1.5);
+  DPR = Math.min(devicePixelRatio||1, 1.5);   // decorative canvases
   for (const t of tiles){
     const r = t.el.getBoundingClientRect();
     if (!r.width) continue;
@@ -1035,8 +533,8 @@ function resize(){
     t.bloomBuf.el.width  = Math.max(1, Math.round(pw*.25));
     t.bloomBuf.el.height = Math.max(1, Math.round(ph*.25));
     t.off.el.width = Math.round(pw*.7); t.off.el.height = Math.round(ph*.7);
-    // Vignette and grain never change, so bake them into one overlay at
-    // resize: a single drawImage per frame instead of two full-canvas fills.
+    // Vignette and grain never change: bake them into one overlay at resize
+    // so it costs a single drawImage per frame, not two full-canvas fills.
     const ov = t.overlay || (t.overlay = document.createElement("canvas"));
     ov.width = pw; ov.height = ph;
     const oc = ov.getContext("2d");
@@ -1057,8 +555,7 @@ function resize(){
 }
 addEventListener("resize", resize);
 
-/* Draw a finished character: flat pass, additive blurred copy for bloom,
-   vignette to hold the eye centre, then a dusting of noise. */
+/* Flat pass, additive blurred copy for bloom, then the baked overlay. */
 function composite(t){
   const g = t.ctx;
   g.clearRect(0, 0, t.w, t.h);
@@ -1067,8 +564,6 @@ function composite(t){
     const b = t.bloomBuf.ctx, bw = t.bloomBuf.el.width, bh = t.bloomBuf.el.height;
     b.setTransform(1,0,0,1,0,0);
     b.clearRect(0, 0, bw, bh);
-    // downsampling to a quarter is most of the blur; a small kernel on top
-    // finishes it, which is far cheaper than one wide blur at half res
     b.filter = `blur(${Math.max(1.5, bw*.030)}px)`;
     b.drawImage(t.scene.el, 0, 0, bw, bh);
     b.filter = "none";
@@ -1117,6 +612,5 @@ function frame(now){
 }
 resize();
 requestAnimationFrame(frame);
-// fonts/layout can settle a frame late; re-measure once
-setTimeout(resize, 250);
+setTimeout(resize, 250);   // fonts/layout can settle a frame late
 </script>
