@@ -65,6 +65,9 @@ also revoke per provider at
 
 ## 1. Deploy
 
+> For a click-by-click version of everything below, see
+> [SETUP-WALKTHROUGH.md](SETUP-WALKTHROUGH.md).
+
 Import this repository at [vercel.com/new](https://vercel.com/new). No build
 settings needed — it's static files plus serverless functions. The first deploy
 will succeed and show a "needs its API keys" banner; that's expected.
