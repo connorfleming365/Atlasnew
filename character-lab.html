@@ -1,0 +1,496 @@
+<title>Atlas — Character Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Same night-console world as the Atlas dashboard, so these read as
+     candidates for the same product rather than a separate exercise. */
+  :root{
+    color-scheme: dark;
+    --bg0:#070d11; --bg1:#0c151b; --bg2:#122028;
+    --line:rgba(232,241,239,.08); --line2:rgba(232,241,239,.16);
+    --ink:#e8f1ef; --ink2:#9db2b5; --ink3:#5f757b;
+    --teal:#45e0be; --peri:#8b93ff; --amber:#f0a44a;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg0);color:var(--ink);font-family:var(--sans);
+       font-size:15px;line-height:1.5}
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  :focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:6px}
+
+  header{padding:34px 24px 20px;max-width:1180px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.32em;color:var(--ink3)}
+  h1{margin:10px 0 8px;font-family:var(--mono);font-size:clamp(24px,4vw,34px);font-weight:500;
+     letter-spacing:.16em;text-wrap:balance}
+  h1 b{color:var(--teal);font-weight:600}
+  .lede{max-width:62ch;color:var(--ink2);font-size:14.5px;margin:0}
+
+  #controls{position:sticky;top:0;z-index:5;background:rgba(7,13,17,.92);
+            backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+            padding:12px 24px;margin-top:22px}
+  .cwrap{max-width:1180px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .clabel{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--ink3);margin-right:2px}
+  .moodbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink2);
+           border:1px solid var(--line2);border-radius:999px;padding:7px 14px;transition:.15s}
+  .moodbtn:hover{border-color:rgba(69,224,190,.45)}
+  .moodbtn[aria-pressed="true"]{color:var(--teal);border-color:rgba(69,224,190,.6);
+           background:rgba(69,224,190,.1)}
+
+  main{max-width:1180px;margin:0 auto;padding:26px 24px 70px}
+  #grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+  .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;overflow:hidden;
+        display:flex;flex-direction:column;transition:border-color .2s,transform .2s}
+  .card:hover{border-color:var(--line2);transform:translateY(-2px)}
+  .stage{position:relative;aspect-ratio:1/1;width:100%;background:
+         radial-gradient(circle at 50% 45%,rgba(255,255,255,.028),transparent 62%)}
+  .stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .meta{padding:15px 17px 18px;border-top:1px solid var(--line)}
+  .num{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--ink3)}
+  .name{font-family:var(--mono);font-size:14.5px;letter-spacing:.12em;margin:5px 0 7px;color:var(--ink)}
+  .desc{font-size:13.5px;color:var(--ink2);margin:0 0 12px}
+  .tags{display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink3);
+       border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+  .verdict{margin:12px 0 0;padding-top:11px;border-top:1px solid var(--line);
+           font-size:12.5px;color:var(--ink3)}
+  .verdict b{color:var(--ink2);font-weight:600}
+
+  footer{max-width:1180px;margin:0 auto;padding:0 24px 70px;color:var(--ink3);font-size:13px}
+  footer p{max-width:64ch}
+  @media (prefers-reduced-motion:reduce){ .card{transition:none} }
+</style>
+
+<header>
+  <div class="eyebrow">ATLAS · CHARACTER DIRECTIONS</div>
+  <h1>Five ways for <b>Atlas</b> to be alive</h1>
+  <p class="lede">Each is a working sketch, not a mockup — the same four states the real
+    agent uses drive every one of them. Switch the state below and watch how each
+    personality carries it. Direction 1 is what's in the dashboard today.</p>
+</header>
+
+<div id="controls">
+  <div class="cwrap">
+    <span class="clabel">STATE</span>
+    <button class="moodbtn" data-mood="idle" aria-pressed="true">IDLE</button>
+    <button class="moodbtn" data-mood="listening" aria-pressed="false">LISTENING</button>
+    <button class="moodbtn" data-mood="thinking" aria-pressed="false">THINKING</button>
+    <button class="moodbtn" data-mood="speaking" aria-pressed="false">SPEAKING</button>
+  </div>
+</div>
+
+<main><div id="grid"></div></main>
+
+<footer>
+  <p>All five render on canvas at the same cost as the current character, respect
+    reduced-motion, and track the pointer so they appear to notice you. Say which
+    direction you want and I'll swap it into the dashboard.</p>
+</footer>
+
+<script>
+"use strict";
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let MOOD = "idle";
+const pointer = {x:0, y:0};
+addEventListener("pointermove", e => {
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = (e.clientY / innerHeight) * 2 - 1;
+}, {passive:true});
+
+/* Shared per-state envelope: energy (mouth/amplitude), pace, and attention. */
+const ENV = {
+  idle:      {energy:.07, pace:.75, attn:.55},
+  listening: {energy:.30, pace:1.15, attn:1.0},
+  thinking:  {energy:.16, pace:2.30, attn:.30},
+  speaking:  {energy:.70, pace:1.45, attn:.85},
+};
+
+const CHARACTERS = [
+  {
+    name:"AURORA CORE",
+    desc:"A soft particle nebula with two eyes. Reads as a creature — warm, watchful, slightly uncanny in a good way.",
+    tags:["current","organic","warm"],
+    verdict:"<b>Best for companionship.</b> The eyes do the heavy lifting; the risk is it reads cute rather than capable.",
+    draw: auroraCore,
+  },
+  {
+    name:"APERTURE",
+    desc:"A camera iris in machined rings. It dilates when you speak and spins its blades while it thinks. No face — pure attention.",
+    tags:["instrument","precise","cool"],
+    verdict:"<b>Best for authority.</b> Feels like equipment you trust. Keep the amber warm or it turns menacing.",
+    draw: aperture,
+  },
+  {
+    name:"SIGNAL",
+    desc:"The character is the waveform. A phosphor Lissajous figure that tightens, scatters and blooms — an oscilloscope that happens to be alive.",
+    tags:["abstract","technical","fast"],
+    verdict:"<b>Best for restraint.</b> Never competes with the widgets. Least characterful when idle — it's a trace, not a being.",
+    draw: signal,
+  },
+  {
+    name:"SENTINEL",
+    desc:"A faceted crystal that turns to face you. Solid, deliberate, expensive-looking; it tilts to acknowledge rather than emote.",
+    tags:["solid","premium","calm"],
+    verdict:"<b>Best for gravity.</b> Reads as an object rather than a mind — strong presence, quieter personality.",
+    draw: sentinel,
+  },
+  {
+    name:"MERCURY",
+    desc:"Liquid metal under surface tension. It pools when resting, splits into orbiting droplets while thinking, ripples as it speaks.",
+    tags:["fluid","playful","tactile"],
+    verdict:"<b>Best for delight.</b> The most alive of the five, and the most likely to distract you from the data.",
+    draw: mercury,
+  },
+];
+
+/* ---------------------------------------------------------------- */
+const glow = (()=>{
+  const cache = {};
+  return (color) => cache[color] || (cache[color] = (() => {
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    const g = c.getContext("2d"), r = g.createRadialGradient(32,32,0,32,32,32);
+    r.addColorStop(0, "rgba(255,255,255,.92)");
+    r.addColorStop(.28, color);
+    r.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = r; g.fillRect(0,0,64,64); return c;
+  })());
+})();
+
+/* ---- 1. AURORA CORE ---- */
+const auroraParts = Array.from({length: REDUCED ? 130 : 420}, () => ({
+  r:.55 + .45*Math.pow(Math.random(),.65), th:Math.random()*Math.PI*2,
+  incl:Math.acos(2*Math.random()-1), sp:(.12+Math.random()*.35)*(Math.random()<.82?1:-1),
+  sz:.7+Math.random()*2.1, hue:Math.random(), tw:Math.random()*Math.PI*2,
+}));
+function auroraCore(g, w, h, t, e, blink){
+  const cx = w/2, cy = h/2 + (REDUCED?0:Math.sin(t*1.4)*w*.012);
+  const R = w*.17 * (1 + .04*Math.sin(t*1.6)) * (1 + e.energy*.14);
+  const violet = e.mood==="thinking" ? .8 : .25;
+  g.globalCompositeOperation = "lighter";
+  for (const p of auroraParts){
+    p.th += p.sp * .016 * e.pace;
+    const sr = p.r * R*2.4;
+    const x = sr*Math.sin(p.incl)*Math.cos(p.th+t*.5),
+          z = sr*Math.sin(p.incl)*Math.sin(p.th+t*.5),
+          y = sr*Math.cos(p.incl)*.8;
+    const persp = 1/(1 - z/(R*9));
+    const a = (.16+.5*((z/(sr||1))*.5+.5)) * (.55+.45*Math.sin(t*2+p.tw));
+    const sz = p.sz*persp*(1+e.energy*.5)*(w/340);
+    g.globalAlpha = a;
+    g.drawImage(glow(p.hue*.55+violet*.7 > .5 ? "rgba(139,147,255,.55)" : "rgba(69,224,190,.55)"),
+                cx + x*persp - sz*2, cy + y*persp - sz*2, sz*4, sz*4);
+  }
+  g.globalAlpha = 1;
+  const gr = g.createRadialGradient(cx,cy,R*.1, cx,cy,R*1.5);
+  gr.addColorStop(0,"rgba(230,255,248,.85)");
+  gr.addColorStop(.35,"rgba(69,224,190,.5)");
+  gr.addColorStop(.7,`rgba(${69+70*violet|0},${224-80*violet|0},${190+60*violet|0},.18)`);
+  gr.addColorStop(1,"rgba(0,0,0,0)");
+  g.beginPath();
+  for (let i=0;i<=44;i++){
+    const a = i/44*Math.PI*2;
+    const rr = R*(1 + .05*Math.sin(3*a+t*1.3) + .035*Math.sin(5*a-t*1.1));
+    const x = cx+Math.cos(a)*rr, y = cy+Math.sin(a)*rr;
+    i ? g.lineTo(x,y) : g.moveTo(x,y);
+  }
+  g.closePath(); g.fillStyle = gr; g.fill();
+  g.globalCompositeOperation = "source-over";
+  // eyes
+  const eh = R*.36*blink*(e.mood==="thinking"?.45:1), ew = Math.max(2.5, eh*.34);
+  if (eh > 1){
+    g.save(); g.shadowColor="rgba(69,224,190,.9)"; g.shadowBlur=14;
+    g.fillStyle="rgba(234,255,248,.95)";
+    for (const s of [-1,1]){
+      const x = cx + s*R*.42 + pointer.x*R*.1, y = cy - R*.08 + pointer.y*R*.08;
+      g.beginPath(); g.roundRect(x-ew/2, y-eh/2, ew, eh, ew/2); g.fill();
+    }
+    g.restore();
+  }
+}
+
+/* ---- 2. APERTURE ---- */
+function aperture(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.26;
+  const look = {x: pointer.x*R*.05*e.attn, y: pointer.y*R*.05*e.attn};
+  g.translate(look.x, look.y);
+  // outer machined ring + ticks
+  g.strokeStyle = "rgba(232,241,239,.14)"; g.lineWidth = Math.max(1, w*.004);
+  g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.stroke();
+  g.beginPath(); g.arc(cx,cy,R*.92,0,Math.PI*2); g.stroke();
+  const spin = t*.35*e.pace;
+  for (let i=0;i<48;i++){
+    const a = i/48*Math.PI*2 + spin*.3;
+    const long = i%4===0, r1 = R*.93, r2 = R*(long?1.02:.985);
+    g.globalAlpha = long ? .55 : .25;
+    g.beginPath();
+    g.moveTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
+    g.lineTo(cx+Math.cos(a)*r2, cy+Math.sin(a)*r2);
+    g.strokeStyle = "rgba(240,164,74,.8)"; g.stroke();
+  }
+  g.globalAlpha = 1;
+  // Blade plate: a disc with a rotating polygonal hole punched through it
+  // (even-odd winding). The hole widens with energy — the iris opening.
+  const open = .30 + e.energy*.42;
+  const blades = 6, rIn = R*.22 + R*.36*open;
+  const bladeSpin = spin*.8;
+  g.beginPath();
+  g.arc(cx, cy, R*.9, 0, Math.PI*2);
+  g.moveTo(cx + Math.cos(bladeSpin)*rIn, cy + Math.sin(bladeSpin)*rIn);
+  for (let i=blades; i>=0; i--){                       // reverse winding = hole
+    const a = bladeSpin + i/blades*Math.PI*2;
+    g.lineTo(cx + Math.cos(a)*rIn, cy + Math.sin(a)*rIn);
+  }
+  const plate = g.createRadialGradient(cx-R*.3, cy-R*.35, R*.1, cx, cy, R);
+  plate.addColorStop(0,"rgba(46,74,86,.97)");
+  plate.addColorStop(.55,"rgba(26,44,54,.97)");
+  plate.addColorStop(1,"rgba(14,26,33,.99)");
+  g.fillStyle = plate; g.fill("evenodd");
+  // blade seams, from each opening vertex out to the rim
+  g.lineWidth = Math.max(1, w*.0035);
+  for (let i=0;i<blades;i++){
+    const a = bladeSpin + i/blades*Math.PI*2;
+    const lead = a + Math.PI*2/blades*.55;
+    g.beginPath();
+    g.moveTo(cx + Math.cos(a)*rIn, cy + Math.sin(a)*rIn);
+    g.quadraticCurveTo(cx + Math.cos(lead)*(rIn+R*.3), cy + Math.sin(lead)*(rIn+R*.3),
+                       cx + Math.cos(lead)*R*.9,       cy + Math.sin(lead)*R*.9);
+    g.strokeStyle = "rgba(140,190,205,.20)"; g.stroke();
+  }
+  // lit inner edge of the opening
+  g.beginPath();
+  for (let i=0;i<=blades;i++){
+    const a = bladeSpin + i/blades*Math.PI*2;
+    const x = cx + Math.cos(a)*rIn, y = cy + Math.sin(a)*rIn;
+    i ? g.lineTo(x,y) : g.moveTo(x,y);
+  }
+  g.strokeStyle = `rgba(240,180,120,${.35+e.energy*.4})`;
+  g.lineWidth = Math.max(1.2, w*.005); g.stroke();
+  // pupil, sitting inside the opening
+  const pr = rIn*.72 * (1 + Math.sin(t*3*e.pace)*.03);
+  const pg = g.createRadialGradient(cx,cy,0, cx,cy,pr);
+  pg.addColorStop(0,"rgba(255,246,232,.98)");
+  pg.addColorStop(.22,"rgba(240,164,74,.95)");
+  pg.addColorStop(.62,"rgba(180,86,20,.5)");
+  pg.addColorStop(1,"rgba(10,18,22,.95)");
+  g.beginPath(); g.arc(cx,cy,pr,0,Math.PI*2); g.fillStyle = pg; g.fill();
+  g.save(); g.globalCompositeOperation="lighter";
+  g.beginPath(); g.arc(cx,cy,pr*(.3+e.energy*.5),0,Math.PI*2);
+  g.fillStyle = `rgba(255,232,200,${.25+e.energy*.5})`; g.fill();
+  g.restore();
+  // scanning arc while thinking
+  if (e.mood==="thinking"){
+    g.beginPath(); g.arc(cx,cy,R*.72, spin*3, spin*3+1.1);
+    g.strokeStyle="rgba(69,224,190,.75)"; g.lineWidth=Math.max(1.5,w*.006); g.stroke();
+  }
+  g.translate(-look.x, -look.y);
+}
+
+/* ---- 3. SIGNAL ---- */
+const trails = [];
+function signal(g, w, h, t, e, _b, idx){
+  const cx = w/2, cy = h/2, R = w*.30;
+  if (!trails[idx]) trails[idx] = [];
+  const tr = trails[idx];
+  const a = e.mood==="thinking" ? 5 : e.mood==="speaking" ? 3 : 2;
+  const b = e.mood==="thinking" ? 4 : e.mood==="listening" ? 3 : 2;
+  const amp = .35 + e.energy*.62;
+  const ph = t*e.pace;
+  // baseline grid
+  g.strokeStyle="rgba(232,241,239,.05)"; g.lineWidth=1;
+  for (const f of [-1,-.5,0,.5,1]){
+    g.beginPath(); g.moveTo(cx-R*1.2, cy+f*R); g.lineTo(cx+R*1.2, cy+f*R); g.stroke();
+  }
+  const pts=[];
+  for (let i=0;i<=220;i++){
+    const u = i/220*Math.PI*2;
+    pts.push([cx + Math.sin(a*u + ph)*R*amp*(1+pointer.x*.06),
+              cy + Math.sin(b*u)*R*amp*.78*(1+pointer.y*.06)]);
+  }
+  tr.push(pts); if (tr.length > (REDUCED?2:7)) tr.shift();
+  g.globalCompositeOperation="lighter";
+  tr.forEach((p,k)=>{
+    const age = (k+1)/tr.length;
+    g.beginPath();
+    p.forEach(([x,y],i)=> i?g.lineTo(x,y):g.moveTo(x,y));
+    g.strokeStyle = `rgba(69,224,190,${.06 + age*age*.5})`;
+    g.lineWidth = Math.max(1, w*.0055*age);
+    g.stroke();
+  });
+  // bright head + endpoint (index guarded: pace/time can go non-finite mid-resize)
+  const hi = Math.floor((t*90*(e.pace||1)) % pts.length);
+  const head = pts[Number.isFinite(hi) ? Math.max(0, Math.min(pts.length-1, hi)) : 0];
+  g.drawImage(glow("rgba(140,255,225,.8)"), head[0]-w*.05, head[1]-w*.05, w*.1, w*.1);
+  g.globalCompositeOperation="source-over";
+  // readout
+  g.fillStyle="rgba(93,117,123,.85)";
+  g.font = `${Math.max(8, w*.032)}px ui-monospace,monospace`;
+  g.fillText(`${a}:${b}  AMP ${(amp*100).toFixed(0)}`, w*.07, h*.93);
+}
+
+/* ---- 4. SENTINEL ---- */
+const V=[], F=[];
+(function buildSolid(){
+  const p = (1+Math.sqrt(5))/2;
+  const raw = [[-1,p,0],[1,p,0],[-1,-p,0],[1,-p,0],[0,-1,p],[0,1,p],[0,-1,-p],[0,1,-p],
+               [p,0,-1],[p,0,1],[-p,0,-1],[-p,0,1]];
+  const n = Math.hypot(1,p);
+  raw.forEach(v => V.push(v.map(c=>c/n)));
+  [[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+   [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]]
+   .forEach(f=>F.push(f));
+})();
+function sentinel(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.26 * (1 + e.energy*.05);
+  const ry = t*.35*e.pace + pointer.x*.5*e.attn;
+  const rx = Math.sin(t*.4)*.25 + pointer.y*.35*e.attn;
+  const cosY=Math.cos(ry), sinY=Math.sin(ry), cosX=Math.cos(rx), sinX=Math.sin(rx);
+  const proj = V.map(([x,y,z])=>{
+    let X = x*cosY - z*sinY, Z = x*sinY + z*cosY;
+    let Y = y*cosX - Z*sinX; Z = y*sinX + Z*cosX;
+    const p = 1/(1 - Z*.28);
+    return {x:cx + X*R*p, y:cy + Y*R*p, z:Z};
+  });
+  // inner light
+  const cg = g.createRadialGradient(cx,cy,0, cx,cy,R*1.5);
+  cg.addColorStop(0,`rgba(200,220,255,${.30+e.energy*.4})`);
+  cg.addColorStop(.5,"rgba(139,147,255,.14)");
+  cg.addColorStop(1,"rgba(0,0,0,0)");
+  g.fillStyle = cg; g.beginPath(); g.arc(cx,cy,R*1.5,0,Math.PI*2); g.fill();
+  const faces = F.map(f=>({f, z:(proj[f[0]].z+proj[f[1]].z+proj[f[2]].z)/3}))
+                 .sort((a,b)=>a.z-b.z);
+  for (const {f,z} of faces){
+    const [A,B,C] = f.map(i=>proj[i]);
+    g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(B.x,B.y); g.lineTo(C.x,C.y); g.closePath();
+    const lit = (z+1)/2;
+    g.fillStyle = `rgba(${18+70*lit|0},${34+92*lit|0},${52+120*lit|0},${.28+lit*.5})`;
+    g.fill();
+    g.strokeStyle = `rgba(160,180,255,${.10+lit*.55})`;
+    g.lineWidth = Math.max(.8, w*.0032*(lit+.3));
+    g.stroke();
+  }
+  // vertex sparks
+  g.globalCompositeOperation="lighter";
+  proj.filter(p=>p.z>.35).forEach(p=>{
+    const s = w*.05*(p.z);
+    g.drawImage(glow("rgba(180,190,255,.6)"), p.x-s, p.y-s, s*2, s*2);
+  });
+  g.globalCompositeOperation="source-over";
+}
+
+/* ---- 5. MERCURY ---- */
+const drops = Array.from({length:7}, (_,i)=>({
+  a: i/7*Math.PI*2, sp:.5+Math.random()*.7, r:.42+Math.random()*.3, ph:Math.random()*6,
+}));
+function mercury(g, w, h, t, e, _b, idx, off){
+  const cx = w/2, cy = h/2, R = w*.20;
+  const o = off.ctx, ow = off.el.width, oh = off.el.height, k = ow/w;
+  o.setTransform(1,0,0,1,0,0);
+  o.clearRect(0,0,ow,oh);
+  o.globalCompositeOperation = "source-over";
+  const paint = (x,y,r)=>{
+    const gr = o.createRadialGradient(x*k,y*k,0, x*k,y*k,r*k);
+    gr.addColorStop(0,"rgba(150,240,225,1)");
+    gr.addColorStop(.55,"rgba(90,200,190,.85)");
+    gr.addColorStop(1,"rgba(40,120,120,0)");
+    o.fillStyle = gr; o.beginPath(); o.arc(x*k,y*k,r*k,0,Math.PI*2); o.fill();
+  };
+  // core pools, splits apart while thinking
+  // droplets stay tethered — past ~.6 they read as separate objects, not one being
+  const spread = e.mood==="thinking" ? .58 : e.mood==="speaking" ? .34 : .14;
+  paint(cx + pointer.x*R*.12, cy + pointer.y*R*.1, R*(1.05 - spread*.3 + e.energy*.12));
+  for (const d of drops){
+    const a = d.a + t*d.sp*.6*e.pace;
+    const dist = R*(.55 + spread*1.5) * (1 + .12*Math.sin(t*2+d.ph));
+    paint(cx + Math.cos(a)*dist, cy + Math.sin(a)*dist*.85,
+          R*d.r*(.42 + e.energy*.3));
+  }
+  // surface ripple on speech
+  if (e.energy > .4){
+    const rr = R*(1.15 + (t*1.6 % 1)*.9);
+    o.strokeStyle = `rgba(120,230,215,${.5*(1-(t*1.6%1))})`;
+    o.lineWidth = Math.max(2, w*.012)*k;
+    o.beginPath(); o.arc(cx*k, cy*k, rr*k, 0, Math.PI*2); o.stroke();
+  }
+  // threshold the soft blobs into one liquid body
+  g.save();
+  g.filter = "blur(6px) contrast(22)";
+  g.drawImage(off.el, 0, 0, w, h);
+  g.restore();
+  // specular highlight so it reads as metal, not paint
+  g.globalCompositeOperation = "lighter";
+  const sg = g.createRadialGradient(cx-R*.35, cy-R*.4, 0, cx-R*.35, cy-R*.4, R*.75);
+  sg.addColorStop(0,"rgba(255,255,255,.5)"); sg.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle = sg; g.beginPath(); g.arc(cx-R*.35, cy-R*.4, R*.75, 0, Math.PI*2); g.fill();
+  g.globalCompositeOperation = "source-over";
+}
+
+/* ---------------- harness ---------------- */
+const grid = document.getElementById("grid");
+const tiles = CHARACTERS.map((ch, i) => {
+  const card = document.createElement("article");
+  card.className = "card";
+  card.innerHTML = `
+    <div class="stage"><canvas></canvas></div>
+    <div class="meta">
+      <div class="num">DIRECTION ${String(i+1).padStart(2,"0")}</div>
+      <div class="name">${ch.name}</div>
+      <p class="desc">${ch.desc}</p>
+      <div class="tags">${ch.tags.map(t=>`<span class="tag">${t}</span>`).join("")}</div>
+      <p class="verdict">${ch.verdict}</p>
+    </div>`;
+  grid.appendChild(card);
+  const el = card.querySelector("canvas");
+  const off = document.createElement("canvas");
+  return {ch, el, ctx: el.getContext("2d"),
+          off: {el: off, ctx: off.getContext("2d")}, blinkT: 2 + Math.random()*3, blink: 1};
+});
+
+function resize(){
+  const dpr = Math.min(devicePixelRatio||1, 2);
+  for (const t of tiles){
+    const r = t.el.getBoundingClientRect();
+    if (!r.width) continue;
+    t.el.width = r.width*dpr; t.el.height = r.height*dpr;
+    t.ctx.setTransform(dpr,0,0,dpr,0,0);
+    t.off.el.width = Math.round(r.width*.5); t.off.el.height = Math.round(r.height*.5);
+    t.w = r.width; t.h = r.height;
+  }
+}
+addEventListener("resize", resize);
+
+document.querySelectorAll(".moodbtn").forEach(b => b.addEventListener("click", () => {
+  MOOD = b.dataset.mood;
+  document.querySelectorAll(".moodbtn").forEach(x =>
+    x.setAttribute("aria-pressed", String(x === b)));
+}));
+
+let last = performance.now(), clock = 0, energy = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  if (document.hidden) { last = now; return; }
+  const dt = Math.min(.05, (now-last)/1000); last = now;
+  const base = ENV[MOOD];
+  clock += dt * (REDUCED ? .3 : 1);
+  // speech energy wobbles the way a voice does; other states hold steady
+  const target = MOOD === "speaking" && !REDUCED
+    ? base.energy * (.55 + .45*Math.abs(Math.sin(clock*7.3)+.4*Math.sin(clock*11.7)))
+    : base.energy;
+  energy += (target - energy) * dt * 7;
+  const e = {...base, energy, mood: MOOD};
+
+  tiles.forEach((t, i) => {
+    if (!t.w) return;
+    t.blinkT -= dt;
+    if (t.blinkT <= 0) t.blinkT = 2.4 + Math.random()*4;
+    t.blink = t.blinkT < .14 ? Math.max(.06, t.blinkT/.14) : 1;
+    const g = t.ctx;
+    g.clearRect(0, 0, t.w, t.h);
+    g.save();
+    t.ch.draw(g, t.w, t.h, clock, e, t.blink, i, t.off);
+    g.restore();
+  });
+}
+resize();
+requestAnimationFrame(frame);
+// fonts/layout can settle a frame late; re-measure once
+setTimeout(resize, 250);
+</script>
