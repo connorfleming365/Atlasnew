@@ -1,9 +1,32 @@
 # Atlas — Daily Agent Dashboard
 
 A single-file interactive dashboard that acts as a daily AI support agent. A living
-particle entity ("Atlas") sits centre-screen — it breathes, blinks, watches the
-pointer, and visibly shifts state between idle, listening, thinking, and speaking —
-surrounded by four live widgets fed by claude.ai connectors.
+character ("Atlas") sits centre-screen, surrounded by four live widgets fed by
+claude.ai connectors.
+
+## The character — Shoal
+
+Atlas is a flock of liquid-metal droplets painted into a single metaball matte,
+and **coherence is the only dial**. Gathered, the droplets fuse into a body that
+carries the face. Let it slip, and the face doesn't fade out — it stops existing,
+because there is no longer one surface for it to sit on. The body is never drawn:
+it is what the flock does when it agrees.
+
+| State | What it does |
+|---|---|
+| Waking | the flock arrives out of nothing and agrees for the first time |
+| Idle | mostly gathered, loose droplets grazing the surface |
+| Listening | fully fused and still — the face at its clearest; the surface carries real microphone amplitude |
+| Thinking | holds together and breathes, eyes lifted and wandering, glow pulsing on the body's beat |
+| Speaking | cohered but agitated, ripples driven by real speech energy, streaks trailing |
+
+Specular and rim lighting are gated on coherence — ungated they hang in empty
+space as a ring once the droplets scatter. The whole thing renders to an
+offscreen buffer and is composited with a bloom pass; the working resolution is
+capped (`900px` on the long side) so a large screen doesn't make it expensive,
+since this runs all day beside everything else.
+
+Other explored directions live in `character-lab.html`.
 
 ## Widgets
 
@@ -20,8 +43,8 @@ surrounded by four live widgets fed by claude.ai connectors.
 - **FLOW** — hands-free: the mic stays open and only sentences addressed as
   **"Atlas, …"** are acted on (wake word). Atlas pauses the mic while it speaks
   so it never hears itself.
-- The entity's ring and glow are driven by **real microphone amplitude**
-  (WebAudio analyser) while listening.
+- The character's surface and ripples are driven by **real microphone amplitude**
+  (WebAudio analyser) while listening, and by speech boundaries while talking.
 - Settings, seen-mail memory, morning-brief marker persist in `localStorage`.
 - Boots with personality: a morning wake auto-delivers the briefing (once per
   day); an evening wake offers the day debrief.
@@ -75,7 +98,7 @@ python3 -m http.server 8000     # then open http://localhost:8000/index.html
 ## Design notes
 
 - Deliberately single-theme: a night-instrument console (petrol-blue ground,
-  aurora teal/periwinkle spent only on the entity and live accents).
+  aurora teal/periwinkle spent only on the character and live accents).
 - Per-section failure containment: each connector error renders its own
   fix-it copy (reconnect / add connector / policy) while other panels stay live;
   transient errors keep last-good data with a staleness stamp.
