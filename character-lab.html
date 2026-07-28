@@ -55,6 +55,15 @@
            font-size:12.5px;color:var(--ink3)}
   .verdict b{color:var(--ink2);font-weight:600}
 
+  .sectionhead{grid-column:1/-1;padding:26px 0 2px}
+  .sectionhead .rule{height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
+  .sectionhead h2{margin:16px 0 6px;font-family:var(--mono);font-size:13px;font-weight:500;
+                  letter-spacing:.22em;color:var(--ink)}
+  .sectionhead p{margin:0;max-width:62ch;color:var(--ink2);font-size:13.5px}
+  .sectionhead .words{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+  .word{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--peri);
+        border:1px solid rgba(139,147,255,.3);border-radius:999px;padding:3px 10px}
+
   footer{max-width:1180px;margin:0 auto;padding:0 24px 70px;color:var(--ink3);font-size:13px}
   footer p{max-width:64ch}
   @media (prefers-reduced-motion:reduce){ .card{transition:none} }
@@ -62,10 +71,11 @@
 
 <header>
   <div class="eyebrow">ATLAS · CHARACTER DIRECTIONS</div>
-  <h1>Five ways for <b>Atlas</b> to be alive</h1>
+  <h1>Ten ways for <b>Atlas</b> to be alive</h1>
   <p class="lede">Each is a working sketch, not a mockup — the same four states the real
     agent uses drive every one of them. Switch the state below and watch how each
-    personality carries it. Direction 1 is what's in the dashboard today.</p>
+    personality carries it; a few only reveal themselves in one state, so try all four.
+    Direction 1 is what's in the dashboard today.</p>
 </header>
 
 <div id="controls">
@@ -81,9 +91,10 @@
 <main><div id="grid"></div></main>
 
 <footer>
-  <p>All five render on canvas at the same cost as the current character, respect
+  <p>All ten render on canvas at the same cost as the current character, respect
     reduced-motion, and track the pointer so they appear to notice you. Say which
-    direction you want and I'll swap it into the dashboard.</p>
+    direction you want and I'll swap it into the dashboard — or name two and I'll
+    cross them.</p>
 </footer>
 
 <script>
@@ -139,6 +150,46 @@ const CHARACTERS = [
     tags:["fluid","playful","tactile"],
     verdict:"<b>Best for delight.</b> The most alive of the five, and the most likely to distract you from the data.",
     draw: mercury,
+  },
+  {
+    round:2,
+    name:"SYNAPSE",
+    desc:"A neural net you can watch fire. Charge travels visibly along the edges — a trickle at rest, a cascade when it's working, waves rolling outward as it speaks.",
+    tags:["neural","legible","alive"],
+    verdict:"<b>Best for showing thought.</b> The only one where 'thinking' is literal rather than decorative — you see the work happen.",
+    draw: synapse,
+  },
+  {
+    round:2,
+    name:"ORRERY",
+    desc:"A brass astrolabe: nested rings on different tilts, bodies orbiting a lit core. It spins up to think and brings its rings into alignment when it answers.",
+    tags:["navigation","crafted","warm"],
+    verdict:"<b>Best name fit.</b> Atlas is a book of maps and a figure holding the heavens — this is the only direction that earns the name.",
+    draw: orrery,
+  },
+  {
+    round:2,
+    name:"NEBULA",
+    desc:"Not an object but weather: layered gas, embedded stars, lightning buried in the cloud. It has no edge and no face — it simply gets brighter when it has something to say.",
+    tags:["space","atmospheric","soft"],
+    verdict:"<b>Best atmosphere.</b> Gorgeous as a backdrop; hardest to read at a glance, because a cloud has no obvious 'awake'.",
+    draw: nebula,
+  },
+  {
+    round:2,
+    name:"SINGULARITY",
+    desc:"An accretion disc around a dark core, bright on the side rushing toward you. Matter spirals in as it listens; jets fire from the poles when it speaks.",
+    tags:["space","dramatic","striking"],
+    verdict:"<b>Most memorable.</b> Unmistakable at any size — though a black hole at the centre of your morning is a bold mood.",
+    draw: singularity,
+  },
+  {
+    round:2,
+    name:"LATENT",
+    desc:"The shape of the machine's own thinking: a manifold folding under invisible attractors. Smooth when calm, creased and rippling when it works.",
+    tags:["intelligence","abstract","modern"],
+    verdict:"<b>Most conceptually honest.</b> Depicts what the thing actually is, rather than dressing it as a creature or a device.",
+    draw: latent,
   },
 ];
 
@@ -423,9 +474,329 @@ function mercury(g, w, h, t, e, _b, idx, off){
   g.globalCompositeOperation = "source-over";
 }
 
+/* ---- 6. SYNAPSE ---- */
+const NET = (() => {
+  const n = REDUCED ? 26 : 46, nodes = [], edges = [];
+  for (let i=0;i<n;i++){
+    // golden-angle disc scatter keeps density even without clumping
+    const a = i*2.399963, r = Math.sqrt(i/n);
+    nodes.push({x:Math.cos(a)*r, y:Math.sin(a)*r*.92, z:Math.random(),
+                fire:0, ph:Math.random()*6});
+  }
+  for (let i=0;i<n;i++){
+    const d = nodes.map((p,j)=>({j, d:Math.hypot(p.x-nodes[i].x, p.y-nodes[i].y)}))
+                   .filter(o=>o.j!==i).sort((a,b)=>a.d-b.d).slice(0,3);
+    for (const o of d) if (!edges.some(e=>(e[0]===o.j&&e[1]===i)||(e[0]===i&&e[1]===o.j)))
+      edges.push([i, o.j]);
+  }
+  return {nodes, edges};
+})();
+let pulses = [];
+function synapse(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.33;
+  const P = ([x,y]) => [cx + x*R + pointer.x*R*.05, cy + y*R + pointer.y*R*.05];
+  // spawn charge: outward waves when speaking, inward when listening, storms when thinking
+  const rate = e.mood==="thinking" ? .55 : e.mood==="speaking" ? .34 : e.mood==="listening" ? .2 : .07;
+  if (pulses.length < 90 && Math.random() < rate){
+    const k = Math.floor(Math.random()*NET.edges.length);
+    const [a,b] = NET.edges[k];
+    const outward = e.mood!=="listening";
+    const ra = Math.hypot(NET.nodes[a].x, NET.nodes[a].y);
+    const rb = Math.hypot(NET.nodes[b].x, NET.nodes[b].y);
+    const flip = outward ? ra > rb : ra < rb;
+    pulses.push({a: flip?b:a, b: flip?a:b, p:0, sp:.5+Math.random()*.7});
+  }
+  // edges
+  g.lineWidth = Math.max(.8, w*.0022);
+  for (const [a,b] of NET.edges){
+    const A = P([NET.nodes[a].x, NET.nodes[a].y]), B = P([NET.nodes[b].x, NET.nodes[b].y]);
+    g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(B[0],B[1]);
+    g.strokeStyle = "rgba(120,180,190,.13)"; g.stroke();
+  }
+  // travelling charge
+  g.globalCompositeOperation = "lighter";
+  pulses = pulses.filter(pu => {
+    pu.p += pu.sp * .022 * e.pace * (REDUCED?.4:1);
+    const A = NET.nodes[pu.a], B = NET.nodes[pu.b];
+    if (pu.p >= 1){ B.fire = 1; return false; }
+    const x = A.x + (B.x-A.x)*pu.p, y = A.y + (B.y-A.y)*pu.p;
+    const [px,py] = P([x,y]);
+    // short comet tail along the edge
+    const tx = A.x + (B.x-A.x)*Math.max(0,pu.p-.16), ty = A.y + (B.y-A.y)*Math.max(0,pu.p-.16);
+    const [qx,qy] = P([tx,ty]);
+    const lg = g.createLinearGradient(qx,qy,px,py);
+    lg.addColorStop(0,"rgba(69,224,190,0)"); lg.addColorStop(1,"rgba(120,255,225,.75)");
+    g.beginPath(); g.moveTo(qx,qy); g.lineTo(px,py);
+    g.strokeStyle = lg; g.lineWidth = Math.max(1.2, w*.005); g.stroke();
+    const s = w*.028;
+    g.drawImage(glow("rgba(120,255,225,.75)"), px-s, py-s, s*2, s*2);
+    return true;
+  });
+  // nodes, brightening as they receive
+  for (const n of NET.nodes){
+    n.fire *= .93;
+    const [px,py] = P([n.x, n.y]);
+    const base = .18 + .12*Math.sin(t*2 + n.ph);
+    const s = w*(.014 + .026*n.fire);
+    g.drawImage(glow(n.fire > .25 ? "rgba(180,255,240,.9)" : "rgba(69,224,190,.5)"),
+                px-s, py-s, s*2, s*2);
+    g.globalAlpha = base + n.fire*.8;
+    g.beginPath(); g.arc(px, py, Math.max(1.2, w*.0055), 0, Math.PI*2);
+    g.fillStyle = "rgba(225,255,250,.95)"; g.fill();
+    g.globalAlpha = 1;
+  }
+  g.globalCompositeOperation = "source-over";
+}
+
+/* ---- 7. ORRERY ---- */
+const RINGS = [
+  {r:.96, tilt:-0.5, sp:.20, bodies:1, hue:"rgba(240,190,120,"},
+  {r:.76, tilt: 0.7, sp:-.31, bodies:2, hue:"rgba(69,224,190,"},
+  {r:.56, tilt:-1.1, sp:.46, bodies:1, hue:"rgba(139,147,255,"},
+  {r:.37, tilt: 0.25, sp:-.68, bodies:2, hue:"rgba(240,164,74,"},
+];
+function orrery(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.30;
+  const tilt = pointer.y*.25*e.attn;
+  // graduated outer bezel
+  g.save(); g.translate(cx, cy);
+  g.strokeStyle="rgba(240,190,120,.22)"; g.lineWidth=Math.max(1,w*.003);
+  g.beginPath(); g.arc(0,0,R*1.06,0,Math.PI*2); g.stroke();
+  for (let i=0;i<72;i++){
+    const a = i/72*Math.PI*2, long = i%6===0;
+    g.globalAlpha = long?.5:.2;
+    g.beginPath();
+    g.moveTo(Math.cos(a)*R*1.06, Math.sin(a)*R*1.06);
+    g.lineTo(Math.cos(a)*R*(long?1.14:1.10), Math.sin(a)*R*(long?1.14:1.10));
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+  // rings — thinking spins them up and folds them toward a common plane
+  const align = e.mood==="thinking" ? .22 : e.mood==="speaking" ? .82 : 1;
+  RINGS.forEach((ring, i) => {
+    const rot = t*ring.sp*e.pace*1.4;
+    // exaggerated foreshortening so the rings read as nested planes, not circles
+    const squash = Math.pow(Math.abs(Math.cos(ring.tilt*align*1.5 + tilt)), 1.8)*.9 + .08;
+    g.save(); g.rotate(ring.tilt*align*.85 + t*ring.sp*.15);
+    g.beginPath(); g.ellipse(0, 0, R*ring.r, R*ring.r*squash, 0, 0, Math.PI*2);
+    g.strokeStyle = ring.hue + ".35)"; g.lineWidth = Math.max(1, w*.0035); g.stroke();
+    for (let b=0;b<ring.bodies;b++){
+      const a = rot + b/ring.bodies*Math.PI*2;
+      const bx = Math.cos(a)*R*ring.r, by = Math.sin(a)*R*ring.r*squash;
+      const front = Math.sin(a) > 0;
+      const s = w*(front?.032:.024);
+      g.globalCompositeOperation="lighter";
+      g.drawImage(glow(ring.hue + ".85)"), bx-s, by-s, s*2, s*2);
+      g.globalCompositeOperation="source-over";
+      g.beginPath(); g.arc(bx, by, Math.max(1.5, w*(front?.010:.007)), 0, Math.PI*2);
+      g.fillStyle = ring.hue + (front?".95)":".6)"); g.fill();
+    }
+    g.restore();
+  });
+  // lit core
+  const cr = R*.085*(1 + e.energy*.3);
+  const cg2 = g.createRadialGradient(0,0,0, 0,0,cr*3.4);
+  cg2.addColorStop(0,"rgba(255,248,232,.98)");
+  cg2.addColorStop(.28,`rgba(250,205,140,${.6+e.energy*.3})`);
+  cg2.addColorStop(.62,"rgba(230,150,60,.16)");
+  cg2.addColorStop(1,"rgba(0,0,0,0)");
+  g.beginPath(); g.arc(0,0,cr*3.4,0,Math.PI*2); g.fillStyle=cg2; g.fill();
+  g.restore();
+}
+
+/* ---- 8. NEBULA ---- */
+const PUFFS = Array.from({length: REDUCED?9:16}, (_,i)=>({
+  a:Math.random()*6.28, d:.1+Math.random()*.62, r:.32+Math.random()*.5,
+  sp:(.05+Math.random()*.13)*(i%2?1:-1), ph:Math.random()*6,
+  hue:[ "rgba(69,224,190,", "rgba(139,147,255,", "rgba(214,110,190,", "rgba(90,170,255," ][i%4],
+}));
+const STARS = Array.from({length: REDUCED?18:44}, ()=>({
+  x:(Math.random()*2-1)*.95, y:(Math.random()*2-1)*.95,
+  s:.25+Math.random()*.85, ph:Math.random()*6,
+}));
+function nebula(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.34;
+  g.globalCompositeOperation = "lighter";
+  for (const p of PUFFS){
+    const a = p.a + t*p.sp*e.pace*.5;
+    const x = cx + Math.cos(a)*p.d*R + pointer.x*R*.04;
+    const y = cy + Math.sin(a)*p.d*R*.85 + pointer.y*R*.04;
+    const rr = p.r*R*(1 + .12*Math.sin(t*.7 + p.ph) + e.energy*.18);
+    const gr = g.createRadialGradient(x,y,0, x,y,rr);
+    gr.addColorStop(0, p.hue + (.16 + e.energy*.18) + ")");
+    gr.addColorStop(.45, p.hue + (.07 + e.energy*.07) + ")");
+    gr.addColorStop(1, p.hue + "0)");
+    g.fillStyle = gr; g.beginPath(); g.arc(x,y,rr,0,Math.PI*2); g.fill();
+  }
+  // dense bright heart
+  const core = g.createRadialGradient(cx,cy,0, cx,cy,R*.5);
+  core.addColorStop(0, `rgba(240,255,252,${.28+e.energy*.5})`);
+  core.addColorStop(.35, `rgba(150,220,255,${.14+e.energy*.2})`);
+  core.addColorStop(1, "rgba(90,120,220,0)");
+  g.fillStyle = core; g.beginPath(); g.arc(cx,cy,R*.5,0,Math.PI*2); g.fill();
+  // embedded stars
+  for (const s of STARS){
+    const tw = .35 + .65*Math.abs(Math.sin(t*1.4 + s.ph));
+    const x = cx + s.x*R, y = cy + s.y*R*.9, sz = w*.0045*s.s*(1+tw);
+    g.globalAlpha = tw*.75;
+    g.drawImage(glow("rgba(235,250,255,.8)"), x-sz*3.5, y-sz*3.5, sz*7, sz*7);
+    // a hard point on top, so stars read as stars and not as more gas
+    g.globalAlpha = tw;
+    g.beginPath(); g.arc(x, y, Math.max(.7, w*.0016*s.s*(1+tw*.6)), 0, Math.PI*2);
+    g.fillStyle = "rgba(255,255,255,.95)"; g.fill();
+    g.globalAlpha = 1;
+  }
+  // lightning buried in the cloud — fires on speech
+  if (e.energy > .38 && Math.sin(t*11) > .93 && !REDUCED){
+    const a0 = t*3 % 6.28;
+    let x = cx + Math.cos(a0)*R*.15, y = cy + Math.sin(a0)*R*.15;
+    g.beginPath(); g.moveTo(x,y);
+    for (let i=0;i<7;i++){
+      x += (Math.random()-.5)*R*.34; y += (Math.random()-.5)*R*.34;
+      g.lineTo(x,y);
+    }
+    g.strokeStyle = "rgba(220,245,255,.85)"; g.lineWidth = Math.max(1.2, w*.004);
+    g.stroke();
+  }
+  g.globalCompositeOperation = "source-over";
+}
+
+/* ---- 9. SINGULARITY ---- */
+const INFALL = Array.from({length: REDUCED?24:60}, ()=>({
+  a:Math.random()*6.28, r:.7+Math.random()*.6, sp:.4+Math.random()*.8,
+}));
+function singularity(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.27;
+  const squash = .30 + pointer.y*.06;      // disc seen near edge-on
+  const spin = t*e.pace;
+  // far side of the disc, lensed up over the top
+  g.globalCompositeOperation = "lighter";
+  const far = g.createLinearGradient(cx-R, cy, cx+R, cy);
+  far.addColorStop(0,"rgba(255,170,80,.10)");
+  far.addColorStop(.5,"rgba(255,225,190,.5)");
+  far.addColorStop(1,"rgba(255,170,80,.10)");
+  g.beginPath(); g.ellipse(cx, cy-R*.06, R*1.06, R*.42, 0, Math.PI, Math.PI*2);
+  g.strokeStyle = far; g.lineWidth = Math.max(2, w*.022); g.stroke();
+  // accretion disc, doppler-bright on the approaching (left) side
+  for (let i=0;i<3;i++){
+    const rr = R*(1.02 + i*.14);
+    const dg = g.createLinearGradient(cx-rr, cy, cx+rr, cy);
+    dg.addColorStop(0, `rgba(255,240,220,${.62-i*.16})`);
+    dg.addColorStop(.35,`rgba(255,175,90,${.34-i*.09})`);
+    dg.addColorStop(.72,`rgba(200,90,40,${.16-i*.04})`);
+    dg.addColorStop(1, `rgba(150,60,30,${.08-i*.02})`);
+    g.beginPath(); g.ellipse(cx, cy, rr, rr*squash, 0, 0, Math.PI*2);
+    g.strokeStyle = dg; g.lineWidth = Math.max(2, w*(.03-i*.007)); g.stroke();
+  }
+  // matter spiralling in
+  for (const p of INFALL){
+    p.a += p.sp*.02*e.pace;
+    const draw = e.mood==="listening" ? .55 : 1;      // listening draws matter inward
+    p.r -= .0016*p.sp*e.pace*draw;
+    if (p.r < .62){ p.r = 1.35; p.a = Math.random()*6.28; }
+    const x = cx + Math.cos(p.a)*R*p.r, y = cy + Math.sin(p.a)*R*p.r*squash;
+    const s = w*.012*(1.4-p.r);
+    g.globalAlpha = Math.min(1, (1.35-p.r)*1.8);
+    g.drawImage(glow("rgba(255,215,170,.8)"), x-s*2, y-s*2, s*4, s*4);
+    g.globalAlpha = 1;
+  }
+  // polar jets on speech
+  if (e.energy > .3){
+    const jl = R*(.9 + e.energy*.85);
+    for (const dir of [-1, 1]){
+      const jg = g.createLinearGradient(cx, cy, cx, cy + dir*jl);
+      jg.addColorStop(0, `rgba(225,245,255,${.85*e.energy})`);
+      jg.addColorStop(.35,`rgba(150,205,255,${.4*e.energy})`);
+      jg.addColorStop(1, "rgba(110,170,255,0)");
+      g.beginPath();
+      g.moveTo(cx - R*.022, cy);
+      g.lineTo(cx + R*.022, cy);
+      g.lineTo(cx + R*.075, cy + dir*jl);
+      g.lineTo(cx - R*.075, cy + dir*jl);
+      g.closePath(); g.fillStyle = jg; g.fill();
+    }
+  }
+  g.globalCompositeOperation = "source-over";
+  // photon ring + event horizon
+  g.beginPath(); g.arc(cx, cy, R*.44, 0, Math.PI*2);
+  g.fillStyle = "#03070a"; g.fill();
+  g.beginPath(); g.arc(cx, cy, R*.455, 0, Math.PI*2);
+  g.strokeStyle = `rgba(255,230,200,${.55+e.energy*.4})`;
+  g.lineWidth = Math.max(1.2, w*.005); g.stroke();
+  void spin;
+}
+
+/* ---- 10. LATENT ---- */
+function latent(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.33, N = REDUCED ? 11 : 17;
+  // two roaming attractors fold the sheet; they move with the state's pace
+  const at = [
+    {x:Math.sin(t*.7*e.pace)*.55, y:Math.cos(t*.53*e.pace)*.45, s: 1},
+    {x:Math.cos(t*.41*e.pace+2)*.6, y:Math.sin(t*.62*e.pace+1)*.5, s:-.8},
+  ];
+  const tiltX = .55 + pointer.y*.12*e.attn, rotY = pointer.x*.35*e.attn + Math.sin(t*.2)*.12;
+  const height = (u,v) => {
+    let z = 0;
+    for (const a of at){
+      const d2 = (u-a.x)**2 + (v-a.y)**2;
+      z += a.s * Math.exp(-d2*4.5) * (.55 + e.energy*.9);
+    }
+    z += Math.sin(u*5 + t*2.4*e.pace) * .05 * (1 + e.energy*2.6);  // speech ripple
+    return z;
+  };
+  const proj = (u,v) => {
+    const z = height(u,v);
+    const x =  u*Math.cos(rotY) - z*Math.sin(rotY)*.4;
+    const y =  v*tiltX - z*.52;
+    return [cx + x*R, cy + y*R*.92, z];
+  };
+  const line = (pts) => {
+    g.beginPath();
+    pts.forEach(([x,y],i)=> i?g.lineTo(x,y):g.moveTo(x,y));
+    g.stroke();
+  };
+  g.lineWidth = Math.max(.9, w*.0026);
+  for (let i=0;i<N;i++){
+    const u = -1 + 2*i/(N-1);
+    const rowA=[], rowB=[];
+    let hi = 0;
+    for (let j=0;j<N;j++){
+      const v = -1 + 2*j/(N-1);
+      const A = proj(u,v), B = proj(v,u);
+      rowA.push(A); rowB.push(B);
+      hi = Math.max(hi, Math.abs(A[2]));
+    }
+    // colour by how creased this line is: calm teal → strained periwinkle
+    const k = Math.min(1, hi*.9);
+    g.strokeStyle = `rgba(${69+70*k|0},${224-77*k|0},${190+65*k|0},${.16+.5*k})`;
+    line(rowA); line(rowB);
+  }
+  // crest highlights where the manifold peaks
+  g.globalCompositeOperation = "lighter";
+  for (const a of at){
+    const [x,y,z] = proj(a.x, a.y);
+    const s = w*.06*Math.min(1.4, Math.abs(z)+.3);
+    g.drawImage(glow(a.s>0 ? "rgba(120,255,225,.55)" : "rgba(150,155,255,.5)"),
+                x-s, y-s, s*2, s*2);
+  }
+  g.globalCompositeOperation = "source-over";
+}
+
 /* ---------------- harness ---------------- */
 const grid = document.getElementById("grid");
 const tiles = CHARACTERS.map((ch, i) => {
+  if (ch.round === 2 && CHARACTERS[i-1]?.round !== 2){
+    const head = document.createElement("div");
+    head.className = "sectionhead";
+    head.innerHTML = `<div class="rule"></div>
+      <h2>ROUND TWO</h2>
+      <p>Five more, worked up from your words. These lean further from
+         “creature with a face” and further into instruments, cosmology and
+         the shape of thinking itself.</p>
+      <div class="words">${["SPACE","NEBULA","INTELLIGENCE","NEURAL","NETWORK"]
+        .map(x=>`<span class="word">${x}</span>`).join("")}</div>`;
+    grid.appendChild(head);
+  }
   const card = document.createElement("article");
   card.className = "card";
   card.innerHTML = `
