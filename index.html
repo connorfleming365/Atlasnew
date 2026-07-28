@@ -189,6 +189,12 @@
   .dockbtn.on{color:var(--teal);border-color:rgba(69,224,190,.4)}
   #hint{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
         color:var(--ink3);padding:8px 0 0}
+  #micnote{display:none;margin:8px 6px 0;padding:8px 12px;border-radius:10px;font-size:12.5px;
+           background:var(--bg2);border:1px solid var(--line2);color:var(--ink2)}
+  #micnote.show{display:block}
+  #micnote b{color:var(--warn);font-weight:600}
+  #micnote button{color:var(--teal);font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+                  margin-left:8px}
 
   /* clickable rows + inline actions */
   .ev,.mail,.task .c,.lastact,.bar{cursor:pointer}
@@ -198,6 +204,9 @@
            border:1px solid rgba(69,224,190,.35);border-radius:999px;padding:3px 10px}
   .actchip:hover{background:rgba(69,224,190,.08)}
   .actchip.warn{color:var(--serious);border-color:rgba(236,131,90,.4)}
+  .actchip.crit{color:var(--crit);border-color:rgba(208,59,59,.42)}
+  .actchip.crit:hover{background:rgba(208,59,59,.1)}
+  .actchip.crit[data-confirm]{background:rgba(208,59,59,.16);color:#ff8a89}
   details.fold{margin-top:6px}
   details.fold summary{font-family:var(--mono);font-size:10px;letter-spacing:.18em;
     color:var(--ink3);cursor:pointer;padding:6px 0;list-style:none}
@@ -280,8 +289,8 @@
              autocomplete="off">
       <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
       <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
-      <button class="dockbtn" id="savebtn" title="Save today's brief as a Markdown file">SAVE</button>
     </div>
+    <div id="micnote" role="status"></div>
     <div id="hint">BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK …</div>
   </div>
 
@@ -333,21 +342,31 @@ S.voiceOn = store.get("voice", true);
 S.flowOn  = store.get("flow", false);
 let lastAction = null;   // most recent undoable action ({type:"focus"|"archive", ...})
 
-/* ---------------- live mic analysis (drives the entity) ---------------- */
+/* ---------------- live mic analysis (drives the entity) ----------------
+   One long-lived capture, opened on the wake gesture and kept alive: it
+   feeds the entity's amplitude AND doubles as the permission probe. It is
+   deliberately NOT re-requested per listen — racing getUserMedia against
+   SpeechRecognition's own capture aborts recognition on Chrome. */
 const AtlasAudio = {
-  ctx:null, analyser:null, stream:null, buf:null, ready:false,
+  ctx:null, analyser:null, stream:null, buf:null, ready:false, denied:false,
   async start(){
-    if (this.ready || this.failed) return this.ready;
+    if (this.ready) return true;
+    if (!navigator.mediaDevices?.getUserMedia){ this.denied="unsupported"; return false; }
     try{
       this.stream = await navigator.mediaDevices.getUserMedia({audio:true});
       this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      if (this.ctx.state==="suspended") await this.ctx.resume().catch(()=>{});
       const src = this.ctx.createMediaStreamSource(this.stream);
       this.analyser = this.ctx.createAnalyser();
       this.analyser.fftSize = 256;
       src.connect(this.analyser);
       this.buf = new Uint8Array(this.analyser.frequencyBinCount);
-      this.ready = true;
-    }catch(_){ this.failed = true; }
+      this.ready = true; this.denied = false;
+    }catch(err){
+      // NotAllowedError = user or permissions-policy refusal; NotFoundError = no device
+      this.denied = err?.name === "NotFoundError" ? "nodevice"
+                  : err?.name === "NotAllowedError" ? "denied" : "error";
+    }
     return this.ready;
   },
   level(){
@@ -358,6 +377,23 @@ const AtlasAudio = {
     return Math.min(1, Math.sqrt(s/this.buf.length)*4.5);
   },
 };
+
+/* Is this frame even allowed to use a microphone? A published artifact runs
+   in an iframe, and mic access only exists if that frame delegates it. */
+function micPolicyBlocked(){
+  try{
+    if (document.featurePolicy?.allowsFeature)
+      return !document.featurePolicy.allowsFeature("microphone");
+    if (document.permissionsPolicy?.allowsFeature)
+      return !document.permissionsPolicy.allowsFeature("microphone");
+  }catch(_){}
+  return false;   // can't tell — let the real call decide
+}
+function micNote(html){
+  const el = $("#micnote");
+  if (!html){ el.classList.remove("show"); el.innerHTML=""; return; }
+  el.innerHTML = html; el.classList.add("show");
+}
 
 /* ================================================================
    THE ENTITY — a particle aurora with eyes. Moods: idle, listening,
@@ -578,15 +614,38 @@ function speak(text, then){
 /* ---- speech recognition ---- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const WAKE_RE = /^(?:hey |ok |okay )?atlas[,!.\s]*(.*)$/i;
-let rec=null, interimEl=null, micBlocked=false;
+let rec=null, interimEl=null, micBlocked=false, starting=false;
+
+const MIC_ERR = {
+  "not-allowed":         ["Microphone blocked", "Your browser refused microphone access to this page. Allow it from the mic icon in the address bar, then press the mic again."],
+  "service-not-allowed": ["Speech service blocked", "The browser's speech service isn't available to this page. Chrome or Edge on desktop is the reliable combination — typing works everywhere."],
+  "audio-capture":       ["No microphone found", "No input device is reachable. Check your system input, then press the mic again."],
+  "network":             ["Speech service unreachable", "Recognition runs through a browser service that couldn't be reached. Try again in a moment."],
+  "aborted":             [null, null],   // routine (we stop it ourselves) — no banner
+  "no-speech":           [null, null],   // routine silence timeout — no banner
+};
+
 function startListening(){
-  if (!SR || S.listening || micBlocked) return;
-  AtlasAudio.start();                       // fire-and-forget: entity reacts to real amplitude
+  if (!SR){ micNote(`<b>Voice input unavailable</b> — this browser has no speech recognition. Chrome or Edge on desktop supports it; typed input works everywhere.`); return; }
+  if (S.listening || starting) return;
+  if (micPolicyBlocked()){
+    micNote(`<b>Microphone not permitted here</b> — the frame hosting this page doesn't grant microphone access, so voice input can't start. Open the artifact in its own browser tab and it will work. Typing works either way.`);
+    return;
+  }
+  starting = true;
+  micNote("");
+  $("#mic").classList.add("on");            // immediate feedback on the gesture
   rec = new SR();
   rec.lang = "en-GB"; rec.interimResults = true;
   rec.continuous = S.flowOn;                // hands-free mode keeps the channel open
-  S.listening = true; $("#mic").classList.add("on"); Entity.mood="listening";
   interimEl?.remove(); interimEl=null;
+  rec.onstart = ()=>{
+    starting=false; S.listening=true; micBlocked=false;
+    $("#mic").classList.add("on"); Entity.mood="listening";
+    // Only now open the analyser: sharing the device with a *running*
+    // recognition session is safe, racing its startup is not.
+    AtlasAudio.start();
+  };
   rec.onresult = e=>{
     let fin="", inter="";
     for (const r of e.results){ if (r.isFinal) fin += r[0].transcript; else inter += r[0].transcript; }
@@ -611,7 +670,7 @@ function startListening(){
     }
   };
   rec.onend = ()=>{
-    S.listening=false; $("#mic").classList.remove("on");
+    starting=false; S.listening=false; $("#mic").classList.remove("on");
     if (Entity.mood==="listening") Entity.mood="idle";
     // hands-free: reopen the channel unless Atlas is mid-reply (speak() resumes us)
     if (S.flowOn && S.awake && !micBlocked)
@@ -620,17 +679,34 @@ function startListening(){
       }, 450);
   };
   rec.onerror = ev=>{
-    S.listening=false; $("#mic").classList.remove("on"); Entity.mood="idle";
-    if (ev.error==="not-allowed"){
+    starting=false; S.listening=false; $("#mic").classList.remove("on"); Entity.mood="idle";
+    const [title, body] = MIC_ERR[ev.error] || ["Voice input stopped", `The speech engine reported “${ev.error}”. Press the mic to try again, or type below.`];
+    if (!title) return;                       // routine stop — stay quiet
+    // A hard refusal ends hands-free mode rather than looping on a dead mic
+    if (ev.error==="not-allowed" || ev.error==="service-not-allowed"){
       micBlocked = true;
-      addMsg("atlas","I need microphone permission for voice — or just type below.");
+      if (S.flowOn){ S.flowOn=false; store.set("flow",false);
+        $("#flowbtn").classList.remove("on"); updateHint(); }
     }
+    micNote(`<b>${title}</b> — ${body}<button id="micretry">TRY AGAIN</button>`);
+    $("#micretry")?.addEventListener("click", ()=>{ micBlocked=false; micNote(""); startListening(); });
   };
-  try{ rec.start(); }catch(_){ S.listening=false; $("#mic").classList.remove("on"); }
+  try{ rec.start(); }
+  catch(err){
+    starting=false; S.listening=false; $("#mic").classList.remove("on");
+    micNote(`<b>Couldn't start the microphone</b> — ${esc(err?.message||"the browser refused the request")}. Press the mic to try again.`);
+  }
 }
-function stopListening(){ try{ rec?.stop(); }catch(_){} S.listening=false; $("#mic").classList.remove("on"); }
+function stopListening(){
+  starting=false;
+  try{ rec?.stop(); }catch(_){}
+  S.listening=false; $("#mic").classList.remove("on");
+}
 
-$("#mic").addEventListener("click", ()=> S.listening ? stopListening() : startListening());
+$("#mic").addEventListener("click", ()=>{
+  micBlocked = false;                          // an explicit click always gets a fresh attempt
+  S.listening ? stopListening() : startListening();
+});
 
 function updateHint(){
   $("#hint").textContent = !SR
@@ -639,7 +715,9 @@ function updateHint(){
       ? "HANDS-FREE — START WITH “ATLAS …”, E.G. “ATLAS, BRIEF ME” · “ATLAS, BLOCK TIME”"
       : "BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK … · UNDO";
 }
-if (!SR){ $("#mic").disabled = true; $("#mic").title = "Voice input needs Chrome or Edge — type instead"; }
+// The button stays enabled even without support: pressing it explains why,
+// which is far better than a dead control the user has to guess about.
+if (!SR) $("#mic").title = "Voice input needs Chrome or Edge — press for details";
 
 $("#voicebtn").addEventListener("click", e=>{
   S.voiceOn=!S.voiceOn; store.set("voice",S.voiceOn);
@@ -653,7 +731,6 @@ $("#flowbtn").addEventListener("click", e=>{
   if (S.flowOn && !S.listening) startListening();
   else if (!S.flowOn && S.listening) stopListening();
 });
-$("#savebtn").addEventListener("click", ()=> saveBrief());
 $("#voicebtn").classList.toggle("on", S.voiceOn);
 $("#flowbtn").classList.toggle("on", S.flowOn);
 updateHint();
@@ -1000,6 +1077,11 @@ async function undoLast(){
       await mcp.callTool("Gmail","label_thread",{threadId:a.threadId, labelIds:["INBOX"]});
       await mcp.invalidate("Gmail","search_threads").catch(()=>{});
       speak("Put it back in your inbox.");
+    } else if (a.type==="trash"){
+      await mcp.callTool("Gmail","unlabel_thread",{threadId:a.threadId, labelIds:["TRASH"]});
+      await mcp.callTool("Gmail","label_thread",{threadId:a.threadId, labelIds:["INBOX"]});
+      await mcp.invalidate("Gmail","search_threads").catch(()=>{});
+      speak("Recovered from Trash and back in your inbox.");
     }
   }catch(err){ speak("Undo didn't take. " + errCopy(err?.code, "the connector")); }
 }
@@ -1039,6 +1121,7 @@ function renderGmail(){
       <div class="acts">
         <button class="actchip" data-act="read">▷ READ ALOUD</button>
         <button class="actchip warn" data-act="archive">ARCHIVE</button>
+        <button class="actchip crit" data-act="delete">DELETE</button>
       </div></div>`;
   const pri = items.filter(m=>!m.low), low = items.filter(m=>m.low);
   body.innerHTML = `
@@ -1054,7 +1137,8 @@ function renderGmail(){
       const chip = ev.target.closest(".actchip");
       if (!chip){ el.classList.toggle("open"); return; }
       if (chip.dataset.act==="read") readMail(el.dataset.tid);
-      else archiveMail(el);
+      else if (chip.dataset.act==="archive") archiveMail(el);
+      else deleteMail(el, chip);
     });
   });
 }
@@ -1077,6 +1161,33 @@ async function readMail(threadId){
     speak(`From ${msg.sender||"unknown"}. ${msg.subject?`Subject: ${msg.subject}. `:""}${cut}${
       text.length>550 ? " … it carries on, but that's the gist." : ""}`);
   }catch(err){ speak("Couldn't open that email. " + errCopy(err?.code, "Gmail")); }
+}
+let pendingDelete = null;   // threadId awaiting a spoken "yes"
+function deleteMail(el, chip){
+  // Two-press confirm: deletion is the one action here that leaves the inbox
+  if (!chip.dataset.confirm){
+    chip.dataset.confirm="1"; chip.textContent="CONFIRM DELETE";
+    setTimeout(()=>{ if (chip.isConnected){ delete chip.dataset.confirm; chip.textContent="DELETE"; } }, 4000);
+    return;
+  }
+  trashThread(el.dataset.tid, el, chip);
+}
+async function trashThread(threadId, el, chip){
+  const mcp=MCP();
+  if (!mcp){ speak("Deleting mail needs the connector bridge."); return; }
+  if (el) el.style.opacity=".3";
+  try{
+    await mcp.callTool("Gmail","apply_sensitive_thread_label",{threadId, labelOption:"TRASH"});
+    lastAction = {type:"trash", threadId};
+    await mcp.invalidate("Gmail","search_threads").catch(()=>{});
+    el?.remove();
+    Entity.pulse(.6);
+    speak("Moved to Trash — recoverable there for 30 days. Say undo to restore it now.");
+  }catch(err){
+    if (el) el.style.opacity="";
+    if (chip){ delete chip.dataset.confirm; chip.textContent="DELETE"; }
+    speak("Couldn't delete that. " + errCopy(err?.code, "Gmail"));
+  }
 }
 async function archiveMail(el){
   const mcp=MCP(); if (!mcp) return;
@@ -1240,17 +1351,25 @@ function partOfDay(){
   const h=new Date().getHours();
   return h<12?"morning":h<18?"afternoon":"evening";
 }
-function briefInbox(){
+/* `short` is the headline version used in the full briefing: a count plus at
+   most one name. Asking "inbox" on its own still gets the detailed read. */
+function briefInbox(short){
   if (S.meta.gmail.status==="err"||!S.data.gmail) return "I can't reach your inbox right now.";
   const items = mailItems(); const un=items.filter(m=>m.unread);
-  if (!items.length) return "Your inbox is quiet — nothing new in the last two days.";
+  if (!items.length) return short ? "Inbox is quiet." : "Your inbox is quiet — nothing new in the last two days.";
   const seen = new Set(store.get("seenMail", []));
   const fresh = un.filter(m=>!seen.has(m.threadId));
   const freshPri = fresh.filter(m=>!m.low);
+  const senders = [...new Set(freshPri.map(m=>m.from.split(/[@<]/)[0].trim()))];
   let s;
-  if (!fresh.length)
+  if (short){
+    if (!freshPri.length) s = fresh.length ? `${fresh.length} new email${fresh.length>1?"s":""}, nothing needing you.`
+                                           : "Nothing new in the inbox.";
+    else s = `${freshPri.length} email${freshPri.length>1?"s":""} worth a look${
+      senders.length ? `, from ${senders.slice(0,2).join(" and ")}${senders.length>2?" and others":""}` : ""}.`;
+  } else if (!fresh.length){
     s = `Nothing new in the inbox since I last briefed you — ${un.length} unread total.`;
-  else {
+  } else {
     s = `${fresh.length} new email${fresh.length>1?"s":""} since last time`;
     s += freshPri.length
       ? `. Worth a look: ${freshPri.slice(0,3).map(m=>`${m.subj}, from ${m.from}`).join("; ")}.`
@@ -1285,41 +1404,6 @@ function debrief(){
     if (n>1) parts.push(`That's ${n} days straight with tasks completed.`);
   }
   return parts.join(" ");
-}
-function buildBriefMd(){
-  const now=new Date();
-  const evs = calEvents().filter(e=>e.start.toDateString()===now.toDateString());
-  const {overdue, today} = taskBuckets();
-  const items = mailItems();
-  const {wk, last} = trainingDigest();
-  const rd = readiness();
-  return [
-    `# Atlas brief — ${now.toDateString()}`, "",
-    `## Schedule`,
-    evs.length ? evs.map(e=>`- ${e.allday?"All day":fmtT(e.start)} — ${e.title}${e.loc?` (${e.loc.split(",")[0]})`:""}`).join("\n") : "- Clear.",
-    "", `## Tasks`,
-    overdue.length ? `**Overdue (${overdue.length})**\n`+overdue.map(t=>`- [ ] ${t.content}`).join("\n") : "",
-    today.length ? `**Due today (${today.length})**\n`+today.map(t=>`- [ ] ${t.content}`).join("\n") : "- Nothing due today.",
-    "", `## Inbox`,
-    items.length ? items.filter(m=>!m.low).map(m=>`- ${m.unread?"🔵 ":""}${m.subj} — ${m.from}`).join("\n") : "- Quiet.",
-    "", `## Training`,
-    `- Last 7 days: ${wk.n} sessions, ${wk.km.toFixed(0)} km, ${(wk.mins/60).toFixed(1)} h`,
-    last ? `- Last: ${last.name}` : "",
-    rd ? `- Readiness: ${rd.verdict} (7-day effort ${rd.acute} vs ${rd.prior} prior)` : "",
-    "", `_Generated by Atlas at ${fmtT(now)}_`,
-  ].filter(x=>x!=="" || true).join("\n");
-}
-async function saveBrief(){
-  const dl = window.claude?.downloads;
-  if (!dl){ speak("Saving files needs the claude.ai artifact viewer."); return; }
-  try{
-    await dl.save({filename:`atlas-brief-${todayKey()}.md`, data:buildBriefMd()});
-    speak("Brief saved.");
-  }catch(err){
-    if (err?.code==="declined") addMsg("atlas","No problem — not saved.");
-    else if (err?.code==="rate_limited") addMsg("atlas","A save prompt is already open — decide that one first.");
-    else speak("Couldn't save the brief just now.");
-  }
 }
 function briefCal(){
   if (S.meta.cal.status==="err"||!S.data.cal) return "I can't see your calendar right now.";
@@ -1368,7 +1452,7 @@ function fullBrief(){
   const n = firstName();
   if (!MCP())
     return `Good ${partOfDay()}. My connector bridge is offline here — open this page from your claude.ai artifacts and I'll pull your calendar, inbox, tasks and training live.`;
-  return `Good ${partOfDay()}${n?`, ${n}`:""}. ${briefCal()} ${briefTasks()} ${briefInbox()} ${briefTraining()}`;
+  return `Good ${partOfDay()}${n?`, ${n}`:""}. ${briefCal()} ${briefTasks()} ${briefInbox(true)} ${briefTraining()}`;
 }
 
 function handleUtterance(text){
@@ -1396,13 +1480,27 @@ function handleUtterance(text){
   if (/\b(block|book|reserve)\b.*\b(time|hour|slot|focus)\b|^focus block/.test(q)){
     focusBlock(/tomorrow/.test(q) ? 1 : 0); return;
   }
-  if (/\b(save|download|export)\b.*\b(brief|summary|day)\b/.test(q)){ saveBrief(); return; }
   if (/\b(read|open)\b.*\b(email|mail|it|that|latest|newest)\b/.test(q)){
     const target = mailItems().filter(m=>!m.low && m.unread)[0] || mailItems()[0];
     if (!target){ speak("Nothing in the inbox to read."); return; }
     readMail(target.threadId);
     return;
   }
+  if (/\b(delete|bin|trash)\b.*\b(email|mail|it|that|newsletter|promo)\b/.test(q)){
+    // Voice deletion always names its target and waits for confirmation
+    const t = mailItems()[0];
+    if (!t){ speak("Nothing in the inbox to delete."); return; }
+    pendingDelete = t.threadId;
+    speak(`Delete “${t.subj}” from ${t.from}? Say yes to move it to Trash.`);
+    return;
+  }
+  if (pendingDelete && /^(yes|yeah|yep|confirm|do it|go ahead)\b/.test(q)){
+    const el = document.querySelector(`.mail[data-tid="${CSS.escape(pendingDelete)}"]`);
+    const id = pendingDelete; pendingDelete = null;
+    trashThread(id, el);
+    return;
+  }
+  if (pendingDelete){ pendingDelete = null; }   // anything else cancels the pending delete
 
   // ---- reporting intents ----
   setTimeout(()=>{   // brief thinking beat before the reply lands
@@ -1433,7 +1531,7 @@ function handleUtterance(text){
     else if (/\b(who are you|what are you|your name)\b/.test(q))
       reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training. I can capture and move tasks, block focus time, archive email, and read messages out loud.";
     else if (/\b(help|what can you do|commands)\b/.test(q))
-      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Debrief. Save my brief. Or undo.";
+      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Debrief. Or undo.";
     else
       reply = "Not sure I caught that. Say help for everything I can do — or try 'brief me'.";
     speak(reply);
@@ -1475,7 +1573,9 @@ $("#wake").addEventListener("click", ()=>{
   setTimeout(()=>$("#boot").remove(), 800);
   Entity.mood="idle";
   startWatches();
-  if (!window.claude?.downloads) $("#savebtn").style.display="none";
+  // FLOW persists across reloads — honour it here, on the wake gesture, which
+  // is the only moment the browser will grant a microphone.
+  if (S.flowOn) setTimeout(startListening, 600);
   const h = new Date().getHours();
   if (MCP() && h>=5 && h<12 && store.get("autobrief")!==todayKey()){
     // morning: deliver the briefing unprompted, once per day, after data lands
