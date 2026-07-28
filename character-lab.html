@@ -56,16 +56,22 @@
            font-size:12.5px;color:var(--ink3)}
   .verdict b{color:var(--ink2);font-weight:600}
 
+  .sectionhead{grid-column:1/-1;padding:22px 0 0}
+  .sectionhead .rule{height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
+  .sectionhead h2{margin:18px 0 6px;font-family:var(--mono);font-size:13px;font-weight:500;
+                  letter-spacing:.22em;color:var(--ink)}
+  .sectionhead p{margin:0;max-width:64ch;color:var(--ink2);font-size:13.5px}
+
   footer{max-width:1180px;margin:0 auto;padding:0 24px 70px;color:var(--ink3);font-size:13px}
   footer p{max-width:64ch}
 </style>
 
 <header>
   <div class="eyebrow">ATLAS · CHARACTER DIRECTIONS</div>
-  <h1>Two crossings for <b>Atlas</b></h1>
-  <p class="lede">Each takes the body of one direction and the behaviour of another. The same four
-    states the real agent uses drive both, so switch between them below — these two differ most in
-    <em>thinking</em>, where each shows its parent temperament.</p>
+  <h1>Directions for <b>Atlas</b></h1>
+  <p class="lede">The two crossings first, then five originals that start somewhere else entirely.
+    The same four states the real agent uses drive all of them, so switch between the states below —
+    most of these only show what they are in <em>thinking</em> and <em>speaking</em>.</p>
 </header>
 
 <div id="controls">
@@ -453,6 +459,310 @@ function maelstrom(g, w, h, t, e){
   g.lineWidth = Math.max(1.2, w*.0045); g.stroke();
 }
 
+/* ================================================================
+   3. MURMURATION — one mind made of many small things. A flock that
+   condenses, splits and rolls; the agent as a swarm of processes.
+   ================================================================ */
+const BIRDS = Array.from({length: REDUCED ? 70 : 240}, () => ({
+  x:0, y:0, px:0, py:0, set:false,
+  a:Math.random()*6.28, r:Math.random(), band:Math.random(),
+  ph:Math.random()*6.28, lead:Math.random() < .07,
+}));
+let birdT = 0;
+function murmuration(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.27;
+  const dt = Math.min(.05, Math.max(0, t - birdT)); birdT = t;
+  const ease = 1 - Math.pow(.0016, dt);          // frame-rate independent
+  const gx = pointer.x*R*.10*e.attn, gy = pointer.y*R*.09*e.attn;
+
+  g.globalCompositeOperation = "lighter";
+  g.lineCap = "round";
+  for (const b of BIRDS){
+    const swirl = t*e.pace*(.55 + b.r*.7);
+    let tx, ty;
+    if (e.mood === "listening"){                 // condenses to a tight ball
+      const rr = R*(.30 + b.r*.26);
+      tx = cx + Math.cos(b.a + swirl)*rr;
+      ty = cy + Math.sin(b.a + swirl)*rr*.92;
+    } else if (e.mood === "thinking"){           // splits into two churning lobes
+      const side = b.band < .5 ? -1 : 1;
+      const rr = R*(.24 + b.r*.30);
+      tx = cx + side*R*.44 + Math.cos(b.a + swirl*1.7)*rr;
+      ty = cy + Math.sin(b.a + swirl*1.7)*rr*.85;
+    } else if (e.mood === "speaking"){           // waves rolling out through the flock
+      const rr = R*(.48 + b.r*.52 + .20*Math.sin(t*4.2 - b.r*7));
+      tx = cx + Math.cos(b.a + swirl)*rr;
+      ty = cy + Math.sin(b.a + swirl)*rr*.92;
+    } else {                                     // idle: a loose, breathing cloud
+      const rr = R*(.44 + b.r*.5);
+      tx = cx + Math.cos(b.a + swirl*.55)*rr + Math.sin(t*.7 + b.ph)*R*.09;
+      ty = cy + Math.sin(b.a + swirl*.55)*rr*.9 + Math.cos(t*.5 + b.ph)*R*.07;
+    }
+    tx += gx; ty += gy;
+    if (!b.set){ b.x = tx; b.y = ty; b.set = true; }
+    b.px = b.x; b.py = b.y;
+    b.x += (tx - b.x)*ease;
+    b.y += (ty - b.y)*ease;
+    // streak length reads as speed, which is what makes a flock look alive
+    const spd = Math.hypot(b.x-b.px, b.y-b.py);
+    const bright = Math.min(1, .28 + spd*.22) * (b.lead ? 1.5 : 1);
+    g.beginPath();
+    g.moveTo(b.px - (b.x-b.px)*2.5, b.py - (b.y-b.py)*2.5);
+    g.lineTo(b.x, b.y);
+    g.strokeStyle = b.lead ? `rgba(200,255,245,${bright*.85})`
+                           : `rgba(120,215,205,${bright*.62})`;
+    g.lineWidth = Math.max(.9, w*(b.lead ? .0042 : .0028));
+    g.stroke();
+  }
+  g.lineCap = "butt";
+  g.globalCompositeOperation = "source-over";
+}
+
+/* ================================================================
+   4. NACRE — thin-film interference. The character is a material:
+   an oil-on-water membrane whose colour comes from film thickness,
+   so every ripple repaints it.
+   ================================================================ */
+function iridescent(u, a){
+  // a repeating interference ramp — magenta, gold, cyan, violet
+  u = (u % 1 + 1) % 1;
+  const r = Math.sin(u*6.283 + 0.0)*.5 + .5;
+  const gr= Math.sin(u*6.283 + 2.1)*.5 + .5;
+  const bl= Math.sin(u*6.283 + 4.2)*.5 + .5;
+  return `rgba(${120+135*r|0},${110+135*gr|0},${140+115*bl|0},${a})`;
+}
+function nacre(g, w, h, t, e){
+  const cx = w/2, cy = h/2 + (REDUCED?0:Math.sin(t*1.1)*w*.008);
+  const R = w*.235*(1 + e.energy*.07);
+  const gx = pointer.x*R*.10*e.attn, gy = pointer.y*R*.09*e.attn;
+  // dark backing so the film has something to sit on
+  const back = g.createRadialGradient(cx+gx, cy+gy, 0, cx+gx, cy+gy, R*1.08);
+  back.addColorStop(0,"rgba(14,26,32,.92)");
+  back.addColorStop(.82,"rgba(10,20,26,.85)");
+  back.addColorStop(1,"rgba(10,20,26,0)");
+  g.fillStyle = back; g.beginPath(); g.arc(cx+gx, cy+gy, R*1.08, 0, Math.PI*2); g.fill();
+
+  g.globalCompositeOperation = "lighter";
+  // fill the middle first, or the innermost band leaves a dark pupil
+  const c0 = g.createRadialGradient(cx+gx, cy+gy, 0, cx+gx, cy+gy, R*.16);
+  c0.addColorStop(0, iridescent(.22*Math.sin(t*.4) + t*.05, .34));
+  c0.addColorStop(1, iridescent(.22*Math.sin(t*.4) + t*.05, 0));
+  g.fillStyle = c0; g.beginPath(); g.arc(cx+gx, cy+gy, R*.16, 0, Math.PI*2); g.fill();
+  const BANDS = REDUCED ? 26 : 74;
+  for (let i=0;i<BANDS;i++){
+    const u = i/BANDS;
+    // film thickness: standing pattern plus a ripple that runs outward on speech
+    const thick = u*3.1
+      + .22*Math.sin(u*9 - t*(.6 + e.energy*3.4))
+      + .16*Math.sin(u*17 + t*.8*e.pace)
+      + (e.mood === "thinking" ? .5*Math.sin(u*23 - t*3.2) : 0);
+    const rr = R*(.06 + u*.98);
+    // eccentric and slowly drifting: perfectly concentric bands read as a
+    // printed target, whereas a real film flows
+    const sq = .90 - u*.10;
+    const ox = Math.sin(u*4.1 + t*.45)*R*.13*u;
+    const oy = Math.cos(u*3.3 + t*.37)*R*.10*u;
+    g.beginPath();
+    g.ellipse(cx+gx*(1-u*.4)+ox, cy+gy*(1-u*.4)+oy - R*.05*u, rr, rr*sq,
+              Math.sin(u*2.2 + t*.25)*.6, 0, Math.PI*2);
+    g.strokeStyle = iridescent(thick, (.16 + .14*Math.sin(u*7 + t)) * (1 - u*.35));
+    g.lineWidth = Math.max(1.4, w*.011);
+    g.stroke();
+  }
+  // wet specular
+  const hx = cx+gx - R*.36, hy = cy+gy - R*.42;
+  const sp = g.createRadialGradient(hx, hy, 0, hx, hy, R*.42);
+  sp.addColorStop(0,"rgba(255,255,255,.5)");
+  sp.addColorStop(.4,"rgba(230,240,255,.10)");
+  sp.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle = sp; g.beginPath(); g.arc(hx, hy, R*.42, 0, Math.PI*2); g.fill();
+  g.globalCompositeOperation = "source-over";
+}
+
+/* ================================================================
+   5. EMBER — a banked coal. Dark crust laced with glowing veins that
+   brighten under load; effort is visible as heat.
+   ================================================================ */
+const VEINS = (() => {
+  const out = [];
+  const grow = (x, y, ang, len, depth) => {
+    if (depth > 5 || len < .03) return;
+    const x2 = x + Math.cos(ang)*len, y2 = y + Math.sin(ang)*len;
+    out.push({x1:x, y1:y, x2, y2, depth, ph:Math.random()*6.28});
+    const n = depth < 2 ? 2 : (Math.random() < .6 ? 2 : 1);
+    for (let i=0;i<n;i++)
+      grow(x2, y2, ang + (Math.random()-.5)*1.5, len*(.58+Math.random()*.22), depth+1);
+  };
+  // roots spread across the crust rather than all leaving one point —
+  // otherwise it reads as an impact star, not a network of cracks
+  for (let i=0;i<11;i++){
+    const a = i/11*6.283 + Math.random()*.5, d = .08 + Math.random()*.30;
+    // roots run broadly tangentially, so the branches cross each other and
+    // the crust reads as a connected crack network rather than scattered marks
+    grow(Math.cos(a)*d, Math.sin(a)*d*.9, a + 1.4 + (Math.random()-.5)*1.6, .26, 0);
+  }
+  return out;
+})();
+function ember(g, w, h, t, e){
+  const cx = w/2, cy = h/2 + (REDUCED?0:Math.sin(t*.9)*w*.006);
+  const R = w*.25;
+  const heat = .30 + e.energy*.9 + (e.mood === "thinking" ? .28 : 0);
+  const gx = pointer.x*R*.06*e.attn, gy = pointer.y*R*.05*e.attn;
+
+  // crust
+  g.beginPath();
+  for (let i=0;i<=40;i++){
+    const a = i/40*Math.PI*2;
+    const rr = R*(1 + .07*Math.sin(3*a + 1.2) + .045*Math.sin(7*a - .6));
+    const x = cx+gx+Math.cos(a)*rr, y = cy+gy+Math.sin(a)*rr*.93;
+    i ? g.lineTo(x,y) : g.moveTo(x,y);
+  }
+  g.closePath();
+  const crust = g.createRadialGradient(cx+gx-R*.3, cy+gy-R*.35, R*.05, cx+gx, cy+gy, R*1.1);
+  crust.addColorStop(0,"#33302e"); crust.addColorStop(.5,"#1e1b1a");
+  crust.addColorStop(1,"#0d0c0c");
+  g.fillStyle = crust; g.fill();
+  g.save(); g.clip();
+
+  // veins of heat running through the crust
+  g.globalCompositeOperation = "lighter";
+  g.lineCap = "round";
+  for (const v of VEINS){
+    const pulse = .5 + .5*Math.sin(t*(1.4 + e.pace) - v.depth*.9 + v.ph);
+    const a = (1 - v.depth*.15) * heat * (.45 + .55*pulse);
+    const x1 = cx+gx+v.x1*R*1.7, y1 = cy+gy+v.y1*R*1.6;
+    const x2 = cx+gx+v.x2*R*1.7, y2 = cy+gy+v.y2*R*1.6;
+    g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2);
+    g.strokeStyle = `rgba(255,${120+70*pulse|0},${40+40*pulse|0},${a*.5})`;
+    g.lineWidth = Math.max(2, w*(.016 - v.depth*.003));
+    g.stroke();
+    g.strokeStyle = `rgba(255,${215+30*pulse|0},${170+60*pulse|0},${a*.85})`;
+    g.lineWidth = Math.max(.8, w*(.005 - v.depth*.0009));
+    g.stroke();
+  }
+  g.lineCap = "butt";
+  // inner glow bleeding through the crust
+  const bleed = g.createRadialGradient(cx+gx, cy+gy, 0, cx+gx, cy+gy, R);
+  bleed.addColorStop(0, `rgba(255,150,60,${.30*heat})`);
+  bleed.addColorStop(.55,`rgba(220,90,30,${.12*heat})`);
+  bleed.addColorStop(1,"rgba(0,0,0,0)");
+  g.fillStyle = bleed; g.fillRect(cx-R*1.3, cy-R*1.3, R*2.6, R*2.6);
+  g.restore();
+
+  // sparks lifting off when it speaks
+  if (e.energy > .35 && !REDUCED){
+    g.globalCompositeOperation = "lighter";
+    for (let i=0;i<14;i++){
+      const seed = i*127.1;
+      const ph = ((t*.5 + i/14) % 1);
+      const x = cx + Math.sin(seed)*R*.8 + Math.sin(t*2 + i)*R*.1;
+      const y = cy + R*.5 - ph*R*1.7;
+      const s = w*.006*(1-ph);
+      g.globalAlpha = (1-ph)*(1-ph)*e.energy;
+      g.drawImage(glow("rgba(255,190,110,.9)"), x-s*3, y-s*3, s*6, s*6);
+    }
+    g.globalAlpha = 1;
+  }
+  g.globalCompositeOperation = "source-over";
+}
+
+/* ================================================================
+   6. CURTAIN — the actual aurora borealis: vertical sheets of light
+   that fold and ripple. Wide rather than round; no face, no centre.
+   ================================================================ */
+const SHEETS = Array.from({length: REDUCED ? 3 : 5}, (_,i)=>({
+  y:.60 + i*.045, amp:.045 + Math.random()*.05, freq:1.4 + Math.random()*1.8,
+  ph:Math.random()*6.28, sp:.25 + Math.random()*.35, hue:i/5,
+}));
+function curtain(g, w, h, t, e){
+  const STEP = REDUCED ? 10 : 4;
+  g.globalCompositeOperation = "lighter";
+  for (let s = SHEETS.length-1; s >= 0; s--){
+    const sh = SHEETS[s];
+    const depth = 1 - s/SHEETS.length;              // nearer sheets brighter
+    const fold = 1 + (e.mood === "thinking" ? 1.6 : 0) + e.energy*.5;
+    for (let x = 0; x <= w; x += STEP){
+      const u = x/w;
+      // the baseline folds; that fold is what makes an aurora read as fabric
+      const base = h*(sh.y + pointer.y*.02*e.attn)
+        + Math.sin(u*sh.freq*6.283 + t*sh.sp*e.pace + sh.ph)*h*sh.amp*fold
+        + Math.sin(u*sh.freq*2.7 - t*sh.sp*.6*e.pace)*h*sh.amp*.5;
+      // ray intensity varies along the curtain, and a bright patch travels
+      // through it when speaking — the way a substorm runs along a real one
+      // incommensurate frequencies: one sine gives evenly-spaced stripes,
+      // which reads as a barcode rather than as rays
+      const ray = .28 + .72 *
+        (Math.sin(u*31.4 + sh.ph*3 + t*.5*e.pace)*.5 + .5) *
+        (Math.sin(u*13.1 - sh.ph*2 - t*.3)*.35 + .65) *
+        (Math.sin(u*7.3  + sh.ph)*.25 + .75);
+      const travel = e.energy > .35
+        ? Math.exp(-Math.pow((u - ((t*.35) % 1.4 - .2))*3.2, 2))*1.5*e.energy : 0;
+      const a = (.05 + .12*ray + travel*.18) * depth * (.55 + e.energy*.6);
+      const hgt = h*(.15 + .13*ray + travel*.08);
+      const lg = g.createLinearGradient(x, base, x, base - hgt);
+      lg.addColorStop(0,   `rgba(70,${210 - sh.hue*30|0},${150 + sh.hue*40|0},${a*1.15})`);
+      lg.addColorStop(.45, `rgba(90,${180 - sh.hue*20|0},${200 + sh.hue*30|0},${a*.6})`);
+      lg.addColorStop(1,   `rgba(${150 + sh.hue*60|0},110,${220},0)`);
+      g.fillStyle = lg;
+      g.fillRect(x, base - hgt, STEP + 1, hgt);
+      // short downward skirt so the curtain has a lit lower hem
+      const dg = g.createLinearGradient(x, base, x, base + h*.05);
+      dg.addColorStop(0, `rgba(120,255,210,${a*.5})`);
+      dg.addColorStop(1, "rgba(120,255,210,0)");
+      g.fillStyle = dg; g.fillRect(x, base, STEP + 1, h*.05);
+    }
+  }
+  g.globalCompositeOperation = "source-over";
+}
+
+/* ================================================================
+   7. LOOM — strands braided into a ring. The day, woven; thinking
+   tangles the weave, answering pulls it back into order.
+   ================================================================ */
+const STRANDS = REDUCED ? 5 : 9;
+function loom(g, w, h, t, e){
+  const cx = w/2, cy = h/2, R = w*.235, tube = R*.30;
+  const squash = .62 + pointer.y*.06*e.attn;
+  const tangle = e.mood === "thinking" ? 1 : e.mood === "listening" ? .25 : .5;
+  const SEG = REDUCED ? 60 : 130;
+  g.globalCompositeOperation = "lighter";
+  g.lineCap = "round";
+  for (let s=0; s<STRANDS; s++){
+    const off = s/STRANDS*Math.PI*2;
+    const wind = 4 + (s % 3);                    // how many times it wraps
+    const pts = [];
+    for (let i=0;i<=SEG;i++){
+      const th = i/SEG*Math.PI*2;
+      const phase = wind*th + off + t*(.5 + .35*Math.sin(s))*e.pace;
+      const wob = tangle * .35 * Math.sin(th*3 + t*1.7*e.pace + s);
+      const rr = R + tube*(Math.cos(phase) + wob);
+      const zz = tube*(Math.sin(phase) + wob);   // out-of-plane offset
+      pts.push([cx + Math.cos(th)*rr,
+                cy + Math.sin(th)*rr*squash + zz*.55,
+                Math.sin(phase)]);               // depth for shading
+    }
+    for (let i=0;i<SEG;i++){
+      const [x1,y1,d1] = pts[i], [x2,y2] = pts[i+1];
+      const near = (d1 + 1)/2;                   // 1 = front of the tube
+      const hue = s/STRANDS;
+      g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2);
+      g.strokeStyle = `rgba(${70 + 90*hue|0},${215 - 70*hue|0},${190 + 60*hue|0},${
+        (.10 + .48*near) * (.6 + e.energy*.7)})`;
+      g.lineWidth = Math.max(.9, w*(.0022 + .0042*near));
+      g.stroke();
+    }
+  }
+  // a bright shuttle running round the weave as it speaks
+  if (e.energy > .3){
+    const th = (t*1.5) % (Math.PI*2);
+    const x = cx + Math.cos(th)*R, y = cy + Math.sin(th)*R*squash;
+    const s = w*.05*e.energy;
+    g.drawImage(glow("rgba(210,255,245,.9)"), x-s, y-s, s*2, s*2);
+  }
+  g.lineCap = "butt";
+  g.globalCompositeOperation = "source-over";
+}
+
 /* ---------------------------------------------------------------- */
 const CHARACTERS = [
   {
@@ -481,11 +791,91 @@ const CHARACTERS = [
     verdict:"<b>Unmistakable and warmer than its parent.</b> The colour temperature does the work a black hole alone couldn't — it looks alive rather than merely destructive.",
     draw: maelstrom, bloom: .85,
   },
+  {
+    round:2,
+    cross:"ORIGINAL",
+    name:"MURMURATION",
+    desc:"A flock, not an object. Hundreds of small things moving as one — which is what an agent running many jobs at once actually is. Nothing here is drawn as a body; the shape only exists because the birds agree on it.",
+    states:[
+      ["IDLE","a loose cloud, breathing and drifting"],
+      ["LISTENING","condenses hard into a tight ball"],
+      ["THINKING","splits into two lobes that churn against each other"],
+      ["SPEAKING","waves roll out through the flock"],
+    ],
+    verdict:"<b>The most alive thing here, and it never repeats.</b> Weakness: at a glance it can read as noise rather than a character.",
+    draw: murmuration, bloom: .9,
+  },
+  {
+    round:2,
+    cross:"ORIGINAL",
+    name:"NACRE",
+    desc:"Colour from thin-film interference rather than pigment — oil on water, the inside of a shell. The bands come from film thickness, so any ripple through the surface repaints the whole thing.",
+    states:[
+      ["IDLE","slow standing bands, faint drift"],
+      ["LISTENING","the film calms and tightens"],
+      ["THINKING","fine interference beats across it"],
+      ["SPEAKING","ripples run outward, repainting as they go"],
+    ],
+    verdict:"<b>The most beautiful material of the set</b> and the only one whose colour isn't chosen — it's a consequence. Risk: iridescence can tip into novelty.",
+    draw: nacre, bloom: .5,
+  },
+  {
+    round:2,
+    cross:"ORIGINAL",
+    name:"EMBER",
+    desc:"A banked coal: dark crust laced with veins of heat. Effort is literally visible as temperature — the harder it works, the brighter and faster the veins run, and sparks lift off when it speaks.",
+    states:[
+      ["IDLE","veins barely glowing, slow breath"],
+      ["LISTENING","heat gathers toward the surface"],
+      ["THINKING","veins flare and flicker fast"],
+      ["SPEAKING","bright pulses run outward, sparks rise"],
+    ],
+    verdict:"<b>The only warm direction, and the best load metaphor.</b> It would sit apart from every cool dashboard on your screen — for better or worse.",
+    draw: ember, bloom: .7,
+  },
+  {
+    round:2,
+    cross:"ORIGINAL",
+    name:"CURTAIN",
+    desc:"The actual aurora, not a glowing ball named after one: vertical sheets of light that fold like fabric. Wide instead of round, with no centre and no face — it would sit across the dashboard rather than in a hole in the middle of it.",
+    states:[
+      ["IDLE","slow drift, gentle folds"],
+      ["LISTENING","the sheets lean toward you"],
+      ["THINKING","rapid folding, the fabric creases"],
+      ["SPEAKING","a bright patch travels the curtain, like a substorm"],
+    ],
+    verdict:"<b>The only one that changes the layout.</b> Frees the middle of the screen for real content — the boldest structural idea here.",
+    draw: curtain, bloom: .6,
+  },
+  {
+    round:2,
+    cross:"ORIGINAL",
+    name:"LOOM",
+    desc:"Strands braided into a ring. Your day, woven — thinking tangles the weave, answering pulls it back into order, and a bright shuttle runs the loop as it speaks.",
+    states:[
+      ["IDLE","a steady, even braid turning"],
+      ["LISTENING","the weave pulls tight and orderly"],
+      ["THINKING","strands wander and cross out of pattern"],
+      ["SPEAKING","a shuttle runs the ring"],
+    ],
+    verdict:"<b>The best fit for what Atlas does.</b> Quietly on-metaphor for pulling separate threads into one day, without being literal about it.",
+    draw: loom, bloom: .9,
+  },
 ];
 
 /* ---------------- harness ---------------- */
 const grid = document.getElementById("grid");
 const tiles = CHARACTERS.map((ch, i) => {
+  if (ch.round === 2 && CHARACTERS[i-1]?.round !== 2){
+    const head = document.createElement("div");
+    head.className = "sectionhead";
+    head.innerHTML = `<div class="rule"></div>
+      <h2>ORIGINALS</h2>
+      <p>Five that aren't crossings of anything — each starts from a different
+         idea of what the thing in the middle of the screen even is: a swarm, a
+         material, a temperature, a weather system, a piece of craft.</p>`;
+    grid.appendChild(head);
+  }
   const card = document.createElement("article");
   card.className = "card";
   card.innerHTML = `
