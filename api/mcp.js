@@ -3,10 +3,13 @@
    shape, so the dashboard cannot tell which mode it is running in. */
 import { SERVER_PROVIDER, configured, getToken } from "../lib/providers.js";
 import { runTool, ToolError } from "../lib/tools.js";
+import { denyCrossSite } from "../lib/guard.js";
 
 export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: { code: "bad_request" } });
+  // this endpoint deletes mail and calendar entries — it answers to our page only
+  if (denyCrossSite(req, res)) return;
   if (!process.env.SESSION_SECRET)
     return res.status(500).json({ error: { code: "upstream_error",
       message: "SESSION_SECRET is not set on this deployment" } });

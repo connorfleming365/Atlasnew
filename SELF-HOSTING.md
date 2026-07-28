@@ -25,6 +25,44 @@ no database, and no token is ever readable by the browser.
 
 ---
 
+## Security model — read this before deploying
+
+**What protects your data.** Provider tokens are sealed with AES-256-GCM and
+stored in `HttpOnly; Secure; SameSite=Lax` cookies, so page scripts can't read
+them and a cross-site POST can't spend them. `/api/mcp` and `/api/auth/disconnect`
+additionally refuse any request that isn't same-origin. The OAuth handshake is
+bound by a random state nonce compared in constant time. Nothing is logged or
+persisted server-side; a deployment with no cookie has no access to anything.
+
+**The deployment is public, and that is the thing to understand.** There is no
+login. Anyone with the URL can load the dashboard — they will see the *connect*
+screen, not your data, because they don't have your cookies. But they could
+connect their own accounts through your deployment and use it as a free proxy.
+For a personal URL nobody knows, that's an acceptable risk. If you'd rather close
+it, put Vercel's Deployment Protection in front of the project (Settings →
+Deployment Protection), which gates the whole site behind your Vercel login.
+
+**Set `APP_URL`.** Without it the OAuth redirect is derived from the request's
+`Host` header. Providers reject redirect URIs that aren't on their registered
+list, so this isn't exploitable on its own — but pinning it removes the question
+entirely.
+
+**Scopes are broader than read-only, by design.** `gmail.modify` is what lets
+Atlas archive and trash; it deliberately stops short of `mail.google.com`, so
+nothing it does is unrecoverable — trashed mail sits in Trash for 30 days. The
+Calendar scope is full read/write because Atlas creates and deletes focus blocks.
+If you want to narrow either, edit `PROVIDERS` in `lib/providers.js` and disable
+the matching actions.
+
+**Rotating access.** `SESSION_SECRET` is the master key: change it and every
+stored token becomes undecryptable, which is the fastest kill switch. You can
+also revoke per provider at
+[Google](https://myaccount.google.com/permissions),
+[Todoist](https://todoist.com/prefs/integrations) and
+[Strava](https://www.strava.com/settings/apps).
+
+---
+
 ## 1. Deploy
 
 Import this repository at [vercel.com/new](https://vercel.com/new). No build
@@ -43,6 +81,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 Add it in Vercel under **Settings → Environment Variables** as `SESSION_SECRET`.
+Add `APP_URL` at the same time, set to your deployment's URL
+(`https://YOUR-DOMAIN`, no trailing slash).
 
 ## 3. Google (Gmail + Calendar)
 
