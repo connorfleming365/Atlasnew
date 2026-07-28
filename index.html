@@ -1096,8 +1096,11 @@ const AUTHZ = new Set(["needs_reauth","server_not_connected","selection_required
 function setMeta(key, patch){
   Object.assign(S.meta[key], patch);
   const pill = $("#pill-"+key);
-  const s = S.meta[key].status;
+  const m = S.meta[key], s = m.status;
   pill.dataset.s = s==="ok" ? "ok" : s==="stale" ? "stale" : s==="err" ? "err" : "";
+  pill.title = m.detail
+    ? `${SERVERS[key]}: ${m.detail}`
+    : s==="stale" ? `${SERVERS[key]}: showing last good data, retrying automatically` : "";
   renderUpdated(key);
   checkPageCondition();
 }
@@ -1148,7 +1151,7 @@ function watchSection(key, tool, input, render, opts={}){
       S.data[key] = res.payload;
       setMeta(key,{status: res.cache && !res.cache.revalidating &&
                    (Date.now()-res.cache.storedAt > 10*60000) ? "stale" : "ok",
-                   code:null,
+                   code:null, detail:"",
                    storedAt: res.cache ? res.cache.storedAt : Date.now()});
       render(res.payload);
     } else {
@@ -1159,8 +1162,15 @@ function watchSection(key, tool, input, render, opts={}){
         $("#p-"+key+" .body").innerHTML =
           `<div class="degraded"><span class="ic">⚠</span><span>${esc(errCopy(code, SERVERS[key]))}</span></div>`;
       } else {
-        // transient: keep last-good data, mark stale
-        setMeta(key,{status: S.data[key] ? "stale" : "err", code});
+        // Transient: keep last-good data, mark stale. errCopy only ever shows
+        // generic per-code text, so the specific upstream reason — the one
+        // thing actually useful for tracking down a real fault — otherwise
+        // vanishes. Surface it to the console and a hover tooltip instead of
+        // discarding it.
+        const detail = ev.error?.message ? ` (${ev.error.message})` : "";
+        console.warn(`[Atlas] ${SERVERS[key]}/${tool} → ${code}${detail}`);
+        setMeta(key,{status: S.data[key] ? "stale" : "err", code,
+          detail: ev.error?.message || ""});
         if (!S.data[key])
           $("#p-"+key+" .body").innerHTML =
             `<div class="degraded"><span class="ic">◌</span><span>${esc(errCopy(code, SERVERS[key]))}</span></div>`;
