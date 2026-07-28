@@ -961,14 +961,18 @@ async function startListening(){
   rec.onstart = ()=>{
     starting=false; S.listening=true; micBlocked=false;
     $("#mic").classList.add("on"); Entity.mood="listening";
+    console.log(`[Atlas] recognition started (flow=${S.flowOn}, lang=${rec.lang})`);
   };
   rec.onresult = e=>{
     let fin="", inter="";
     for (const r of e.results){ if (r.isFinal) fin += r[0].transcript; else inter += r[0].transcript; }
     if (inter){
       Entity.pulse(.4);
-      if (!interimEl){ interimEl=document.createElement("div"); interimEl.id="interim";
-        transcript.appendChild(interimEl); }
+      if (!interimEl){
+        console.log("[Atlas] recognition is receiving audio (first interim chunk)");
+        interimEl=document.createElement("div"); interimEl.id="interim";
+        transcript.appendChild(interimEl);
+      }
       interimEl.textContent = inter+"…";
       transcript.scrollTop = transcript.scrollHeight;
     }
@@ -976,13 +980,19 @@ async function startListening(){
       interimEl?.remove(); interimEl=null;
       fin = fin.trim();
       if (S.flowOn){
-        // hands-free: only sentences addressed to Atlas count
+        // Hands-free: only sentences addressed to Atlas count. Everything
+        // else is deliberately silent — no banner, no sound — which is
+        // exactly what background conversation should get, but it's also
+        // indistinguishable from "recognition just isn't working" unless
+        // you know to look here. console.log is the one place this is
+        // visible without changing that on-screen silence.
         const m = fin.match(WAKE_RE);
-        if (!m) return;
+        if (!m){ console.log(`[Atlas] heard (no wake word, ignored): "${fin}"`); return; }
         const cmd = m[1].trim();
+        console.log(`[Atlas] heard: "${fin}"`);
         if (!cmd){ speak("Yes?"); return; }
         handleUtterance(cmd);
-      } else handleUtterance(fin);
+      } else { console.log(`[Atlas] heard: "${fin}"`); handleUtterance(fin); }
     }
   };
   rec.onend = ()=>{
@@ -996,6 +1006,7 @@ async function startListening(){
   };
   rec.onerror = ev=>{
     starting=false; S.listening=false; $("#mic").classList.remove("on"); Entity.mood="idle";
+    console.log(`[Atlas] recognition error: ${ev.error}`);
     const [title, body] = MIC_ERR[ev.error] || ["Voice input stopped", `The speech engine reported “${ev.error}”. Press the mic to try again, or type below.`];
     if (!title) return;                       // routine stop — stay quiet
     // A hard refusal ends hands-free mode rather than looping on a dead mic
