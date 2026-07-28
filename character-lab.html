@@ -69,9 +69,9 @@
 <header>
   <div class="eyebrow">ATLAS · CHARACTER DIRECTIONS</div>
   <h1>Directions for <b>Atlas</b></h1>
-  <p class="lede">The two crossings first, then five originals that start somewhere else entirely.
-    The same four states the real agent uses drive all of them, so switch between the states below —
-    most of these only show what they are in <em>thinking</em> and <em>speaking</em>.</p>
+  <p class="lede">The newest crossing first, then the earlier pair and five originals. The same four
+    states the real agent uses drive all of them, so switch between the states below — most of these
+    only show what they are in <em>thinking</em> and <em>speaking</em>.</p>
 </header>
 
 <div id="controls">
@@ -763,9 +763,190 @@ function loom(g, w, h, t, e){
   g.globalCompositeOperation = "source-over";
 }
 
+/* ================================================================
+   8. SHOAL — Murmuration × Quicksilver.
+   Both parents are already the same idea: many small things resolving
+   into one body. So there is one system here — a flock of liquid-metal
+   droplets — and coherence is the dial. Held together they fuse into a
+   mercury creature with a face; let go and the face dissolves back into
+   a swarm. Nothing is faded between two drawings; the body is simply
+   what the flock does when it agrees.
+   ================================================================ */
+const SH_N = REDUCED ? 20 : 42;
+const SH_DROPS = Array.from({length: SH_N}, (_,i)=>({
+  x:0, y:0, px:0, py:0, set:false,
+  a: i/SH_N*6.283 + Math.random()*.4, r: Math.random(), band: Math.random(),
+  ph: Math.random()*6.28, sz: .55 + Math.random()*.5,
+}));
+const SH_HALO = Array.from({length: REDUCED ? 60 : 190}, () => ({
+  r:.55 + .45*Math.pow(Math.random(), .65), th:Math.random()*Math.PI*2,
+  incl:Math.acos(2*Math.random()-1), sp:(.12+Math.random()*.35)*(Math.random()<.82?1:-1),
+  sz:.7+Math.random()*1.9, hue:Math.random(), tw:Math.random()*Math.PI*2,
+}));
+let shoalT = 0;
+const COHERENCE = {idle:.74, listening:1, thinking:.10, speaking:.64};
+
+function shoal(g, w, h, t, e, blink, idx, off){
+  const bob = REDUCED ? 0 : Math.sin(t*1.4)*w*.008;
+  const cx = w/2, cy = h/2 + bob, R = w*.20;
+  const dt = Math.min(.05, Math.max(0, t - shoalT)); shoalT = t;
+  const ease = 1 - Math.pow(.004, dt);
+  const COH = COHERENCE[e.mood] ?? .7;
+  const violet = e.mood==="thinking" ? .8 : .25;
+  const gx = pointer.x*R*.12*e.attn, gy = pointer.y*R*.10*e.attn;
+  const bx = cx + gx, by = cy + gy;
+
+  /* --- vapour halo --- */
+  g.globalCompositeOperation = "lighter";
+  for (const p of SH_HALO){
+    p.th += p.sp * .016 * e.pace;
+    const sr = p.r * R*2.6;
+    const x = sr*Math.sin(p.incl)*Math.cos(p.th+t*.5),
+          z = sr*Math.sin(p.incl)*Math.sin(p.th+t*.5),
+          y = sr*Math.cos(p.incl)*.8;
+    const persp = 1/(1 - z/(R*9));
+    const a = (.11+.38*((z/(sr||1))*.5+.5)) * (.55+.45*Math.sin(t*2+p.tw));
+    const sz = p.sz*persp*(1+e.energy*.5)*(w/340);
+    g.globalAlpha = a;
+    g.drawImage(glow(p.hue*.55 + violet*.7 > .5 ? "rgba(150,158,255,.5)" : "rgba(120,225,215,.5)"),
+                bx + x*persp - sz*2, by + y*persp - sz*2, sz*4, sz*4);
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = "source-over";
+
+  /* --- flock: every droplet is painted into one metaball matte, so
+         proximity alone decides whether they read as a body or a swarm --- */
+  const o = off.ctx, ow = off.el.width, oh = off.el.height, k = ow/w;
+  o.setTransform(1,0,0,1,0,0);
+  o.globalCompositeOperation = "source-over";
+  o.filter = "none";
+  o.clearRect(0,0,ow,oh);
+  const paint = (x,y,r)=>{
+    const gr = o.createRadialGradient(x*k,y*k,0, x*k,y*k,r*k);
+    gr.addColorStop(0,  "rgba(255,255,255,1)");
+    gr.addColorStop(.90,"rgba(255,255,255,1)");
+    gr.addColorStop(.97,"rgba(255,255,255,.88)");
+    gr.addColorStop(1,  "rgba(255,255,255,0)");
+    o.fillStyle = gr; o.beginPath(); o.arc(x*k,y*k,r*k,0,Math.PI*2); o.fill();
+  };
+
+  // the core mass: nearly the whole body when coherent, one droplet among
+  // many when it has let go
+  paint(bx, by, R*(.15 + .78*COH) * (1 + e.energy*.08));
+
+  for (const d of SH_DROPS){
+    const swirl = t*e.pace*(.5 + d.r*.75);
+    let tx, ty;
+    if (e.mood === "thinking"){
+      // two lobes churning against each other — Murmuration's tell
+      const side = d.band < .5 ? -1 : 1;
+      const rr = R*(.30 + d.r*.46);
+      tx = bx + side*R*.56 + Math.cos(d.a + swirl*1.7)*rr;
+      ty = by + Math.sin(d.a + swirl*1.7)*rr*.86;
+    } else {
+      const pulse = e.mood === "speaking" ? .13*Math.sin(t*4.2 - d.r*7) : 0;
+      const rr = R*(.20 + (1-COH)*(.55 + d.r*.62) + pulse);
+      tx = bx + Math.cos(d.a + swirl)*rr;
+      ty = by + Math.sin(d.a + swirl)*rr*.90
+         + (e.mood === "idle" ? Math.cos(t*.5 + d.ph)*R*.05 : 0);
+    }
+    if (!d.set){ d.x = tx; d.y = ty; d.set = true; }
+    d.px = d.x; d.py = d.y;
+    d.x += (tx - d.x)*ease;
+    d.y += (ty - d.y)*ease;
+    paint(d.x, d.y, R*(.095 + .205*COH)*d.sz);
+  }
+
+  o.globalCompositeOperation = "copy";
+  o.filter = `blur(${Math.max(2, ow*.011)}px)`;
+  o.drawImage(off.el, 0, 0);
+  o.filter = "none";
+  o.globalCompositeOperation = "source-in";
+  const mg = o.createLinearGradient(0, (by - R*1.15)*k, 0, (by + R*1.25)*k);
+  mg.addColorStop(0,   "#e9fcf7");
+  mg.addColorStop(.24, "#93d6d2");
+  mg.addColorStop(.52, "#2f7681");
+  mg.addColorStop(.76, "#17454e");
+  mg.addColorStop(1,   "#58a7a0");
+  o.fillStyle = mg; o.fillRect(0, 0, ow, oh);
+  o.globalCompositeOperation = "source-over";
+  g.drawImage(off.el, 0, 0, w, h);
+
+  /* --- motion streaks: the flock's signature, in liquid metal --- */
+  g.globalCompositeOperation = "lighter";
+  g.lineCap = "round";
+  for (const d of SH_DROPS){
+    const spd = Math.hypot(d.x-d.px, d.y-d.py);
+    if (spd < .25) continue;
+    g.beginPath();
+    g.moveTo(d.px - (d.x-d.px)*3.2, d.py - (d.y-d.py)*3.2);
+    g.lineTo(d.x, d.y);
+    g.strokeStyle = `rgba(175,240,235,${Math.min(.5, spd*.05)*(1-COH*.5)})`;
+    g.lineWidth = Math.max(1, w*.004*d.sz);
+    g.stroke();
+  }
+  g.lineCap = "butt";
+
+  /* --- lighting, gated by coherence: a specular and a rim only make sense
+         while there is a single surface to sit on. Left ungated they hang in
+         empty space as a ring once the flock disperses. --- */
+  const hx = bx - R*.34, hy = by - R*.42;
+  const sg = g.createRadialGradient(hx, hy, 0, hx, hy, R*.5);
+  sg.addColorStop(0,`rgba(255,255,255,${.42*(.15+.85*COH)})`);
+  sg.addColorStop(.35,`rgba(230,255,250,${.11*(.15+.85*COH)})`);
+  sg.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle = sg; g.beginPath(); g.arc(hx, hy, R*.5, 0, Math.PI*2); g.fill();
+  const rg = g.createRadialGradient(bx, by, R*.72, bx, by, R*1.16);
+  rg.addColorStop(0,  "rgba(90,150,190,0)");
+  rg.addColorStop(.62,`rgba(120,180,225,${.20*COH})`);
+  rg.addColorStop(1,  "rgba(90,150,190,0)");
+  g.fillStyle = rg; g.beginPath(); g.arc(bx, by, R*1.16, 0, Math.PI*2); g.fill();
+  g.globalCompositeOperation = "source-over";
+
+  /* --- the face, which only exists while the flock is together --- */
+  const face = Math.max(0, Math.min(1, (COH - .34) / .34));
+  if (face > .02){
+    const eyeOpen = (e.mood==="listening" ? 1.18 : 1) * blink * face;
+    const eh = R*.42*Math.min(eyeOpen,1.3), ew = Math.max(2.5, eh*.34);
+    const ex = R*.40, ey = -R*.06;
+    for (const s of [-1,1]){
+      const x = bx + s*ex + gx*.5, y = by + ey + gy*.5;
+      const sock = g.createRadialGradient(x, y, 0, x, y, eh*1.5);
+      sock.addColorStop(0,`rgba(6,20,24,${.62*face})`);
+      sock.addColorStop(1,"rgba(6,20,24,0)");
+      g.fillStyle = sock; g.beginPath(); g.arc(x, y, eh*1.5, 0, Math.PI*2); g.fill();
+    }
+    if (eh > 1){
+      g.save();
+      g.shadowColor = "rgba(120,255,232,.9)"; g.shadowBlur = 16;
+      g.fillStyle = `rgba(238,255,250,${.97*face})`;
+      for (const s of [-1,1]){
+        const x = bx + s*ex + gx*.5, y = by + ey + gy*.5;
+        g.beginPath(); g.roundRect(x-ew/2, y-eh/2, ew, eh, ew/2); g.fill();
+      }
+      g.restore();
+    }
+  }
+}
+
 /* ---------------------------------------------------------------- */
 const CHARACTERS = [
   {
+    section:"THE NEW CROSSING",
+    cross:"MURMURATION × QUICKSILVER",
+    name:"SHOAL",
+    desc:"A flock of liquid-metal droplets. Both parents were already the same idea — many small things resolving into one body — so there's one system here and coherence is the dial. Held together the droplets fuse into a mercury creature with a face; let go and the face dissolves back into a swarm. The body isn't drawn: it's what the flock does when it agrees.",
+    states:[
+      ["IDLE","mostly gathered, droplets grazing the surface"],
+      ["LISTENING","fully fused and still — the face is at its clearest"],
+      ["THINKING","breaks into two churning lobes, the face gone entirely"],
+      ["SPEAKING","half-gathered, pulsing outward, streaks trailing"],
+    ],
+    verdict:"<b>The strongest idea of the set.</b> Its states aren't decoration — coherence <em>is</em> the mood, so you can read its attention from across the room without knowing anything about it.",
+    draw: shoal, bloom: .45,
+  },
+  {
+    section:"EARLIER CROSSINGS",
     cross:"AURORA × MERCURY",
     name:"QUICKSILVER",
     desc:"Aurora's creature rebuilt in Mercury's material: a liquid-metal body under surface tension, with eyes sunk into the surface and a vapour halo coming off it.",
@@ -779,6 +960,7 @@ const CHARACTERS = [
     draw: quicksilver, bloom: .42,
   },
   {
+    section:"EARLIER CROSSINGS",
     cross:"SINGULARITY × NEBULA",
     name:"MAELSTROM",
     desc:"Singularity's gravity given Nebula's matter. Gas and dust spiral into a dark core, heating from violet through cyan to white as they fall — dust lanes crossing in front, stars swallowed at the edge.",
@@ -792,7 +974,7 @@ const CHARACTERS = [
     draw: maelstrom, bloom: .85,
   },
   {
-    round:2,
+    section:"ORIGINALS",
     cross:"ORIGINAL",
     name:"MURMURATION",
     desc:"A flock, not an object. Hundreds of small things moving as one — which is what an agent running many jobs at once actually is. Nothing here is drawn as a body; the shape only exists because the birds agree on it.",
@@ -806,7 +988,7 @@ const CHARACTERS = [
     draw: murmuration, bloom: .9,
   },
   {
-    round:2,
+    section:"ORIGINALS",
     cross:"ORIGINAL",
     name:"NACRE",
     desc:"Colour from thin-film interference rather than pigment — oil on water, the inside of a shell. The bands come from film thickness, so any ripple through the surface repaints the whole thing.",
@@ -820,7 +1002,7 @@ const CHARACTERS = [
     draw: nacre, bloom: .5,
   },
   {
-    round:2,
+    section:"ORIGINALS",
     cross:"ORIGINAL",
     name:"EMBER",
     desc:"A banked coal: dark crust laced with veins of heat. Effort is literally visible as temperature — the harder it works, the brighter and faster the veins run, and sparks lift off when it speaks.",
@@ -834,7 +1016,7 @@ const CHARACTERS = [
     draw: ember, bloom: .7,
   },
   {
-    round:2,
+    section:"ORIGINALS",
     cross:"ORIGINAL",
     name:"CURTAIN",
     desc:"The actual aurora, not a glowing ball named after one: vertical sheets of light that fold like fabric. Wide instead of round, with no centre and no face — it would sit across the dashboard rather than in a hole in the middle of it.",
@@ -848,7 +1030,7 @@ const CHARACTERS = [
     draw: curtain, bloom: .6,
   },
   {
-    round:2,
+    section:"ORIGINALS",
     cross:"ORIGINAL",
     name:"LOOM",
     desc:"Strands braided into a ring. Your day, woven — thinking tangles the weave, answering pulls it back into order, and a bright shuttle runs the loop as it speaks.",
@@ -866,14 +1048,19 @@ const CHARACTERS = [
 /* ---------------- harness ---------------- */
 const grid = document.getElementById("grid");
 const tiles = CHARACTERS.map((ch, i) => {
-  if (ch.round === 2 && CHARACTERS[i-1]?.round !== 2){
+  const BLURB = {
+    "THE NEW CROSSING":"",
+    "EARLIER CROSSINGS":"Each takes the body of one direction and the behaviour of another.",
+    "ORIGINALS":"Not crossings of anything — each starts from a different idea of what the "
+      + "thing in the middle of the screen even is: a swarm, a material, a temperature, "
+      + "a weather system, a piece of craft.",
+  };
+  if (ch.section && CHARACTERS[i-1]?.section !== ch.section){
     const head = document.createElement("div");
     head.className = "sectionhead";
-    head.innerHTML = `<div class="rule"></div>
-      <h2>ORIGINALS</h2>
-      <p>Five that aren't crossings of anything — each starts from a different
-         idea of what the thing in the middle of the screen even is: a swarm, a
-         material, a temperature, a weather system, a piece of craft.</p>`;
+    head.innerHTML = (i ? `<div class="rule"></div>` : "") +
+      `<h2>${ch.section}</h2>` +
+      (BLURB[ch.section] ? `<p>${BLURB[ch.section]}</p>` : "");
     grid.appendChild(head);
   }
   const card = document.createElement("article");
