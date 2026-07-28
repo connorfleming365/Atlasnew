@@ -1333,12 +1333,18 @@ async function addTask(content, dueString){
   const mcp=MCP();
   if (!mcp){ addMsg("atlas","Task capture needs the claude.ai artifact viewer with Todoist linked."); return; }
   Entity.mood="thinking";
+  // The TASKS panel only ever shows overdue-or-due-today items — that's
+  // what "find-tasks-by-date" fetches and what taskBuckets() filters to. A
+  // task created with no due date is real (it lands in the Todoist Inbox)
+  // but is invisible here forever, which reads as "it didn't work." Default
+  // to today so anything captured from this dashboard actually shows up on
+  // it, unless you named a different day.
+  dueString = dueString || "today";
   try{
-    const t = {content, projectId:"inbox"};
-    if (dueString) t.dueString = dueString;
+    const t = {content, projectId:"inbox", dueString};
     await mcp.callTool("Todoist","add-tasks",{tasks:[t]});
     await mcp.invalidate("Todoist","find-tasks-by-date").catch(()=>{});
-    speak(`Captured: ${content}${dueString?`, due ${dueString}`:""}.`);
+    speak(`Captured: ${content}, due ${dueString}.`);
   }catch(err){
     speak("I couldn't save that task. " + errCopy(err?.code, "Todoist"));
   }
