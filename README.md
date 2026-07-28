@@ -73,12 +73,18 @@ Opened as a plain file, the page still boots — entity, voice loop, and chat al
 work — with each panel showing an "open via claude.ai artifacts" notice instead
 of live data.
 
-### Voice vs. live data
+### Two ways to run it
 
-| | Live connector data | Spoken replies | Microphone |
+| | Live data | Spoken replies | Microphone |
 |---|---|---|---|
-| Published artifact | ✅ | ✅ | ❌ withheld by the frame |
-| Run locally / self-hosted | ❌ no `window.claude.mcp` | ✅ | ✅ |
+| Published artifact | ✅ via `window.claude.mcp` | ✅ | ❌ withheld by the frame |
+| **Self-hosted** (see [SELF-HOSTING.md](SELF-HOSTING.md)) | ✅ via its own OAuth backend | ✅ | ✅ |
+| Opened as a plain file | ❌ | ✅ | ✅ |
+
+`index.html` is byte-identical across all three. On load it probes for the
+artifact connector bridge; failing that, for its own `/api/status`; failing
+that, it runs unlinked. Self-hosting is the only configuration where voice
+input and live data work at the same time.
 
 Microphone and speech are Permissions-Policy features granted by whatever page
 embeds this one, and a page cannot grant them to itself. The artifact frame

@@ -62,6 +62,11 @@
           border-radius:10px;padding:10px 14px;display:flex;gap:12px;align-items:center;
           font-size:13.5px;color:var(--ink2)}
   .banner button{color:var(--teal);font-family:var(--mono);font-size:12px;letter-spacing:.08em}
+  .banner a.connect{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--teal);
+    border:1px solid rgba(69,224,190,.35);border-radius:999px;padding:5px 11px;text-decoration:none;
+    white-space:nowrap}
+  .banner a.connect:hover{background:rgba(69,224,190,.1)}
+  #connectbar{flex-wrap:wrap}
 
   /* ---------- panels ---------- */
   .panel{background:var(--bg1);border:1px solid var(--line);border-radius:14px;
@@ -329,6 +334,104 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const MCP = () => window.claude?.mcp;
+
+/* ================================================================
+   HOSTED MODE
+   Served from its own backend rather than the claude.ai artifact
+   frame, this page gets a real microphone — but no connector bridge.
+   So it builds one: `/api/mcp` speaks the same (server, tool, input)
+   triple and answers in the same payload shapes, and the shim below
+   presents it as `window.claude.mcp`. Everything downstream of this
+   point is identical in both modes.
+   ================================================================ */
+const ATLAS = { hosted:false, status:null };
+
+const stable = v => JSON.stringify(v, (k, val) =>
+  val && typeof val === "object" && !Array.isArray(val)
+    ? Object.fromEntries(Object.keys(val).sort().map(kk => [kk, val[kk]]))
+    : val);
+
+function installHostedBridge(){
+  const cache = new Map(), watches = new Set();
+  const idOf = (s,t,i) => `${s} ${t} ${stable(i ?? null)}`;
+
+  async function post(server, tool, input){
+    let r;
+    try{
+      r = await fetch("/api/mcp", {
+        method:"POST", credentials:"same-origin",
+        headers:{ "content-type":"application/json" },
+        body: JSON.stringify({ server, tool, input }),
+      });
+    }catch(_){
+      throw { code:"server_unavailable", server, message:"network unreachable", retryable:true };
+    }
+    if (!r.ok) throw { code:"server_unavailable", server, message:`HTTP ${r.status}`, retryable:true };
+    const j = await r.json().catch(()=>({ error:{ code:"upstream_error", message:"bad JSON" } }));
+    if (j.error) throw j.error;
+    return { content: [], payload: j.payload };
+  }
+
+  async function callTool(server, tool, input, opts){
+    const key = idOf(server, tool, input);
+    const staleTime = opts?.cache === false ? 0 : (opts?.cache?.staleTime ?? 0);
+    const hit = cache.get(key);
+    if (!opts?.cache?.refresh && hit && Date.now() - hit.at < staleTime)
+      return { ...hit.res, cache:{ storedAt: hit.at, revalidating:false } };
+    const res = await post(server, tool, input);
+    cache.set(key, { at: Date.now(), res });
+    return res;
+  }
+
+  function watchTool(server, tool, input, handler, opts){
+    let alive = true;
+    const key = idOf(server, tool, input);
+    const tick = async () => {
+      if (!alive) return;
+      try{
+        const res = await post(server, tool, input);
+        cache.set(key, { at: Date.now(), res });
+        if (alive) handler({ type:"data",
+          result:{ ...res, cache:{ storedAt: Date.now(), revalidating:false } } });
+      }catch(error){
+        if (alive) handler({ type:"error", error });
+      }
+    };
+    const w = { key, tick };
+    watches.add(w);
+    queueMicrotask(tick);
+    const every = Math.max(30000, opts?.refetchInterval || 300000);
+    const timer = setInterval(() => { if (!document.hidden) tick(); }, every);
+    return () => { alive = false; clearInterval(timer); watches.delete(w); };
+  }
+
+  async function invalidate(server, tool){
+    const match = k => {
+      const [s,t] = k.split(" ");
+      return (!server || s === server) && (!tool || t === tool);
+    };
+    for (const k of [...cache.keys()]) if (match(k)) cache.delete(k);
+    for (const w of watches) if (match(w.key)) w.tick();
+  }
+
+  window.claude = Object.assign(window.claude || {}, {
+    mcp: { callTool, watchTool, invalidate, listTools: async () => ({ servers: [] }) },
+  });
+}
+
+const hostedReady = (async () => {
+  if (window.claude?.mcp) return false;                 // artifact runtime wins
+  if (!/^https?:$/.test(location.protocol)) return false;
+  try{
+    const r = await fetch("/api/status", { credentials:"same-origin" });
+    if (!r.ok) return false;
+    const st = await r.json();
+    if (!st?.hosted) return false;
+    ATLAS.hosted = true; ATLAS.status = st;
+    installHostedBridge();
+    return true;
+  }catch(_){ return false; }
+})();
 
 /* ---------------- shared state ---------------- */
 const S = {
@@ -975,6 +1078,8 @@ $("#say").addEventListener("keydown", e=>{
 const SERVERS = { cal:"Google Calendar", gmail:"Gmail", todo:"Todoist", strava:"Strava" };
 
 function errCopy(code, server){
+  if (ATLAS.hosted && (code === "needs_reauth" || code === "server_not_connected"))
+    return `Connect ${server} using the button at the top of the page.`;
   switch(code){
     case "needs_reauth":        return `Reconnect ${server} in claude.ai Settings → Connectors.`;
     case "server_not_connected":return `Add ${server} in claude.ai Settings → Connectors.`;
@@ -1029,6 +1134,12 @@ function watchSection(key, tool, input, render, opts={}){
     setMeta(key,{status:"off"});
     $("#p-"+key+" .body").innerHTML =
       `<div class="degraded"><span class="ic">◌</span><span>Connector link needs the claude.ai artifact viewer. Open this page from your Claude artifacts to go live.</span></div>`;
+    return;
+  }
+  if (ATLAS.hosted && ATLAS.status?.servers?.[SERVERS[key]]?.connected === false){
+    setMeta(key,{status:"err", code:"server_not_connected"});
+    $("#p-"+key+" .body").innerHTML =
+      `<div class="degraded"><span class="ic">⚠</span><span>${esc(errCopy("server_not_connected", SERVERS[key]))}</span></div>`;
     return;
   }
   const unsub = mcp.watchTool(SERVERS[key], tool, input, ev=>{
@@ -1777,10 +1888,13 @@ function tickClock(){
 }
 tickClock(); setInterval(tickClock, 15000);
 
-(function bootLog(){
-  const lines = MCP()
+(async function bootLog(){
+  const hosted = await hostedReady;
+  const lines = (MCP() || hosted)
     ? ["◦ core systems … online","◦ speech engine … ready",
-       "◦ linking calendar · gmail · todoist · strava …","◦ awaiting wake command"]
+       hosted ? "◦ linking calendar · gmail · todoist · strava (self-hosted) …"
+              : "◦ linking calendar · gmail · todoist · strava …",
+       "◦ awaiting wake command"]
     : ["◦ core systems … online","◦ speech engine … ready",
        "◦ connector bridge … not detected (open via claude.ai artifacts)","◦ awaiting wake command"];
   const log=$("#bootlog");
@@ -1792,7 +1906,28 @@ tickClock(); setInterval(tickClock, 15000);
   }, 350+i*420));
 })();
 
-$("#wake").addEventListener("click", ()=>{
+/* Hosted mode: offer the providers that still need linking. Everything
+   already connected stays out of the way. */
+function renderConnectBar(){
+  if (!ATLAS.hosted) return;
+  const provs = Object.entries(ATLAS.status?.providers || {});
+  const pending = provs.filter(([,p]) => !p.connected);
+  document.getElementById("connectbar")?.remove();
+  if (!pending.length) return;
+  const bar = document.createElement("div");
+  bar.className = "banner"; bar.id = "connectbar";
+  const unconfigured = pending.filter(([,p]) => !p.configured);
+  bar.innerHTML =
+    `<span>${unconfigured.length === pending.length
+      ? "This deployment still needs its API keys — see SELF-HOSTING.md."
+      : "Connect your accounts to bring Atlas to life:"}</span>` +
+    pending.filter(([,p]) => p.configured)
+      .map(([id,p]) => `<a class="connect" href="/api/auth/start?provider=${id}">CONNECT ${p.label.toUpperCase()}</a>`)
+      .join("");
+  $("#mid").prepend(bar);
+}
+
+$("#wake").addEventListener("click", async ()=>{
   if (S.awake) return; S.awake=true;
   // user gesture: prime TTS so later speech is allowed
   // Prime speech on the gesture, and use that same silent utterance to find
@@ -1806,6 +1941,8 @@ $("#wake").addEventListener("click", ()=>{
   $("#boot").classList.add("gone");
   setTimeout(()=>$("#boot").remove(), 800);
   Entity.mood="idle";
+  await hostedReady;              // settle which bridge we're on first
+  renderConnectBar();
   startWatches();
   // FLOW persists across reloads — honour it here, on the wake gesture, which
   // is the only moment the browser will grant a microphone.

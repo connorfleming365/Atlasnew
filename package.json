@@ -1,0 +1,12 @@
+{
+  "name": "atlas-daily-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Atlas — a daily agent dashboard over Gmail, Calendar, Todoist and Strava, with voice.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "vercel dev",
+    "serve": "python3 -m http.server 8000"
+  }
+}
