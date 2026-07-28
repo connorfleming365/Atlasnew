@@ -195,6 +195,11 @@
   #micnote b{color:var(--warn);font-weight:600}
   #micnote button{color:var(--teal);font-family:var(--mono);font-size:11px;letter-spacing:.08em;
                   margin-left:8px}
+  #micnote code{font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+  table.diag{border-collapse:collapse;margin:8px 0 4px;width:100%}
+  table.diag td{padding:3px 0;font-size:12px;border-bottom:1px solid var(--line)}
+  table.diag td:last-child{text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink)}
+  .diagnote{font-size:12px;color:var(--ink3);padding-top:6px}
 
   /* clickable rows + inline actions */
   .ev,.mail,.task .c,.lastact,.bar{cursor:pointer}
@@ -378,21 +383,59 @@ const AtlasAudio = {
   },
 };
 
-/* Is this frame even allowed to use a microphone? A published artifact runs
-   in an iframe, and mic access only exists if that frame delegates it. */
-function micPolicyBlocked(){
-  try{
-    if (document.featurePolicy?.allowsFeature)
-      return !document.featurePolicy.allowsFeature("microphone");
-    if (document.permissionsPolicy?.allowsFeature)
-      return !document.permissionsPolicy.allowsFeature("microphone");
-  }catch(_){}
-  return false;   // can't tell — let the real call decide
-}
+/* Environment facts. A published artifact runs inside a sandboxed frame:
+   microphone access exists only if that frame delegates it, speech
+   synthesis needs the same, and localStorage throws outright. None of
+   that is detectable by guessing, so measure it and say so. */
+const ENV = {
+  framed: (() => { try { return window.self !== window.top; } catch(_){ return true; } })(),
+  micPolicy: (() => {
+    try{
+      if (document.featurePolicy?.allowsFeature)
+        return document.featurePolicy.allowsFeature("microphone");
+      if (document.permissionsPolicy?.allowsFeature)
+        return document.permissionsPolicy.allowsFeature("microphone");
+    }catch(_){}
+    return null;                      // unknown — the real call decides
+  })(),
+  storage: (() => { try { localStorage.setItem("atlas.probe","1");
+                          localStorage.removeItem("atlas.probe"); return true; }
+                    catch(_){ return false; } })(),
+  hasSR: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+  hasTTS: "speechSynthesis" in window,
+  micProbe: "not tried",
+  ttsProbe: "not tried",
+};
+
 function micNote(html){
   const el = $("#micnote");
   if (!html){ el.classList.remove("show"); el.innerHTML=""; return; }
-  el.innerHTML = html; el.classList.add("show");
+  el.innerHTML = html + ` <button data-diag>WHY?</button>`;
+  el.classList.add("show");
+  el.querySelector("[data-diag]")?.addEventListener("click", showDiagnostics);
+}
+function showDiagnostics(){
+  const rows = [
+    ["Running inside a frame", ENV.framed ? "yes" : "no"],
+    ["Frame grants microphone", ENV.micPolicy === null ? "unknown" : ENV.micPolicy ? "yes" : "no"],
+    ["Microphone request", ENV.micProbe],
+    ["Speech recognition API", ENV.hasSR ? "present" : "missing"],
+    ["Spoken replies", ENV.ttsProbe],
+    ["Voices installed", ENV.hasTTS ? String(speechSynthesis.getVoices().length) : "n/a"],
+    ["Settings can be saved", ENV.storage ? "yes" : "no (frame blocks storage)"],
+  ];
+  $("#micnote").innerHTML =
+    `<b>What this browser is allowing</b><table class="diag">` +
+    rows.map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("") +
+    `</table><div class="diagnote">` + (ENV.framed
+      ? `Microphone and speech are granted by the page that embeds this one, and no code in here can
+         turn them on. Every panel, action and typed command works regardless. For the full voice
+         version, run <code>index.html</code> from the repo over <code>http://localhost</code>, where
+         the browser asks you directly.`
+      : `Atlas is running top-level, so any refusal above came from the browser or the system rather
+         than an embedding page — check the mic icon in the address bar and your input device.`)
+    + `</div>`;
+  $("#micnote").classList.add("show");
 }
 
 /* ================================================================
@@ -593,22 +636,43 @@ if ("speechSynthesis" in window){
   pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
 }
 
+let ttsReported = false;
+function ttsFailed(why){
+  ENV.ttsProbe = "blocked (" + why + ")";
+  if (ttsReported) return;
+  ttsReported = true;
+  micNote(ENV.framed
+    ? `<b>Spoken replies are switched off by the page hosting this one.</b> The embedding frame doesn't allow speech output, so Atlas will answer in text instead. Every panel and command still works.`
+    : `<b>Spoken replies aren't playing</b> — the browser refused speech output${
+        ENV.hasTTS && !speechSynthesis.getVoices().length ? ", and no system voices are installed" : ""
+      }. Atlas will answer in text.`);
+}
 function speak(text, then){
   addMsg("atlas", text);
-  if (!S.voiceOn || !("speechSynthesis" in window)){ Entity.mood="idle"; then?.(); return; }
+  if (!S.voiceOn || !ENV.hasTTS){ Entity.mood="idle"; then?.(); return; }
   if (S.listening) stopListening();   // don't hear our own voice
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   if (voice) u.voice = voice;
   u.rate = 1.02; u.pitch = 1.0;
-  u.onstart = ()=> Entity.mood="speaking";
-  u.onboundary = ()=> Entity.pulse(.7);
-  u.onend = u.onerror = ()=>{
+  let started = false, done = false;
+  const finish = ()=>{
+    if (done) return;                 // onend and the watchdog can both land
+    done = true;
     Entity.mood = S.listening ? "listening" : "idle";
     then?.();
     if (S.flowOn && !S.listening) startListening();
   };
+  u.onstart = ()=>{ started = true; ENV.ttsProbe = "working"; Entity.mood="speaking"; };
+  u.onboundary = ()=> Entity.pulse(.7);
+  u.onend = finish;
+  u.onerror = ev => { ttsFailed(ev.error || "error"); finish(); };
   speechSynthesis.speak(u);
+  // Some frames neither speak nor fire onerror. Don't leave the user
+  // wondering why the room is silent — and don't strand flow mode.
+  setTimeout(()=>{
+    if (!started && !speechSynthesis.speaking){ ttsFailed("silent"); finish(); }
+  }, 1800);
 }
 
 /* ---- speech recognition ---- */
@@ -625,16 +689,35 @@ const MIC_ERR = {
   "no-speech":           [null, null],   // routine silence timeout — no banner
 };
 
-function startListening(){
-  if (!SR){ micNote(`<b>Voice input unavailable</b> — this browser has no speech recognition. Chrome or Edge on desktop supports it; typed input works everywhere.`); return; }
+async function startListening(){
+  if (!SR){ micNote(`<b>Voice input unavailable</b> — this browser has no speech recognition. Chrome and Edge on desktop have it; typed input works everywhere.`); return; }
   if (S.listening || starting) return;
-  if (micPolicyBlocked()){
-    micNote(`<b>Microphone not permitted here</b> — the frame hosting this page doesn't grant microphone access, so voice input can't start. Open the artifact in its own browser tab and it will work. Typing works either way.`);
-    return;
-  }
   starting = true;
   micNote("");
   $("#mic").classList.add("on");            // immediate feedback on the gesture
+
+  // Ask for the microphone for real rather than predicting the answer: this
+  // is what makes the browser show its permission prompt where it's allowed,
+  // and it settles fully before recognition starts so the two never race for
+  // the device.
+  const got = await AtlasAudio.start();
+  if (!got){
+    starting = false; $("#mic").classList.remove("on"); Entity.mood = "idle";
+    ENV.micProbe = "denied (" + AtlasAudio.denied + ")";
+    if (S.flowOn){                     // don't loop hands-free on a dead mic
+      S.flowOn = false; store.set("flow", false);
+      $("#flowbtn").classList.remove("on"); updateHint();
+    }
+    if (AtlasAudio.denied === "nodevice")
+      micNote(`<b>No microphone found</b> — no input device is reachable. Check your system input, then press the mic again.`);
+    else if (ENV.framed)
+      micNote(`<b>Voice input is switched off by the page hosting this one.</b> Atlas is running in an embedded frame that doesn't pass microphone access through, and nothing in here can grant it. Everything else works — type to Atlas below, and every panel action is live.`);
+    else
+      micNote(`<b>Microphone blocked</b> — your browser refused access to this page. Allow it from the mic icon in the address bar, then press the mic again.`);
+    return;
+  }
+  ENV.micProbe = "granted";
+  if (!S.listening && !starting) return;    // stopped while we were waiting
   rec = new SR();
   rec.lang = "en-GB"; rec.interimResults = true;
   rec.continuous = S.flowOn;                // hands-free mode keeps the channel open
@@ -642,9 +725,6 @@ function startListening(){
   rec.onstart = ()=>{
     starting=false; S.listening=true; micBlocked=false;
     $("#mic").classList.add("on"); Entity.mood="listening";
-    // Only now open the analyser: sharing the device with a *running*
-    // recognition session is safe, racing its startup is not.
-    AtlasAudio.start();
   };
   rec.onresult = e=>{
     let fin="", inter="";
@@ -710,7 +790,7 @@ $("#mic").addEventListener("click", ()=>{
 
 function updateHint(){
   $("#hint").textContent = !SR
-    ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE BELOW; REPLIES ARE STILL SPOKEN"
+    ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE ANY COMMAND BELOW"
     : S.flowOn
       ? "HANDS-FREE — START WITH “ATLAS …”, E.G. “ATLAS, BRIEF ME” · “ATLAS, BLOCK TIME”"
       : "BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK … · UNDO";
@@ -1566,8 +1646,13 @@ tickClock(); setInterval(tickClock, 15000);
 $("#wake").addEventListener("click", ()=>{
   if (S.awake) return; S.awake=true;
   // user gesture: prime TTS so later speech is allowed
-  if ("speechSynthesis" in window){
-    const u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); pickVoice();
+  // Prime speech on the gesture, and use that same silent utterance to find
+  // out whether this frame allows speech at all.
+  if (ENV.hasTTS){
+    const u = new SpeechSynthesisUtterance(" "); u.volume = 0;
+    u.onstart = ()=> ENV.ttsProbe = "working";
+    u.onerror = ev => ENV.ttsProbe = "blocked (" + (ev.error||"error") + ")";
+    speechSynthesis.speak(u); pickVoice();
   }
   $("#boot").classList.add("gone");
   setTimeout(()=>$("#boot").remove(), 800);

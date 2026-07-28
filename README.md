@@ -50,6 +50,28 @@ Opened as a plain file, the page still boots — entity, voice loop, and chat al
 work — with each panel showing an "open via claude.ai artifacts" notice instead
 of live data.
 
+### Voice vs. live data
+
+These pull in opposite directions, and it's worth knowing before you pick where
+to run it:
+
+| | Live connector data | Microphone + spoken replies |
+|---|---|---|
+| Published artifact | ✅ | ❌ — the embedding frame withholds both |
+| Run locally / self-hosted | ❌ — no `window.claude.mcp` | ✅ |
+
+Microphone access and speech synthesis are granted by whatever page embeds this
+one. The artifact frame doesn't pass either through, so inside it Atlas answers
+in text; the mic button explains this and a **WHY?** link shows exactly what the
+browser is permitting. Nothing in the page can grant itself those permissions.
+
+For the full voice experience, serve it top-level over a secure origin —
+`http://localhost` counts:
+
+```bash
+python3 -m http.server 8000     # then open http://localhost:8000/index.html
+```
+
 ## Design notes
 
 - Deliberately single-theme: a night-instrument console (petrol-blue ground,
