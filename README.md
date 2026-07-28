@@ -75,18 +75,21 @@ of live data.
 
 ### Voice vs. live data
 
-These pull in opposite directions, and it's worth knowing before you pick where
-to run it:
+| | Live connector data | Spoken replies | Microphone |
+|---|---|---|---|
+| Published artifact | ✅ | ✅ | ❌ withheld by the frame |
+| Run locally / self-hosted | ❌ no `window.claude.mcp` | ✅ | ✅ |
 
-| | Live connector data | Microphone + spoken replies |
-|---|---|---|
-| Published artifact | ✅ | ❌ — the embedding frame withholds both |
-| Run locally / self-hosted | ❌ — no `window.claude.mcp` | ✅ |
+Microphone and speech are Permissions-Policy features granted by whatever page
+embeds this one, and a page cannot grant them to itself. The artifact frame
+withholds the **microphone** but does allow **speech output** — so inside it
+Atlas talks and you type, which the UI states up front: the mic and FLOW
+controls are marked unavailable and explain why, and a **WHY?** link reports
+exactly what the browser is permitting.
 
-Microphone access and speech synthesis are granted by whatever page embeds this
-one. The artifact frame doesn't pass either through, so inside it Atlas answers
-in text; the mic button explains this and a **WHY?** link shows exactly what the
-browser is permitting. Nothing in the page can grant itself those permissions.
+The mic button stays clickable even when marked unavailable. It makes a real
+request rather than predicting the answer, so if the frame ever starts allowing
+the microphone it recovers on its own.
 
 For the full voice experience, serve it top-level over a secure origin —
 `http://localhost` counts:

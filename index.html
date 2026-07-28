@@ -187,6 +187,10 @@
   .dockbtn{flex:none;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
            color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:8px 12px}
   .dockbtn.on{color:var(--teal);border-color:rgba(69,224,190,.4)}
+  .dockbtn.off,#mic.off{opacity:.4}
+  #mic.off svg{fill:var(--ink3)}
+  #mic.off::before{content:"";position:absolute;left:14px;right:14px;top:50%;height:1.5px;
+    background:var(--ink3);transform:rotate(-35deg);border-radius:2px}
   #hint{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
         color:var(--ink3);padding:8px 0 0}
   #micnote{display:none;margin:8px 6px 0;padding:8px 12px;border-radius:10px;font-size:12.5px;
@@ -796,6 +800,19 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const WAKE_RE = /^(?:hey |ok |okay )?atlas[,!.\s]*(.*)$/i;
 let rec=null, interimEl=null, micBlocked=false, starting=false;
 
+/* The embedding frame can withhold the microphone while still allowing
+   speech output — which is exactly what the claude.ai artifact frame does.
+   That is a working half, not a failure, so the controls say so up front
+   rather than letting you discover it by pressing a dead button.
+   `null` policy means unknown: leave the controls alone and let a real
+   request decide. */
+const MIC_OFF = ENV.framed && ENV.micPolicy === false;
+function explainMicOff(){
+  micNote(`<b>Voice input is off in this frame, but Atlas still talks.</b>
+    The page hosting this one withholds the microphone, and nothing in here can
+    grant it. Type below and every reply comes back out loud.`);
+}
+
 const MIC_ERR = {
   "not-allowed":         ["Microphone blocked", "Your browser refused microphone access to this page. Allow it from the mic icon in the address bar, then press the mic again."],
   "service-not-allowed": ["Speech service blocked", "The browser's speech service isn't available to this page. Chrome or Edge on desktop is the reliable combination — typing works everywhere."],
@@ -903,9 +920,16 @@ $("#mic").addEventListener("click", ()=>{
   micBlocked = false;                          // an explicit click always gets a fresh attempt
   S.listening ? stopListening() : startListening();
 });
+$("#flowbtn").addEventListener("click", ev=>{
+  // hands-free is meaningless without an input device; say why instead of
+  // toggling a mode that can only fail
+  if (MIC_OFF){ ev.stopImmediatePropagation(); explainMicOff(); }
+}, true);
 
 function updateHint(){
-  $("#hint").textContent = !SR
+  $("#hint").textContent = MIC_OFF
+    ? "TYPE ANY COMMAND — ATLAS REPLIES ALOUD · BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING"
+    : !SR
     ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE ANY COMMAND BELOW"
     : S.flowOn
       ? "HANDS-FREE — START WITH “ATLAS …”, E.G. “ATLAS, BRIEF ME” · “ATLAS, BLOCK TIME”"
@@ -914,6 +938,15 @@ function updateHint(){
 // The button stays enabled even without support: pressing it explains why,
 // which is far better than a dead control the user has to guess about.
 if (!SR) $("#mic").title = "Voice input needs Chrome or Edge — press for details";
+if (MIC_OFF){
+  // marked unavailable, but still clickable — it makes a real request, so if
+  // the frame ever starts allowing the microphone this recovers by itself
+  $("#mic").classList.add("off");
+  $("#mic").title = "This frame withholds the microphone — press for details";
+  $("#flowbtn").classList.add("off");
+  $("#flowbtn").title = "Hands-free needs a microphone, which this frame withholds";
+  if (S.flowOn){ S.flowOn = false; store.set("flow", false); }
+}
 
 $("#voicebtn").addEventListener("click", e=>{
   S.voiceOn=!S.voiceOn; store.set("voice",S.voiceOn);
@@ -1776,7 +1809,13 @@ $("#wake").addEventListener("click", ()=>{
   startWatches();
   // FLOW persists across reloads — honour it here, on the wake gesture, which
   // is the only moment the browser will grant a microphone.
-  if (S.flowOn) setTimeout(startListening, 600);
+  if (S.flowOn && !MIC_OFF) setTimeout(startListening, 600);
+  // say once what this frame allows, so the first impression is "it talks,
+  // you type" rather than a mic button that does nothing
+  if (MIC_OFF && !store.get("micNoticeSeen")){
+    store.set("micNoticeSeen", true);
+    setTimeout(explainMicOff, 2600);
+  }
   const h = new Date().getHours();
   if (MCP() && h>=5 && h<12 && store.get("autobrief")!==todayKey()){
     // morning: deliver the briefing unprompted, once per day, after data lands
