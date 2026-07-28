@@ -190,6 +190,24 @@
   #hint{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
         color:var(--ink3);padding:8px 0 0}
 
+  /* clickable rows + inline actions */
+  .ev,.mail,.task .c,.lastact,.bar{cursor:pointer}
+  .acts{display:none;gap:8px;padding:6px 0 2px;flex-wrap:wrap}
+  .mail.open .acts,.task.open .acts{display:flex}
+  .actchip{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--teal);
+           border:1px solid rgba(69,224,190,.35);border-radius:999px;padding:3px 10px}
+  .actchip:hover{background:rgba(69,224,190,.08)}
+  .actchip.warn{color:var(--serious);border-color:rgba(236,131,90,.4)}
+  details.fold{margin-top:6px}
+  details.fold summary{font-family:var(--mono);font-size:10px;letter-spacing:.18em;
+    color:var(--ink3);cursor:pointer;padding:6px 0;list-style:none}
+  details.fold summary::-webkit-details-marker{display:none}
+  details.fold summary::before{content:"▸ "}
+  details.fold[open] summary::before{content:"▾ "}
+  .readiness{font-size:12.5px;color:var(--ink2);padding-top:8px;border-top:1px solid var(--line);margin-top:10px}
+  .readiness b{color:var(--teal);font-weight:600}
+  .streak{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;margin-left:auto}
+
   /* ---------- boot overlay ---------- */
   #boot{position:fixed;inset:0;z-index:50;background:var(--bg0);display:grid;
         place-items:center;transition:opacity .7s}
@@ -262,8 +280,9 @@
              autocomplete="off">
       <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
       <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
+      <button class="dockbtn" id="savebtn" title="Save today's brief as a Markdown file">SAVE</button>
     </div>
-    <div id="hint">BRIEF ME · WHAT’S NEXT · INBOX · TASKS · TRAINING · ADD TASK …</div>
+    <div id="hint">BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK …</div>
   </div>
 
   <div class="col" id="right">
@@ -304,6 +323,41 @@ const S = {
   unsubs: [],
 };
 ["cal","gmail","todo","strava"].forEach(k => S.meta[k] = {status:"off"});
+
+/* ---------------- persistence (survives reloads) ---------------- */
+const store = {
+  get(k, d){ try{ const v = JSON.parse(localStorage.getItem("atlas."+k)); return v ?? d; }catch(_){ return d; } },
+  set(k, v){ try{ localStorage.setItem("atlas."+k, JSON.stringify(v)); }catch(_){} },
+};
+S.voiceOn = store.get("voice", true);
+S.flowOn  = store.get("flow", false);
+let lastAction = null;   // most recent undoable action ({type:"focus"|"archive", ...})
+
+/* ---------------- live mic analysis (drives the entity) ---------------- */
+const AtlasAudio = {
+  ctx:null, analyser:null, stream:null, buf:null, ready:false,
+  async start(){
+    if (this.ready || this.failed) return this.ready;
+    try{
+      this.stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const src = this.ctx.createMediaStreamSource(this.stream);
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 256;
+      src.connect(this.analyser);
+      this.buf = new Uint8Array(this.analyser.frequencyBinCount);
+      this.ready = true;
+    }catch(_){ this.failed = true; }
+    return this.ready;
+  },
+  level(){
+    if (!this.ready) return 0;
+    this.analyser.getByteTimeDomainData(this.buf);
+    let s=0;
+    for (const v of this.buf){ const d=(v-128)/128; s += d*d; }
+    return Math.min(1, Math.sqrt(s/this.buf.length)*4.5);
+  },
+};
 
 /* ================================================================
    THE ENTITY — a particle aurora with eyes. Moods: idle, listening,
@@ -380,6 +434,8 @@ const Entity = (() => {
     if (mood==="speaking" && !REDUCED){
       // random-walk mouth energy while TTS is running
       if (Math.random()<.12) levelTarget = .25+Math.random()*.65;
+    } else if (mood==="listening" && AtlasAudio.ready){
+      levelTarget = Math.max(M.lvl, AtlasAudio.level());   // real voice amplitude
     } else levelTarget = M.lvl;
     boost -= boost*dt*3.5;
     level += (Math.min(1, levelTarget+boost)-level)*dt*8;
@@ -504,6 +560,7 @@ if ("speechSynthesis" in window){
 function speak(text, then){
   addMsg("atlas", text);
   if (!S.voiceOn || !("speechSynthesis" in window)){ Entity.mood="idle"; then?.(); return; }
+  if (S.listening) stopListening();   // don't hear our own voice
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   if (voice) u.voice = voice;
@@ -520,11 +577,14 @@ function speak(text, then){
 
 /* ---- speech recognition ---- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec=null, interimEl=null;
+const WAKE_RE = /^(?:hey |ok |okay )?atlas[,!.\s]*(.*)$/i;
+let rec=null, interimEl=null, micBlocked=false;
 function startListening(){
-  if (!SR || S.listening) return;
+  if (!SR || S.listening || micBlocked) return;
+  AtlasAudio.start();                       // fire-and-forget: entity reacts to real amplitude
   rec = new SR();
-  rec.lang = "en-GB"; rec.interimResults = true; rec.continuous = false;
+  rec.lang = "en-GB"; rec.interimResults = true;
+  rec.continuous = S.flowOn;                // hands-free mode keeps the channel open
   S.listening = true; $("#mic").classList.add("on"); Entity.mood="listening";
   interimEl?.remove(); interimEl=null;
   rec.onresult = e=>{
@@ -537,32 +597,66 @@ function startListening(){
       interimEl.textContent = inter+"…";
       transcript.scrollTop = transcript.scrollHeight;
     }
-    if (fin){ interimEl?.remove(); interimEl=null; handleUtterance(fin.trim()); }
+    if (fin){
+      interimEl?.remove(); interimEl=null;
+      fin = fin.trim();
+      if (S.flowOn){
+        // hands-free: only sentences addressed to Atlas count
+        const m = fin.match(WAKE_RE);
+        if (!m) return;
+        const cmd = m[1].trim();
+        if (!cmd){ speak("Yes?"); return; }
+        handleUtterance(cmd);
+      } else handleUtterance(fin);
+    }
   };
   rec.onend = ()=>{
     S.listening=false; $("#mic").classList.remove("on");
     if (Entity.mood==="listening") Entity.mood="idle";
+    // hands-free: reopen the channel unless Atlas is mid-reply (speak() resumes us)
+    if (S.flowOn && S.awake && !micBlocked)
+      setTimeout(()=>{
+        if (S.flowOn && !S.listening && !window.speechSynthesis?.speaking) startListening();
+      }, 450);
   };
   rec.onerror = ev=>{
     S.listening=false; $("#mic").classList.remove("on"); Entity.mood="idle";
-    if (ev.error==="not-allowed")
+    if (ev.error==="not-allowed"){
+      micBlocked = true;
       addMsg("atlas","I need microphone permission for voice — or just type below.");
+    }
   };
   try{ rec.start(); }catch(_){ S.listening=false; $("#mic").classList.remove("on"); }
 }
-function stopListening(){ try{ rec?.stop(); }catch(_){} }
+function stopListening(){ try{ rec?.stop(); }catch(_){} S.listening=false; $("#mic").classList.remove("on"); }
 
 $("#mic").addEventListener("click", ()=> S.listening ? stopListening() : startListening());
+
+function updateHint(){
+  $("#hint").textContent = !SR
+    ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE BELOW; REPLIES ARE STILL SPOKEN"
+    : S.flowOn
+      ? "HANDS-FREE — START WITH “ATLAS …”, E.G. “ATLAS, BRIEF ME” · “ATLAS, BLOCK TIME”"
+      : "BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK … · UNDO";
+}
 if (!SR){ $("#mic").disabled = true; $("#mic").title = "Voice input needs Chrome or Edge — type instead"; }
 
 $("#voicebtn").addEventListener("click", e=>{
-  S.voiceOn=!S.voiceOn; e.currentTarget.classList.toggle("on",S.voiceOn);
+  S.voiceOn=!S.voiceOn; store.set("voice",S.voiceOn);
+  e.currentTarget.classList.toggle("on",S.voiceOn);
   if (!S.voiceOn) window.speechSynthesis?.cancel();
 });
 $("#flowbtn").addEventListener("click", e=>{
-  S.flowOn=!S.flowOn; e.currentTarget.classList.toggle("on",S.flowOn);
+  S.flowOn=!S.flowOn; store.set("flow",S.flowOn);
+  e.currentTarget.classList.toggle("on",S.flowOn);
+  updateHint();
   if (S.flowOn && !S.listening) startListening();
+  else if (!S.flowOn && S.listening) stopListening();
 });
+$("#savebtn").addEventListener("click", ()=> saveBrief());
+$("#voicebtn").classList.toggle("on", S.voiceOn);
+$("#flowbtn").classList.toggle("on", S.flowOn);
+updateHint();
 $("#say").addEventListener("keydown", e=>{
   if (e.key==="Enter" && e.target.value.trim()){
     handleUtterance(e.target.value.trim()); e.target.value="";
@@ -672,8 +766,24 @@ function calEvents(){
     const allday = !e.start?.dateTime;
     const start = new Date(e.start?.dateTime || (e.start?.date+"T00:00:00"));
     const end   = new Date(e.end?.dateTime   || (e.end?.date  +"T23:59:59"));
-    return {title:e.summary||"(untitled)", loc:e.location, allday, start, end};
+    return {title:e.summary||"(untitled)", loc:e.location, allday, start, end,
+            attendees:e.attendees||null};
   }).sort((a,b)=>a.start-b.start);
+}
+function speakEvent(e){
+  const now = new Date();
+  let s = `${e.title}, ${e.allday ? "all day" : fmtT(e.start)+" to "+fmtT(e.end)}`;
+  if (e.loc) s += `, at ${e.loc.split(",")[0]}`;
+  if (e.attendees?.length){
+    const acc = e.attendees.filter(a=>a.responseStatus==="accepted").length;
+    const pend = e.attendees.filter(a=>a.responseStatus==="needsAction").length;
+    s += `. ${acc} of ${e.attendees.length} have accepted${pend?`, ${pend} yet to reply`:""}`;
+  }
+  if (e.start>now){
+    const m = Math.round((e.start-now)/60000);
+    s += m<120 ? `. Starts in ${m} minutes.` : `. Starts at ${fmtT(e.start)}.`;
+  } else if (e.end<=now) s += ". Already done.";
+  speak(s);
 }
 function renderCal(){
   const body = $("#p-cal .body");
@@ -682,7 +792,7 @@ function renderCal(){
   if (!evs.length){ body.innerHTML=`<div class="empty">Clear calendar — nothing scheduled.</div>`; return; }
   const next = evs.find(e=>e.start>now);
   let html="", lastDay="";
-  for (const e of evs){
+  evs.forEach((e,i)=>{
     const dstr = e.start.toDateString();
     if (dstr!==lastDay){
       lastDay=dstr;
@@ -696,12 +806,14 @@ function renderCal(){
       const m=Math.round((e.start-now)/60000);
       chip=`<span class="chip">${m<60?`IN ${m}M`:`IN ${Math.round(m/60)}H`}</span>`;
     }
-    html += `<div class="ev${e===next?" next":""}${isPast?" past":""}">
+    html += `<div class="ev${e===next?" next":""}${isPast?" past":""}" data-i="${i}" title="Click to hear details">
       <div class="t">${e.allday?"ALL DAY":fmtT(e.start)}</div>
       <div><div class="name">${esc(e.title)}${chip}</div>
       ${e.loc?`<div class="loc">${esc(e.loc)}</div>`:""}</div></div>`;
-  }
+  });
   body.innerHTML = html;
+  body.querySelectorAll(".ev").forEach(el=>
+    el.addEventListener("click", ()=>speakEvent(evs[+el.dataset.i])));
 }
 
 /* --- todoist --- */
@@ -722,23 +834,49 @@ function renderTodo(){
   const row = (t, od) => `
     <div class="task" data-id="${esc(t.id)}">
       <button class="tick" aria-label="Complete: ${esc(t.content)}"></button>
-      <div class="c">
+      <div class="c" title="Click for options">
         ${t.priority && t.priority!=="p4" ? `<span class="pri ${t.priority}">${t.priority.toUpperCase()}</span>`:""}
         ${esc(t.content)}
         <div class="meta">${od?`<span class="od">overdue · ${esc((t.dueDate||t.deadlineDate||"").slice(0,10))}</span>`
                              :(t.dueDate&&t.dueDate.length>10?fmtT(new Date(t.dueDate)):"today")}${t.recurring&&t.recurring!==false?" · ↻":""}</div>
+        <div class="acts">
+          <button class="actchip" data-act="tomorrow">→ TOMORROW</button>
+          <button class="actchip" data-act="next week">→ NEXT WEEK</button>
+        </div>
       </div>
     </div>`;
   let html="";
   if (overdue.length){
     html += `<div class="daylabel">OVERDUE · ${overdue.length}</div>` + overdue.map(t=>row(t,true)).join("");
   }
-  html += `<div class="daylabel">DUE TODAY · ${today.length}</div>`;
+  html += `<div class="daylabel" style="display:flex">DUE TODAY · ${today.length}<span class="streak" id="streak"></span></div>`;
   html += today.length ? today.map(t=>row(t,false)).join("") : `<div class="empty">Nothing due today.</div>`;
   body.innerHTML = html;
+  renderStreak();
   body.querySelectorAll(".task .tick").forEach(btn=>{
     btn.addEventListener("click", ()=> completeTask(btn.closest(".task")));
   });
+  body.querySelectorAll(".task .c").forEach(el=>{
+    el.addEventListener("click", ev=>{
+      if (ev.target.closest(".actchip")) return;
+      el.closest(".task").classList.toggle("open");
+    });
+  });
+  body.querySelectorAll(".task .actchip").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      rescheduleTask(btn.closest(".task").dataset.id, resolveDay(btn.dataset.act), btn.dataset.act);
+    });
+  });
+}
+function renderStreak(){
+  const el = $("#streak"); if (!el) return;
+  const days = S.data.completedByDay;
+  if (!days) return;
+  let n=0; const d=new Date();
+  // today counts if something's done; otherwise start from yesterday
+  if (!days[dayKey(d)]) d.setDate(d.getDate()-1);
+  while (days[dayKey(d)]){ n++; d.setDate(d.getDate()-1); }
+  if (n>0) el.textContent = `STREAK ${n}D ⚡`;
 }
 async function completeTask(el){
   const mcp=MCP(); if (!mcp) return;
@@ -773,19 +911,118 @@ $("#addtask").addEventListener("submit", e=>{
   if (v){ addTask(v); $("#newtask").value=""; }
 });
 
+/* --- day words → YYYY-MM-DD --- */
+function resolveDay(word){
+  const d = new Date(); word = (word||"").toLowerCase().trim();
+  if (word==="today" || word==="tonight") return dayKey(d);
+  if (word==="tomorrow"){ d.setDate(d.getDate()+1); return dayKey(d); }
+  if (word==="next week"){ d.setDate(d.getDate() + ((8-d.getDay())%7 || 7)); return dayKey(d); } // next Monday
+  const names=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const i = names.indexOf(word.replace(/^on /,""));
+  if (i>=0){ d.setDate(d.getDate() + ((i-d.getDay()+7)%7 || 7)); return dayKey(d); }
+  return null;
+}
+function fuzzyTask(words){
+  const ts = taskBuckets().all;
+  const qs = words.toLowerCase().split(/\s+/).filter(w=>w.length>2);
+  let best=null, bs=0;
+  for (const t of ts){
+    const c = t.content.toLowerCase();
+    let s=0; for (const w of qs) if (c.includes(w)) s++;
+    if (s>bs){ bs=s; best=t; }
+  }
+  return bs>0 ? best : null;
+}
+async function rescheduleTask(id, date, label){
+  const mcp=MCP(); if (!mcp || !date) return;
+  const t = (S.data.todo?.tasks||[]).find(x=>x.id===id);
+  try{
+    await mcp.callTool("Todoist","reschedule-tasks",{tasks:[{id, date}]});
+    await mcp.invalidate("Todoist","find-tasks-by-date").catch(()=>{});
+    Entity.pulse(.6);
+    speak(`Moved${t?` “${t.content}”`:""} to ${label||date}.`);
+  }catch(err){
+    speak("Couldn't move that one. " + errCopy(err?.code, "Todoist"));
+  }
+}
+
+/* --- focus block: put the top task into the next free calendar hour --- */
+async function focusBlock(dayOffset=0){
+  const mcp=MCP();
+  if (!mcp){ speak("Focus blocks need the connector bridge — open me from your claude.ai artifacts."); return; }
+  const {overdue, today} = taskBuckets();
+  const target = [...overdue,...today].sort((a,b)=>(a.priority||"p4").localeCompare(b.priority||"p4"))[0];
+  if (!target){ speak("Nothing on the list to block time for — you're clear."); return; }
+  const now = new Date();
+  const base = new Date(now); base.setDate(base.getDate()+dayOffset);
+  let cursor = new Date(base); cursor.setHours(8,0,0,0);
+  if (dayOffset===0 && now>cursor) cursor = new Date(Math.ceil(now.getTime()/900000)*900000); // next 15-min mark
+  const dayEnd = new Date(base); dayEnd.setHours(21,30,0,0);
+  const dur = 60*60000;
+  const evs = calEvents().filter(e=>!e.allday && e.end>cursor && e.start<dayEnd)
+                         .sort((a,b)=>a.start-b.start);
+  for (const e of evs){
+    if (e.start - cursor >= dur) break;
+    if (e.end > cursor) cursor = new Date(e.end);
+  }
+  if (cursor.getTime()+dur > dayEnd.getTime()){
+    speak(dayOffset ? "Tomorrow looks full — no free hour between 8 and 9:30 pm."
+                    : "No free hour left today. Say block time tomorrow and I'll look there.");
+    return;
+  }
+  Entity.mood="thinking";
+  const end = new Date(cursor.getTime()+dur);
+  try{
+    const r = await mcp.callTool("Google Calendar","create_event",{
+      summary:`Focus: ${target.content}`,
+      description:"Blocked by Atlas for your top task.",
+      startTime:cursor.toISOString(), endTime:end.toISOString(),
+      notificationLevel:"NONE",
+    });
+    lastAction = {type:"focus", eventId:r.payload?.id};
+    await mcp.invalidate("Google Calendar","list_events").catch(()=>{});
+    speak(`Blocked ${fmtT(cursor)} to ${fmtT(end)}${dayOffset?" tomorrow":""} for: ${target.content}. Say undo to remove it.`);
+  }catch(err){
+    speak("Couldn't create the block. " + errCopy(err?.code, "Google Calendar"));
+  }
+}
+
+async function undoLast(){
+  if (!lastAction){ speak("Nothing to undo."); return; }
+  const mcp=MCP(); if (!mcp) return;
+  const a = lastAction; lastAction=null;
+  try{
+    if (a.type==="focus"){
+      await mcp.callTool("Google Calendar","delete_event",{eventId:a.eventId, notificationLevel:"NONE"});
+      await mcp.invalidate("Google Calendar","list_events").catch(()=>{});
+      speak("Focus block removed.");
+    } else if (a.type==="archive"){
+      await mcp.callTool("Gmail","label_thread",{threadId:a.threadId, labelIds:["INBOX"]});
+      await mcp.invalidate("Gmail","search_threads").catch(()=>{});
+      speak("Put it back in your inbox.");
+    }
+  }catch(err){ speak("Undo didn't take. " + errCopy(err?.code, "the connector")); }
+}
+
 /* --- gmail --- */
+const PROMO_RE = /no-?reply|donotreply|newsletter|offers?@|marketing|promo|complete-order|auto-confirm|notification|updates?@|news@|deals?@/i;
+const PROMO_SUBJ_RE = /unsubscribe|% ?off|sale|your (order|receipt)|ordered:|receipt for|free delivery|discount/i;
 function mailItems(){
   const th = S.data.gmail?.threads || [];
   return th.map(t=>{
     const m = t.messages?.[t.messages.length-1] || {};
-    return {
-      from: (m.sender||"").replace(/<.*>/,"").trim(),
+    const fromRaw = m.sender||"";
+    const item = {
+      threadId: t.id,
+      from: fromRaw.replace(/<.*>/,"").trim(),
       subj: m.subject || "(no subject)",
       snip: (m.snippet||"").replace(/&#?\w+;/g," ").replace(/\s+/g," ").trim(),
       unread: (m.labelIds||[]).includes("UNREAD"),
       important: (m.labelIds||[]).includes("IMPORTANT"),
       date: m.date ? new Date(m.date) : null,
     };
+    item.low = !item.important && (PROMO_RE.test(fromRaw) || PROMO_SUBJ_RE.test(item.subj));
+    return item;
   });
 }
 function renderGmail(){
@@ -795,16 +1032,67 @@ function renderGmail(){
   if (!items.length){ body.innerHTML=`<div class="empty">Inbox quiet — nothing in the last 48 hours.</div>`; return; }
   const when = d => !d ? "" :
     (d.toDateString()===new Date().toDateString() ? fmtT(d) : d.toLocaleDateString([], {weekday:"short"}));
+  const row = m => `<div class="mail${m.unread?" unread":""}" data-tid="${esc(m.threadId)}" title="Click for actions">
+      <div class="row1"><span class="from">${esc(m.from)}</span><span class="when">${when(m.date)}</span></div>
+      <div class="subj">${esc(m.subj)}</div>
+      <div class="snip">${esc(m.snip.slice(0,110))}</div>
+      <div class="acts">
+        <button class="actchip" data-act="read">▷ READ ALOUD</button>
+        <button class="actchip warn" data-act="archive">ARCHIVE</button>
+      </div></div>`;
+  const pri = items.filter(m=>!m.low), low = items.filter(m=>m.low);
   body.innerHTML = `
     <div class="mailstat">
       <div><div class="n">${unread}</div><div class="l">UNREAD</div></div>
       <div><div class="n">${items.length}</div><div class="l">LAST 48H</div></div>
-      <div><div class="n">${items.filter(m=>m.important).length}</div><div class="l">FLAGGED</div></div>
+      <div><div class="n">${low.length}</div><div class="l">LOW PRIORITY</div></div>
     </div>` +
-    items.map(m=>`<div class="mail${m.unread?" unread":""}">
-      <div class="row1"><span class="from">${esc(m.from)}</span><span class="when">${when(m.date)}</span></div>
-      <div class="subj">${esc(m.subj)}</div>
-      <div class="snip">${esc(m.snip.slice(0,110))}</div></div>`).join("");
+    pri.map(row).join("") +
+    (low.length ? `<details class="fold"><summary>LOW PRIORITY · ${low.length}</summary>${low.map(row).join("")}</details>` : "");
+  body.querySelectorAll(".mail").forEach(el=>{
+    el.addEventListener("click", ev=>{
+      const chip = ev.target.closest(".actchip");
+      if (!chip){ el.classList.toggle("open"); return; }
+      if (chip.dataset.act==="read") readMail(el.dataset.tid);
+      else archiveMail(el);
+    });
+  });
+}
+async function readMail(threadId){
+  const mcp=MCP();
+  if (!mcp){ speak("Reading email needs the connector bridge."); return; }
+  Entity.mood="thinking";
+  try{
+    const r = await mcp.callTool("Gmail","get_thread",
+      {threadId, messageFormat:"FULL_CONTENT"}, {cache:{staleTime:300000}});
+    const msg = (r.payload?.messages||[]).slice(-1)[0] || {};
+    let text = msg.plaintextBody || "";
+    if (!text && msg.htmlBody){
+      const doc = new DOMParser().parseFromString(msg.htmlBody, "text/html");
+      doc.querySelectorAll("style,script,title").forEach(n=>n.remove());
+      text = doc.body?.textContent || "";
+    }
+    text = text.replace(/https?:\/\/\S+/g," ").replace(/\s+/g," ").trim() || msg.snippet || "";
+    const cut = text.slice(0, 550);
+    speak(`From ${msg.sender||"unknown"}. ${msg.subject?`Subject: ${msg.subject}. `:""}${cut}${
+      text.length>550 ? " … it carries on, but that's the gist." : ""}`);
+  }catch(err){ speak("Couldn't open that email. " + errCopy(err?.code, "Gmail")); }
+}
+async function archiveMail(el){
+  const mcp=MCP(); if (!mcp) return;
+  const threadId = el.dataset.tid;
+  el.style.opacity=".3";
+  try{
+    await mcp.callTool("Gmail","unlabel_thread",{threadId, labelIds:["INBOX"]});
+    lastAction = {type:"archive", threadId};
+    await mcp.invalidate("Gmail","search_threads").catch(()=>{});
+    el.remove();
+    Entity.pulse(.6);
+    addMsg("atlas","Archived. Say undo to bring it back.");
+  }catch(err){
+    el.style.opacity="";
+    speak("Couldn't archive that. " + errCopy(err?.code, "Gmail"));
+  }
 }
 
 /* --- strava --- */
@@ -829,6 +1117,22 @@ function trainingDigest(){
   }
   return {days, wk, last: acts[0]||null};
 }
+function readiness(){
+  const acts = S.data.strava?.activities || [];
+  if (!acts.length) return null;
+  const now = Date.now();
+  let acute=0, prior=0;
+  for (const a of acts){
+    const days = (now - new Date(a.start_local)) / 86400000;
+    const eff = a.summary?.relative_effort || 0;
+    if (days<=7) acute += eff; else if (days<=14) prior += eff;
+  }
+  const ratio = prior ? acute/prior : (acute ? 1.5 : 1);
+  const verdict = ratio>1.35 ? "load well up on last week — favour recovery"
+                : ratio<0.75 ? "fresh — room to push"
+                : "load steady — on track";
+  return {acute, prior, ratio, verdict};
+}
 function renderStrava(){
   const body = $("#p-strava .body");
   const acts = S.data.strava?.activities || [];
@@ -844,10 +1148,12 @@ function renderStrava(){
       ${hot&&d.effort?`<span class="v">${d.effort}</span>`:""}
       <i style="height:${Math.max(h,2)}%"></i></div>`;
   }).join("");
-  const lastLine = last ? `<div class="lastact">Last: <b>${esc(last.name)}</b> — ${
+  const lastLine = last ? `<div class="lastact" title="Click to hear details">Last: <b>${esc(last.name)}</b> — ${
     last.summary?.distance ? (last.summary.distance/1000).toFixed(1)+" km, " : ""}${
     Math.round((last.summary?.moving_time||0)/60)} min${
     last.summary?.pr_count?`, ${last.summary.pr_count} PRs 🏅`:""}</div>` : "";
+  const rd = readiness();
+  const pace5k = S.data.zones?.sample_race_pace?.time;
   body.innerHTML = `
     <div class="stats">
       <div class="stat"><div class="n">${wk.km.toFixed(0)}<small> km</small></div><div class="l">7-DAY DIST</div></div>
@@ -857,7 +1163,34 @@ function renderStrava(){
     <div class="daylabel">RELATIVE EFFORT · 14 DAYS${focus?` · FOCUS: ${esc(String(focus).toUpperCase())}`:""}</div>
     <div class="chart" role="img" aria-label="Daily relative training effort, last 14 days">${bars}</div>
     <div class="xlab">${days.map(d=>`<span>${d.lab}</span>`).join("")}</div>
-    ${lastLine}`;
+    ${lastLine}
+    ${rd ? `<div class="readiness"><b>${rd.verdict.toUpperCase().split(" — ")[0]}</b> — ${esc(rd.verdict.split(" — ")[1]||"")}
+      · 7-day effort ${rd.acute} vs ${rd.prior} prior${pace5k?` · 5K ref ${esc(pace5k)}`:""}</div>` : ""}`;
+  body.querySelector(".lastact")?.addEventListener("click", ()=>speakActivity(last));
+  body.querySelectorAll(".bar").forEach((el,i)=>{
+    el.addEventListener("click", ()=>speakDay(days[i]));
+  });
+}
+function speakActivity(a){
+  if (!a) return;
+  const s = a.summary||{};
+  let out = `${a.name}, ${new Date(a.start_local).toLocaleDateString([], {weekday:"long"})}. `;
+  if (s.distance){
+    const km = s.distance/1000, mins = s.moving_time/60;
+    const pace = mins/km, pm = Math.floor(pace), ps = Math.round((pace-pm)*60);
+    out += `${km.toFixed(1)} kilometres in ${Math.round(mins)} minutes — ${pm}:${String(ps).padStart(2,"0")} per k. `;
+  } else out += `${Math.round((s.moving_time||0)/60)} minutes. `;
+  if (s.relative_effort) out += `Effort ${s.relative_effort}. `;
+  if (s.pr_count) out += `${s.pr_count} personal records. `;
+  if (s.kudos_count) out += `${s.kudos_count} kudos.`;
+  speak(out.trim());
+}
+function speakDay(d){
+  if (!d) return;
+  if (!d.effort){ speak(`${d.key}: rest day.`); return; }
+  const acts = (S.data.strava?.activities||[]).filter(a=>dayKey(new Date(a.start_local))===d.key);
+  speak(`${d.key}: ${acts.length} session${acts.length===1?"":"s"} — ${
+    acts.map(a=>a.name).join(", ")}. Total effort ${d.effort}, ${d.mins} minutes.`);
 }
 
 /* ---------------- boot the watches ---------------- */
@@ -872,10 +1205,30 @@ function startWatches(){
   watchSection("todo","find-tasks-by-date",
     {startDate:"today", limit:100}, renderTodo, {refetch:180000});
   watchSection("strava","list_activities", {first:30}, renderStrava, {refetch:600000});
-  // one-shot profile read (name + training focus flavour the briefings)
+  // one-shot reads: profile + zones flavour the briefings and readiness line
   MCP()?.callTool("Strava","get_athlete_profile",{}, {cache:{staleTime:300000}})
     .then(r=>{ S.data.profile=r.payload; renderStrava(); })
     .catch(()=>{});
+  MCP()?.callTool("Strava","get_athlete_zones",{}, {cache:{staleTime:300000}})
+    .then(r=>{ S.data.zones=r.payload; renderStrava(); })
+    .catch(()=>{});
+  refreshCompleted();
+}
+async function refreshCompleted(){
+  const mcp=MCP(); if (!mcp) return;
+  try{
+    const since=new Date(); since.setDate(since.getDate()-6);
+    const r = await mcp.callTool("Todoist","find-completed-tasks",
+      {since:dayKey(since), until:todayKey()}, {cache:{staleTime:120000, refresh:true}});
+    const byDay={};
+    for (const t of (r.payload?.tasks||[])){
+      const k=(t.completedAt||"").slice(0,10);
+      if (k) byDay[k]=(byDay[k]||0)+1;
+    }
+    S.data.completed = r.payload?.tasks||[];
+    S.data.completedByDay = byDay;
+    renderStreak();
+  }catch(_){ /* streak/debrief simply stay unavailable */ }
 }
 addEventListener("pagehide", ()=> S.unsubs.forEach(u=>{ try{u()}catch(_){} }));
 
@@ -891,9 +1244,82 @@ function briefInbox(){
   if (S.meta.gmail.status==="err"||!S.data.gmail) return "I can't reach your inbox right now.";
   const items = mailItems(); const un=items.filter(m=>m.unread);
   if (!items.length) return "Your inbox is quiet — nothing new in the last two days.";
-  let s = `You have ${un.length} unread of ${items.length} recent emails.`;
-  if (un.length) s += " Newest: " + un.slice(0,3).map(m=>`${m.subj}, from ${m.from}`).join("; ") + ".";
+  const seen = new Set(store.get("seenMail", []));
+  const fresh = un.filter(m=>!seen.has(m.threadId));
+  const freshPri = fresh.filter(m=>!m.low);
+  let s;
+  if (!fresh.length)
+    s = `Nothing new in the inbox since I last briefed you — ${un.length} unread total.`;
+  else {
+    s = `${fresh.length} new email${fresh.length>1?"s":""} since last time`;
+    s += freshPri.length
+      ? `. Worth a look: ${freshPri.slice(0,3).map(m=>`${m.subj}, from ${m.from}`).join("; ")}.`
+      : ` — all low priority.`;
+  }
+  // remember what's been briefed (cap the stored list)
+  store.set("seenMail", [...new Set([...items.map(m=>m.threadId), ...seen])].slice(0,300));
   return s;
+}
+function briefDoneToday(){
+  const done = (S.data.completed||[]).filter(t=>(t.completedAt||"").slice(0,10)===todayKey());
+  if (!done.length) return "No tasks closed out yet today.";
+  return `You've closed ${done.length} task${done.length>1?"s":""} today: ${
+    done.slice(0,4).map(t=>t.content).join(", ")}.`;
+}
+function debrief(){
+  refreshCompleted();   // freshen in background for next time
+  const parts = [`Here's the day debrief.`, briefDoneToday()];
+  const trainToday = (S.data.strava?.activities||[])
+    .filter(a=>dayKey(new Date(a.start_local))===todayKey());
+  parts.push(trainToday.length
+    ? `Training done: ${trainToday.map(a=>a.name).join(", ")}.`
+    : "No training logged today.");
+  const now=new Date();
+  const tmrw = calEvents().filter(e=>e.start>now && e.start.toDateString()!==now.toDateString())[0];
+  if (tmrw) parts.push(`Tomorrow starts with ${tmrw.title} at ${tmrw.allday?"the top of the day":fmtT(tmrw.start)}.`);
+  const days=S.data.completedByDay;
+  if (days){
+    let n=0; const d=new Date();
+    if (!days[dayKey(d)]) d.setDate(d.getDate()-1);
+    while (days[dayKey(d)]){ n++; d.setDate(d.getDate()-1); }
+    if (n>1) parts.push(`That's ${n} days straight with tasks completed.`);
+  }
+  return parts.join(" ");
+}
+function buildBriefMd(){
+  const now=new Date();
+  const evs = calEvents().filter(e=>e.start.toDateString()===now.toDateString());
+  const {overdue, today} = taskBuckets();
+  const items = mailItems();
+  const {wk, last} = trainingDigest();
+  const rd = readiness();
+  return [
+    `# Atlas brief — ${now.toDateString()}`, "",
+    `## Schedule`,
+    evs.length ? evs.map(e=>`- ${e.allday?"All day":fmtT(e.start)} — ${e.title}${e.loc?` (${e.loc.split(",")[0]})`:""}`).join("\n") : "- Clear.",
+    "", `## Tasks`,
+    overdue.length ? `**Overdue (${overdue.length})**\n`+overdue.map(t=>`- [ ] ${t.content}`).join("\n") : "",
+    today.length ? `**Due today (${today.length})**\n`+today.map(t=>`- [ ] ${t.content}`).join("\n") : "- Nothing due today.",
+    "", `## Inbox`,
+    items.length ? items.filter(m=>!m.low).map(m=>`- ${m.unread?"🔵 ":""}${m.subj} — ${m.from}`).join("\n") : "- Quiet.",
+    "", `## Training`,
+    `- Last 7 days: ${wk.n} sessions, ${wk.km.toFixed(0)} km, ${(wk.mins/60).toFixed(1)} h`,
+    last ? `- Last: ${last.name}` : "",
+    rd ? `- Readiness: ${rd.verdict} (7-day effort ${rd.acute} vs ${rd.prior} prior)` : "",
+    "", `_Generated by Atlas at ${fmtT(now)}_`,
+  ].filter(x=>x!=="" || true).join("\n");
+}
+async function saveBrief(){
+  const dl = window.claude?.downloads;
+  if (!dl){ speak("Saving files needs the claude.ai artifact viewer."); return; }
+  try{
+    await dl.save({filename:`atlas-brief-${todayKey()}.md`, data:buildBriefMd()});
+    speak("Brief saved.");
+  }catch(err){
+    if (err?.code==="declined") addMsg("atlas","No problem — not saved.");
+    else if (err?.code==="rate_limited") addMsg("atlas","A save prompt is already open — decide that one first.");
+    else speak("Couldn't save the brief just now.");
+  }
 }
 function briefCal(){
   if (S.meta.cal.status==="err"||!S.data.cal) return "I can't see your calendar right now.";
@@ -950,7 +1376,7 @@ function handleUtterance(text){
   Entity.mood="thinking";
   const q = text.toLowerCase().replace(/[?!.]/g,"").trim();
 
-  // task capture: "add task X", "remind me to X", "new task X"
+  // ---- action intents (these do their own speaking) ----
   const add = q.match(/^(?:add(?: a)? task|new task|create(?: a)? task|remind me to)\s+(.+)$/);
   if (add){
     let content = add[1], due=null;
@@ -959,10 +1385,37 @@ function handleUtterance(text){
     addTask(content.trim(), due);
     return;
   }
+  const move = q.match(/^(?:reschedule|push|move|bump|delay)\s+(.+?)\s+(?:to|until|till|for)\s+(today|tomorrow|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/);
+  if (move){
+    const t = fuzzyTask(move[1]);
+    if (!t){ speak(`I couldn't find an open task matching “${move[1]}”.`); return; }
+    rescheduleTask(t.id, resolveDay(move[2]), move[2]);
+    return;
+  }
+  if (/^undo\b/.test(q)){ undoLast(); return; }
+  if (/\b(block|book|reserve)\b.*\b(time|hour|slot|focus)\b|^focus block/.test(q)){
+    focusBlock(/tomorrow/.test(q) ? 1 : 0); return;
+  }
+  if (/\b(save|download|export)\b.*\b(brief|summary|day)\b/.test(q)){ saveBrief(); return; }
+  if (/\b(read|open)\b.*\b(email|mail|it|that|latest|newest)\b/.test(q)){
+    const target = mailItems().filter(m=>!m.low && m.unread)[0] || mailItems()[0];
+    if (!target){ speak("Nothing in the inbox to read."); return; }
+    readMail(target.threadId);
+    return;
+  }
+
+  // ---- reporting intents ----
   setTimeout(()=>{   // brief thinking beat before the reply lands
     let reply;
-    if (/\b(brief|briefing|my day|good (morning|afternoon|evening)|status|report|catch me up|debrief)\b/.test(q))
+    if (/\b(debrief|wrap( it)? up|close out|how did i do|end of day)\b/.test(q))
+      reply = debrief();
+    else if (/\b(brief|briefing|my day|good (morning|afternoon|evening)|status|report|catch me up)\b/.test(q))
       reply = fullBrief();
+    else if (/\b(ready|readiness|recover|rest day|should i train)\b/.test(q)){
+      const rd = readiness();
+      reply = rd ? `Training readiness: ${rd.verdict}. Seven-day effort ${rd.acute} against ${rd.prior} the week before.`
+                 : "I don't have enough training data for a readiness read yet.";
+    }
     else if (/\b(what'?s next|next (up|event|meeting)|upcoming)\b/.test(q))
       reply = briefCal();
     else if (/\b(calendar|schedule|meeting|event|agenda|today)\b/.test(q))
@@ -978,11 +1431,11 @@ function handleUtterance(text){
     else if (/\b(thanks|thank you|cheers|nice one)\b/.test(q))
       reply = "Any time.";
     else if (/\b(who are you|what are you|your name)\b/.test(q))
-      reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training, and I can capture tasks for you.";
+      reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training. I can capture and move tasks, block focus time, archive email, and read messages out loud.";
     else if (/\b(help|what can you do|commands)\b/.test(q))
-      reply = "Try: brief me. What's next. How's my inbox. What's due today. How's training. Or: add task, then anything you want captured.";
+      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Debrief. Save my brief. Or undo.";
     else
-      reply = "Not sure I caught that. Try 'brief me', 'what's next', 'inbox', 'tasks', 'training', or 'add task…'.";
+      reply = "Not sure I caught that. Say help for everything I can do — or try 'brief me'.";
     speak(reply);
   }, 350);
 }
@@ -1022,8 +1475,17 @@ $("#wake").addEventListener("click", ()=>{
   setTimeout(()=>$("#boot").remove(), 800);
   Entity.mood="idle";
   startWatches();
-  setTimeout(()=>{
-    speak(`Good ${partOfDay()}. Systems linked and watching your day. Ask me for your briefing whenever you're ready.`);
-  }, 900);
+  if (!window.claude?.downloads) $("#savebtn").style.display="none";
+  const h = new Date().getHours();
+  if (MCP() && h>=5 && h<12 && store.get("autobrief")!==todayKey()){
+    // morning: deliver the briefing unprompted, once per day, after data lands
+    store.set("autobrief", todayKey());
+    setTimeout(()=>speak(fullBrief()), 3200);
+  } else if (MCP() && h>=17 && store.get("debriefOffer")!==todayKey()){
+    store.set("debriefOffer", todayKey());
+    setTimeout(()=>speak(`Good ${partOfDay()}. Systems linked. Say debrief when you're ready to close out the day.`), 900);
+  } else {
+    setTimeout(()=>speak(`Good ${partOfDay()}. Systems linked and watching your day. Ask me for your briefing whenever you're ready.`), 900);
+  }
 });
 </script>

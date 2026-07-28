@@ -7,35 +7,43 @@ surrounded by four live widgets fed by claude.ai connectors.
 
 ## Widgets
 
-| Panel | Connector | What it shows |
+| Panel | Connector | What it shows / does |
 |---|---|---|
-| TODAY | Google Calendar | Today + tomorrow timeline, NOW / next-up countdown chips |
-| TASKS | Todoist | Overdue and due-today groups, priority chips, tick-to-complete, quick capture |
-| INBOX | Gmail | Unread / recent / flagged counts, latest threads |
-| TRAINING | Strava | 7-day distance/time/sessions, 14-day relative-effort chart, last activity |
+| TODAY | Google Calendar | Today + tomorrow timeline, NOW / next-up chips; click an event to hear details (incl. attendee RSVPs) |
+| TASKS | Todoist | Overdue / due-today groups, tick-to-complete, click a task for reschedule chips, quick capture, completion streak |
+| INBOX | Gmail | Rules-based triage (priority vs low-priority fold), click a thread to read aloud or archive (undoable) |
+| TRAINING | Strava | 7-day stat tiles, 14-day effort chart (click a bar for that day), readiness read (acute vs prior week load), 5K reference pace |
 
-## Voice
+## Voice ("flow")
 
-- **Mic button** — push-to-talk via the browser's speech recognition (Chrome/Edge).
-- **VOICE** — spoken replies via speech synthesis (en-GB voice preferred).
-- **FLOW** — hands-free mode: Atlas resumes listening after each spoken reply.
-- Typed input always works as a fallback.
+- **Mic button** — push-to-talk (Chrome/Edge speech recognition). Replies are spoken (en-GB voice preferred); typed input always works.
+- **FLOW** — hands-free: the mic stays open and only sentences addressed as
+  **"Atlas, …"** are acted on (wake word). Atlas pauses the mic while it speaks
+  so it never hears itself.
+- The entity's ring and glow are driven by **real microphone amplitude**
+  (WebAudio analyser) while listening.
+- Settings, seen-mail memory, morning-brief marker persist in `localStorage`.
+- Boots with personality: a morning wake auto-delivers the briefing (once per
+  day); an evening wake offers the day debrief.
 
-Commands: `brief me` · `what's next` · `inbox` · `tasks` · `training` ·
-`add task <anything> [today|tomorrow|…]` · `help`
+Commands: `brief me` · `what's next` · `block time [tomorrow]` · `inbox` ·
+`read the latest email` · `tasks` · `push <task> to <day>` · `training` ·
+`am I ready to train` · `debrief` · `save my brief` · `undo` · `help`
 
 ## Running it
 
-The connector layer uses `window.claude.mcp`, which exists only when the page is
-published as a **claude.ai Artifact** with this capability manifest:
+The connector layer uses `window.claude.mcp` (plus `window.claude.downloads`
+for brief export), which exists only when the page is published as a
+**claude.ai Artifact** with this capability manifest:
 
 ```json
 {"mcp": {"servers": [
-  {"server": "Gmail",           "tools": ["search_threads"]},
-  {"server": "Google Calendar", "tools": ["list_events"]},
-  {"server": "Todoist",         "tools": ["find-tasks-by-date", "add-tasks", "complete-tasks"]},
-  {"server": "Strava",          "tools": ["list_activities", "get_athlete_profile"]}
-]}}
+  {"server": "Gmail",           "tools": ["search_threads", "get_thread", "label_thread", "unlabel_thread"]},
+  {"server": "Google Calendar", "tools": ["list_events", "create_event", "delete_event"]},
+  {"server": "Todoist",         "tools": ["find-tasks-by-date", "add-tasks", "complete-tasks", "reschedule-tasks", "find-completed-tasks"]},
+  {"server": "Strava",          "tools": ["list_activities", "get_athlete_profile", "get_athlete_zones"]}
+]},
+ "downloads": true}
 ```
 
 Opened as a plain file, the page still boots — entity, voice loop, and chat all
