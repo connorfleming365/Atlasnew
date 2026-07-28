@@ -1,14 +1,12 @@
 # Atlas setup — click-by-click
 
-Assumes step 1 is done: the repo is imported at Vercel and you have a URL.
-Throughout, **`YOUR-DOMAIN`** means that host with no scheme and no trailing
-slash — e.g. `atlasnew-abc123.vercel.app`.
+Personalized for your deployment: **atlasnew-ten.vercel.app**
 
-Two values you'll paste repeatedly, so put them somewhere handy:
+Two values you'll paste repeatedly:
 
 ```
-Redirect URI     https://YOUR-DOMAIN/api/auth/callback
-Callback domain  YOUR-DOMAIN
+Redirect URI     https://atlasnew-ten.vercel.app/api/auth/callback
+Callback domain  atlasnew-ten.vercel.app
 ```
 
 Google and Todoist want the **full redirect URI**. Strava wants the **bare
@@ -46,11 +44,11 @@ readable back in the dashboard. Click **Save**.
 | Field | Value |
 |---|---|
 | Key | `APP_URL` |
-| Value | `https://YOUR-DOMAIN` |
+| Value | `https://atlasnew-ten.vercel.app` |
 | Environments | all three |
 
-No trailing slash. `https://atlasnew-abc.vercel.app` ✅ ·
-`https://atlasnew-abc.vercel.app/` ❌
+No trailing slash. `https://atlasnew-ten.vercel.app` ✅ ·
+`https://atlasnew-ten.vercel.app/` ❌
 
 **✅ Check:** the list shows both keys. Nothing works yet — that's expected.
 
@@ -126,7 +124,7 @@ for a personal dashboard.
 3. **Application type: Web application**. Name it `Atlas Web`.
 4. Under **Authorised redirect URIs** click **ADD URI** and paste exactly:
    ```
-   https://YOUR-DOMAIN/api/auth/callback
+   https://atlasnew-ten.vercel.app/api/auth/callback
    ```
    Leave *Authorised JavaScript origins* empty.
 5. **Create**.
@@ -142,10 +140,10 @@ and starts with `https://`.
 
 1. Go to **developer.todoist.com/appconsole.html** (sign in if asked).
 2. **Create a new app**.
-3. **App name** `Atlas`; **App service URL** `https://YOUR-DOMAIN`. **Create app**.
+3. **App name** `Atlas`; **App service URL** `https://atlasnew-ten.vercel.app`. **Create app**.
 4. On the app's page find **OAuth redirect URL** and enter:
    ```
-   https://YOUR-DOMAIN/api/auth/callback
+   https://atlasnew-ten.vercel.app/api/auth/callback
    ```
    **Save** / **Update app**.
 5. Copy the **Client ID** and **Client secret** from the same page.
@@ -160,16 +158,16 @@ and starts with `https://`.
 2. Fill the form:
    - **Application Name** `Atlas`
    - **Category** anything, e.g. *Training*
-   - **Website** `https://YOUR-DOMAIN`
+   - **Website** `https://atlasnew-ten.vercel.app`
    - **Application Description** anything
-   - **Authorization Callback Domain** → **`YOUR-DOMAIN`**
+   - **Authorization Callback Domain** → **`atlasnew-ten.vercel.app`**
      — bare host only. No `https://`, no `/api/...`, no trailing slash.
 3. Strava may require an app icon — any small square image will do.
 4. **Create**.
 5. The page then shows **Client ID** and **Client Secret** (click *Show* for the
    secret). Copy both.
 
-**✅ Check:** the callback domain field reads like `atlasnew-abc.vercel.app`
+**✅ Check:** the callback domain field reads exactly `atlasnew-ten.vercel.app`
 with nothing else around it.
 
 ---
@@ -195,14 +193,14 @@ common and very confusing failure.
 deployment. Go to the **Deployments** tab → the **⋯** menu on the newest one →
 **Redeploy** → confirm. Wait for **Ready**.
 
-**✅ Check:** open `https://YOUR-DOMAIN/api/status`. Every provider should read
+**✅ Check:** open `https://atlasnew-ten.vercel.app/api/status`. Every provider should read
 `"configured": true` and `"connected": false`, and `"sessionReady": true`.
 
 ---
 
 ## Step 8 — Connect, and allow the microphone
 
-1. Open `https://YOUR-DOMAIN` and press **WAKE ATLAS**.
+1. Open `https://atlasnew-ten.vercel.app` and press **WAKE ATLAS**.
 2. A bar appears with **CONNECT GOOGLE / TODOIST / STRAVA**.
 3. **CONNECT GOOGLE** → choose your account → you'll see
    **"Google hasn't verified this app"** → **Advanced** → **Go to Atlas
@@ -222,13 +220,13 @@ showing a banner. Try saying *"Atlas, brief me"* after turning on **FLOW**.
 
 ## Troubleshooting
 
-Always start at **`https://YOUR-DOMAIN/api/status`** — it tells you which
+Always start at **`https://atlasnew-ten.vercel.app/api/status`** — it tells you which
 providers are configured (keys present) and which are connected (you've
 authorised them).
 
 | What you see | What it means |
 |---|---|
-| `redirect_uri_mismatch` | The provider's URI must equal `https://YOUR-DOMAIN/api/auth/callback` exactly — scheme, host, path |
+| `redirect_uri_mismatch` | The provider's URI must equal `https://atlasnew-ten.vercel.app/api/auth/callback` exactly — scheme, host, path |
 | Google **403 access_denied** | Your address isn't under **Test users** (step 4d) |
 | Strava error on connect | Callback domain has a scheme or path in it (step 6) |
 | **"That link expired"** | The state nonce lives 10 minutes. Click Connect again |
