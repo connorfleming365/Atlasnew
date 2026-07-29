@@ -982,7 +982,7 @@ function speakCloud(text, voiceId, then, interrupt){
 async function runCloudQueue(){
   const job = cloudQueue.shift();
   if (!job) return;
-  if (S.listening) stopListening();   // don't hear our own voice
+  if (S.listening) muteForSpeech();   // don't hear our own voice
   const finish = (()=>{ let done=false; return ()=>{
     if (done) return; done = true;
     cloudActive = null;
@@ -1013,7 +1013,7 @@ async function runCloudQueue(){
 function speakLocal(text, then, alreadyLogged, interrupt=true){
   if (!alreadyLogged) addMsg("atlas", text);
   if (!S.voiceOn || !ENV.hasTTS){ Entity.mood="idle"; then?.(); return; }
-  if (S.listening) stopListening();   // don't hear our own voice
+  if (S.listening) muteForSpeech();   // don't hear our own voice
   if (interrupt) speechSynthesis.cancel();   // else queue behind what's already playing
   const u = new SpeechSynthesisUtterance(text);
   if (voice) u.voice = voice;
@@ -1167,6 +1167,19 @@ async function startListening(){
 function stopListening(){
   starting=false;
   try{ rec?.stop(); }catch(_){}
+  S.listening=false; $("#mic").classList.remove("on");
+}
+// `.stop()` is graceful — it keeps processing whatever audio it already
+// captured and can still fire a `result` well after this call returns.
+// That's fine for "the user pressed the mic button," but it's exactly wrong
+// for muting ahead of Atlas's own speech: with recognition still chewing on
+// its buffer, that deferred result ends up being a transcript of Atlas
+// talking, delivered right as atlasIsSpeaking() goes false again — heard,
+// just late instead of live. `.abort()` cuts immediately and reports nothing
+// for audio captured so far.
+function muteForSpeech(){
+  starting=false;
+  try{ rec?.abort(); }catch(_){}
   S.listening=false; $("#mic").classList.remove("on");
 }
 
