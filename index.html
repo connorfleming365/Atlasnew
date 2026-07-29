@@ -969,6 +969,22 @@ let cloudQueue = [], cloudActive = null;
 // plain <audio> element with no such global, so anything gating on "is Atlas
 // currently talking" has to check both, or it only ever sees the local half.
 function atlasIsSpeaking(){ return Boolean(window.speechSynthesis?.speaking) || Boolean(cloudActive); }
+
+// Speaker output lingering as room echo/reverb (or the "done talking" event
+// firing a beat before the last bit of sound actually finishes) means the
+// instant Atlas stops, the room isn't necessarily silent yet. There's no way
+// to ask the recognition engine's own internal audio capture for real
+// acoustic echo cancellation from here — getUserMedia's echoCancellation
+// constraint doesn't apply to it — so the practical mitigation is a short
+// cooldown before the mic reopens, plus ignoring anything heard in the first
+// instant after it does.
+const MIC_COOLDOWN_MS = 700, MIC_GRACE_MS = 350;
+function armFlowMic(){
+  if (!S.flowOn || !S.awake || micBlocked) return;
+  setTimeout(()=>{
+    if (S.flowOn && !S.listening && !atlasIsSpeaking()) startListening();
+  }, MIC_COOLDOWN_MS);
+}
 function speakCloud(text, voiceId, then, interrupt){
   addMsg("atlas", text);
   if (!S.voiceOn){ Entity.mood="idle"; then?.(); return; }
@@ -989,7 +1005,7 @@ async function runCloudQueue(){
     Entity.mood = S.listening ? "listening" : "idle";
     job.then?.();
     if (cloudQueue.length) runCloudQueue();
-    else if (S.flowOn && !S.listening) startListening();
+    else armFlowMic();
   }; })();
   try{
     const r = await fetch("/api/tts", { method:"POST", credentials:"same-origin",
@@ -1024,7 +1040,7 @@ function speakLocal(text, then, alreadyLogged, interrupt=true){
     done = true;
     Entity.mood = S.listening ? "listening" : "idle";
     then?.();
-    if (S.flowOn && !S.listening) startListening();
+    armFlowMic();
   };
   u.onstart = ()=>{ started = true; ENV.ttsProbe = "working"; Entity.mood="speaking"; };
   u.onboundary = ()=> Entity.pulse(.7);
@@ -1040,7 +1056,7 @@ function speakLocal(text, then, alreadyLogged, interrupt=true){
 
 /* ---- speech recognition ---- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec=null, interimEl=null, micBlocked=false, starting=false;
+let rec=null, interimEl=null, micBlocked=false, starting=false, listenStartedAt=0;
 
 /* The embedding frame can withhold the microphone while still allowing
    speech output — which is exactly what the claude.ai artifact frame does.
@@ -1099,6 +1115,7 @@ async function startListening(){
   interimEl?.remove(); interimEl=null;
   rec.onstart = ()=>{
     starting=false; S.listening=true; micBlocked=false;
+    listenStartedAt = Date.now();
     $("#mic").classList.add("on"); Entity.mood="listening";
     console.log(`[Atlas] recognition started (flow=${S.flowOn}, lang=${rec.lang})`);
   };
@@ -1108,6 +1125,10 @@ async function startListening(){
     // physically picking up the speakers) lets a result through anyway, drop
     // it rather than treat Atlas's own voice as a command.
     if (atlasIsSpeaking()) return;
+    // Room echo/reverb from Atlas's own voice can still be dying down in the
+    // instant right after the mic reopens — a brief grace period here catches
+    // that tail without needing a longer cooldown to feel laggy in general use.
+    if (Date.now() - listenStartedAt < MIC_GRACE_MS) return;
     let fin="", inter="";
     // In continuous mode (FLOW) e.results keeps every segment for the whole
     // session, not just this event — starting the loop at 0 re-concatenates
@@ -1139,10 +1160,7 @@ async function startListening(){
     starting=false; S.listening=false; $("#mic").classList.remove("on");
     if (Entity.mood==="listening") Entity.mood="idle";
     // hands-free: reopen the channel unless Atlas is mid-reply (speak() resumes us)
-    if (S.flowOn && S.awake && !micBlocked)
-      setTimeout(()=>{
-        if (S.flowOn && !S.listening && !atlasIsSpeaking()) startListening();
-      }, 450);
+    armFlowMic();
   };
   rec.onerror = ev=>{
     starting=false; S.listening=false; $("#mic").classList.remove("on"); Entity.mood="idle";
