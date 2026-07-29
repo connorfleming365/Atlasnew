@@ -37,6 +37,11 @@ Other explored directions live in `character-lab.html`.
 | INBOX | Gmail | Rules-based triage (priority vs low-priority fold), click a thread to read aloud or archive (undoable) |
 | TRAINING | Strava | 7-day stat tiles, 14-day effort chart (click a bar for that day), readiness read (acute vs prior week load), 5K reference pace |
 
+Reading a widget aloud (an event, an email, a task move, a training day)
+never interrupts whatever Atlas is already saying — it plays right after,
+or immediately if Atlas is quiet. A new spoken/typed command still cuts in
+right away, as does clicking **VOICE** off, which stops speech outright.
+
 ## Voice ("flow")
 
 - **Mic button** — push-to-talk (Chrome/Edge speech recognition). Replies are spoken (en-GB voice preferred by default); typed input always works.

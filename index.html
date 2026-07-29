@@ -933,27 +933,49 @@ function ttsFailed(why){
         ENV.hasTTS && !speechSynthesis.getVoices().length ? ", and no system voices are installed" : ""
       }. Atlas will answer in text.`);
 }
-function speak(text, then){
+/* speak() — a new command reply, cuts off whatever Atlas was already
+   saying (the normal "you spoke, it answers" override).
+   speakWidget() — reading something aloud because you clicked a panel
+   item (an event, an email, a task, a training day). It never cuts off
+   speech that's already playing; it plays right away if nothing is, or
+   queues behind it otherwise. Only the VOICE pill stops speech outright. */
+function speak(text, then){ speakDispatch(text, then, true); }
+function speakWidget(text, then){ speakDispatch(text, then, false); }
+function speakDispatch(text, then, interrupt){
   const cloudId = selectedCloudVoiceId();
-  if (cloudId && ATLAS.hosted) return speakCloud(text, cloudId, then);
-  speakLocal(text, then);
+  if (cloudId && ATLAS.hosted) return speakCloud(text, cloudId, then, interrupt);
+  speakLocal(text, then, false, interrupt);
 }
-async function speakCloud(text, voiceId, then){
+let cloudQueue = [], cloudActive = null;
+function speakCloud(text, voiceId, then, interrupt){
   addMsg("atlas", text);
   if (!S.voiceOn){ Entity.mood="idle"; then?.(); return; }
+  if (interrupt){
+    cloudQueue = [];
+    if (cloudActive){ cloudActive.pause(); cloudActive = null; }
+  }
+  cloudQueue.push({text, voiceId, then});
+  if (!cloudActive) runCloudQueue();
+}
+async function runCloudQueue(){
+  const job = cloudQueue.shift();
+  if (!job) return;
   if (S.listening) stopListening();   // don't hear our own voice
   const finish = (()=>{ let done=false; return ()=>{
     if (done) return; done = true;
+    cloudActive = null;
     Entity.mood = S.listening ? "listening" : "idle";
-    then?.();
-    if (S.flowOn && !S.listening) startListening();
+    job.then?.();
+    if (cloudQueue.length) runCloudQueue();
+    else if (S.flowOn && !S.listening) startListening();
   }; })();
   try{
     const r = await fetch("/api/tts", { method:"POST", credentials:"same-origin",
-      headers:{"content-type":"application/json"}, body: JSON.stringify({ text, voiceId }) });
+      headers:{"content-type":"application/json"}, body: JSON.stringify({ text: job.text, voiceId: job.voiceId }) });
     if (!r.ok) throw new Error("http "+r.status);
     const url = URL.createObjectURL(await r.blob());
     const audio = new Audio(url);
+    cloudActive = audio;
     audio.onplay = ()=>{ ENV.ttsProbe = "working"; Entity.mood="speaking"; };
     audio.onended = ()=>{ URL.revokeObjectURL(url); finish(); };
     audio.onerror = ()=>{ URL.revokeObjectURL(url); finish(); };
@@ -961,14 +983,16 @@ async function speakCloud(text, voiceId, then){
   }catch(err){
     // Cloud voice unreachable/misconfigured — fall back rather than go silent.
     console.warn("cloud voice failed, falling back to local voice:", err.message);
-    speakLocal(text, then, true);
+    cloudActive = null;
+    speakLocal(job.text, job.then, true, true);
+    if (cloudQueue.length) runCloudQueue();
   }
 }
-function speakLocal(text, then, alreadyLogged){
+function speakLocal(text, then, alreadyLogged, interrupt=true){
   if (!alreadyLogged) addMsg("atlas", text);
   if (!S.voiceOn || !ENV.hasTTS){ Entity.mood="idle"; then?.(); return; }
   if (S.listening) stopListening();   // don't hear our own voice
-  speechSynthesis.cancel();
+  if (interrupt) speechSynthesis.cancel();   // else queue behind what's already playing
   const u = new SpeechSynthesisUtterance(text);
   if (voice) u.voice = voice;
   u.rate = 1.02; u.pitch = 1.0;
@@ -1146,7 +1170,11 @@ if (MIC_OFF){
 $("#voicebtn").addEventListener("click", e=>{
   S.voiceOn=!S.voiceOn; store.set("voice",S.voiceOn);
   e.currentTarget.classList.toggle("on",S.voiceOn);
-  if (!S.voiceOn) window.speechSynthesis?.cancel();
+  if (!S.voiceOn){
+    window.speechSynthesis?.cancel();
+    cloudQueue = [];
+    if (cloudActive){ cloudActive.pause(); cloudActive = null; }
+  }
 });
 $("#flowbtn").addEventListener("click", e=>{
   S.flowOn=!S.flowOn; store.set("flow",S.flowOn);
@@ -1302,7 +1330,7 @@ function speakEvent(e){
     const m = Math.round((e.start-now)/60000);
     s += m<120 ? `. Starts in ${m} minutes.` : `. Starts at ${fmtT(e.start)}.`;
   } else if (e.end<=now) s += ". Already done.";
-  speak(s);
+  speakWidget(s);
 }
 function renderCal(){
   const body = $("#p-cal .body");
@@ -1383,7 +1411,7 @@ function renderTodo(){
   });
   body.querySelectorAll(".task .actchip").forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      rescheduleTask(btn.closest(".task").dataset.id, resolveDay(btn.dataset.act), btn.dataset.act);
+      rescheduleTask(btn.closest(".task").dataset.id, resolveDay(btn.dataset.act), btn.dataset.act, false);
     });
   });
 }
@@ -1410,7 +1438,8 @@ async function completeTask(el){
     addMsg("atlas", "Couldn't tick that off — " + errCopy(err?.code, "Todoist"));
   }
 }
-async function addTask(content, dueString){
+async function addTask(content, dueString, interrupt=true){
+  const say = interrupt ? speak : speakWidget;
   const mcp=MCP();
   if (!mcp){ addMsg("atlas","Task capture needs the claude.ai artifact viewer with Todoist linked."); return; }
   Entity.mood="thinking";
@@ -1425,15 +1454,15 @@ async function addTask(content, dueString){
     const t = {content, projectId:"inbox", dueString};
     await mcp.callTool("Todoist","add-tasks",{tasks:[t]});
     await mcp.invalidate("Todoist","find-tasks-by-date").catch(()=>{});
-    speak(`Captured: ${content}, due ${dueString}.`);
+    say(`Captured: ${content}, due ${dueString}.`);
   }catch(err){
-    speak("I couldn't save that task. " + errCopy(err?.code, "Todoist"));
+    say("I couldn't save that task. " + errCopy(err?.code, "Todoist"));
   }
 }
 $("#addtask").addEventListener("submit", e=>{
   e.preventDefault();
   const v=$("#newtask").value.trim();
-  if (v){ addTask(v); $("#newtask").value=""; }
+  if (v){ addTask(v, null, false); $("#newtask").value=""; }
 });
 
 /* --- day words → YYYY-MM-DD --- */
@@ -1458,16 +1487,17 @@ function fuzzyTask(words){
   }
   return bs>0 ? best : null;
 }
-async function rescheduleTask(id, date, label){
+async function rescheduleTask(id, date, label, interrupt=true){
+  const say = interrupt ? speak : speakWidget;
   const mcp=MCP(); if (!mcp || !date) return;
   const t = (S.data.todo?.tasks||[]).find(x=>x.id===id);
   try{
     await mcp.callTool("Todoist","reschedule-tasks",{tasks:[{id, date}]});
     await mcp.invalidate("Todoist","find-tasks-by-date").catch(()=>{});
     Entity.pulse(.6);
-    speak(`Moved${t?` “${t.content}”`:""} to ${label||date}.`);
+    say(`Moved${t?` “${t.content}”`:""} to ${label||date}.`);
   }catch(err){
-    speak("Couldn't move that one. " + errCopy(err?.code, "Todoist"));
+    say("Couldn't move that one. " + errCopy(err?.code, "Todoist"));
   }
 }
 
@@ -1584,15 +1614,16 @@ function renderGmail(){
     el.addEventListener("click", ev=>{
       const chip = ev.target.closest(".actchip");
       if (!chip){ el.classList.toggle("open"); return; }
-      if (chip.dataset.act==="read") readMail(el.dataset.tid);
+      if (chip.dataset.act==="read") readMail(el.dataset.tid, false);
       else if (chip.dataset.act==="archive") archiveMail(el);
       else deleteMail(el, chip);
     });
   });
 }
-async function readMail(threadId){
+async function readMail(threadId, interrupt=true){
+  const say = interrupt ? speak : speakWidget;
   const mcp=MCP();
-  if (!mcp){ speak("Reading email needs the connector bridge."); return; }
+  if (!mcp){ say("Reading email needs the connector bridge."); return; }
   Entity.mood="thinking";
   try{
     const r = await mcp.callTool("Gmail","get_thread",
@@ -1606,9 +1637,9 @@ async function readMail(threadId){
     }
     text = text.replace(/https?:\/\/\S+/g," ").replace(/\s+/g," ").trim() || msg.snippet || "";
     const cut = text.slice(0, 550);
-    speak(`From ${msg.sender||"unknown"}. ${msg.subject?`Subject: ${msg.subject}. `:""}${cut}${
+    say(`From ${msg.sender||"unknown"}. ${msg.subject?`Subject: ${msg.subject}. `:""}${cut}${
       text.length>550 ? " … it carries on, but that's the gist." : ""}`);
-  }catch(err){ speak("Couldn't open that email. " + errCopy(err?.code, "Gmail")); }
+  }catch(err){ say("Couldn't open that email. " + errCopy(err?.code, "Gmail")); }
 }
 let pendingDelete = null;   // threadId awaiting a spoken "yes"
 function deleteMail(el, chip){
@@ -1618,11 +1649,12 @@ function deleteMail(el, chip){
     setTimeout(()=>{ if (chip.isConnected){ delete chip.dataset.confirm; chip.textContent="DELETE"; } }, 4000);
     return;
   }
-  trashThread(el.dataset.tid, el, chip);
+  trashThread(el.dataset.tid, el, chip, false);
 }
-async function trashThread(threadId, el, chip){
+async function trashThread(threadId, el, chip, interrupt=true){
+  const say = interrupt ? speak : speakWidget;
   const mcp=MCP();
-  if (!mcp){ speak("Deleting mail needs the connector bridge."); return; }
+  if (!mcp){ say("Deleting mail needs the connector bridge."); return; }
   if (el) el.style.opacity=".3";
   try{
     await mcp.callTool("Gmail","apply_sensitive_thread_label",{threadId, labelOption:"TRASH"});
@@ -1630,11 +1662,11 @@ async function trashThread(threadId, el, chip){
     await mcp.invalidate("Gmail","search_threads").catch(()=>{});
     el?.remove();
     Entity.pulse(.6);
-    speak("Moved to Trash — recoverable there for 30 days. Say undo to restore it now.");
+    say("Moved to Trash — recoverable there for 30 days. Say undo to restore it now.");
   }catch(err){
     if (el) el.style.opacity="";
     if (chip){ delete chip.dataset.confirm; chip.textContent="DELETE"; }
-    speak("Couldn't delete that. " + errCopy(err?.code, "Gmail"));
+    say("Couldn't delete that. " + errCopy(err?.code, "Gmail"));
   }
 }
 async function archiveMail(el){
@@ -1650,7 +1682,7 @@ async function archiveMail(el){
     addMsg("atlas","Archived. Say undo to bring it back.");
   }catch(err){
     el.style.opacity="";
-    speak("Couldn't archive that. " + errCopy(err?.code, "Gmail"));
+    speakWidget("Couldn't archive that. " + errCopy(err?.code, "Gmail"));
   }
 }
 
@@ -1742,13 +1774,13 @@ function speakActivity(a){
   if (s.relative_effort) out += `Effort ${s.relative_effort}. `;
   if (s.pr_count) out += `${s.pr_count} personal records. `;
   if (s.kudos_count) out += `${s.kudos_count} kudos.`;
-  speak(out.trim());
+  speakWidget(out.trim());
 }
 function speakDay(d){
   if (!d) return;
-  if (!d.effort){ speak(`${d.key}: rest day.`); return; }
+  if (!d.effort){ speakWidget(`${d.key}: rest day.`); return; }
   const acts = (S.data.strava?.activities||[]).filter(a=>dayKey(new Date(a.start_local))===d.key);
-  speak(`${d.key}: ${acts.length} session${acts.length===1?"":"s"} — ${
+  speakWidget(`${d.key}: ${acts.length} session${acts.length===1?"":"s"} — ${
     acts.map(a=>a.name).join(", ")}. Total effort ${d.effort}, ${d.mins} minutes.`);
 }
 
