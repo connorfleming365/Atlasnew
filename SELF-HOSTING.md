@@ -47,10 +47,16 @@ unset and nothing changes: the picker just doesn't show the Cloud group.
 By default, voice and typed input are handled by a fixed set of phrase matches
 ("brief me", "add task …") — instant, free, and completely literal. Setting
 `ANTHROPIC_API_KEY` replaces that with real Claude reasoning: arbitrary
-phrasing, follow-up conversation, and tool access to add/complete/reschedule/
-delete a task, read/archive/delete email, and create/delete/move-or-edit a
-calendar event — driven by a fresh snapshot of the day rather than canned
-templates.
+phrasing, follow-up conversation, and tool access to:
+
+- add (one or several at once), complete, reschedule, or delete a task
+- read, search beyond the last 48h, archive, delete, or draft a reply to
+  email (drafts only — nothing is ever sent without you doing it yourself
+  in Gmail)
+- create, delete, move/edit, or search a calendar event outside the
+  today/tomorrow snapshot
+
+— driven by a fresh snapshot of the day rather than canned templates.
 
 **Cost and latency, honestly.** Each exchange is a few hundred tokens —
 fractions of a cent on the default model (`claude-haiku-4-5-20251001`), more
