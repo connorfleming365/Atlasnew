@@ -49,9 +49,21 @@ Other explored directions live in `character-lab.html`.
 - Boots with personality: a morning wake auto-delivers the briefing (once per
   day); an evening wake offers the day debrief.
 
-Commands: `brief me` · `what's next` · `block time [tomorrow]` · `inbox` ·
+**Two brains, chosen automatically.** With `ANTHROPIC_API_KEY` set on a
+self-hosted deployment, every utterance goes to real Claude reasoning —
+arbitrary phrasing, follow-ups, genuine tool use over your tasks/email/
+calendar. Without it (including always, inside the claude.ai artifact, which
+has no backend to hold that key), Atlas falls back to a fixed set of exact
+phrases:
+
+`brief me` · `what's next` · `block time [tomorrow]` · `inbox` ·
 `read the latest email` · `tasks` · `push <task> to <day>` · `training` ·
-`am I ready to train` · `debrief` · `save my brief` · `undo` · `help`
+`am I ready to train` · `debrief` · `undo` · `help`
+
+The fixed-phrase version is preserved unmodified on the `checkpoint/regex-
+brain-v1` branch — a permanent revert point, not a snapshot that'll drift.
+Details and the cost/latency trade-off: **SELF-HOSTING.md → The
+conversational brain**.
 
 ## Running it
 

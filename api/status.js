@@ -1,11 +1,12 @@
 /* What this deployment can currently do. The front-end probes this at
    load to decide whether to install the hosted connector shim. */
-import { PROVIDERS, SERVER_PROVIDER, cookieName, configured } from "../lib/providers.js";
+import { PROVIDERS, SERVER_PROVIDER, cookieName, configured, envVar } from "../lib/providers.js";
 import { parseCookies, unseal } from "../lib/session.js";
+import { brainConfigured } from "../lib/brain.js";
 
 export default function handler(req, res){
   const cookies = parseCookies(req);
-  const hasSecret = Boolean(process.env.SESSION_SECRET);
+  const hasSecret = Boolean(envVar("SESSION_SECRET"));
   const providers = {};
   for (const [id, p] of Object.entries(PROVIDERS)){
     const tok = hasSecret && cookies[cookieName(id)] ? unseal(cookies[cookieName(id)]) : null;
@@ -19,5 +20,6 @@ export default function handler(req, res){
   const servers = {};
   for (const [server, id] of Object.entries(SERVER_PROVIDER)) servers[server] = providers[id];
   res.setHeader("cache-control", "no-store");
-  res.json({ hosted: true, sessionReady: hasSecret, providers, servers });
+  res.json({ hosted: true, sessionReady: hasSecret, providers, servers,
+    brain: { configured: brainConfigured() } });
 }

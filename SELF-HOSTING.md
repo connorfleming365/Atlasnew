@@ -14,11 +14,41 @@ in both.
 index.html          the dashboard (detects hosted mode at load)
 api/status.js       what this deployment can do
 api/mcp.js          the connector bridge
+api/brain.js        the Claude-powered conversational brain
 api/auth/*.js       OAuth start / callback / disconnect
 lib/session.js      AES-256-GCM encrypted cookies
 lib/providers.js    OAuth config + token refresh
 lib/tools.js        provider REST → connector payload shapes
+lib/brain.js        context assembly + tool-calling loop for the brain
 ```
+
+## The conversational brain
+
+By default, voice and typed input are handled by a fixed set of phrase matches
+("brief me", "add task …") — instant, free, and completely literal. Setting
+`ANTHROPIC_API_KEY` replaces that with real Claude reasoning: arbitrary
+phrasing, follow-up conversation, and tool access to the same actions (add/
+reschedule tasks, archive/delete/read email, create/delete calendar events),
+driven by a fresh snapshot of the day rather than canned templates.
+
+**Cost and latency, honestly.** Each exchange is a few hundred tokens —
+fractions of a cent on the default model (`claude-haiku-4-5-20251001`), more
+on `claude-sonnet-5` if you set `ANTHROPIC_MODEL`. Replies take 1–3 seconds
+rather than the instant regex match, longer if a tool call is involved (a
+second round trip). Get a key at
+[console.anthropic.com](https://console.anthropic.com) → API Keys.
+
+**Revert point.** The original fixed-phrase brain is preserved exactly as it
+was, untouched, on the `checkpoint/regex-brain-v1` branch — and it's still
+what runs automatically wherever there's no backend to call Claude from (the
+claude.ai artifact, or a plain file opened locally), regardless of whether
+this deployment has a key set. To go back to it here too, just remove
+`ANTHROPIC_API_KEY` — the app checks for it at runtime.
+
+**Confirmation policy.** The system prompt instructs Claude to confirm in
+words before archiving/deleting email or deleting a calendar event, and to
+just proceed for everything else (adding a task, rescheduling, creating a
+focus block, reading mail aloud).
 
 Tokens live in encrypted, HttpOnly cookies keyed from `SESSION_SECRET`. There is
 no database, and no token is ever readable by the browser.

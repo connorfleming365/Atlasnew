@@ -218,6 +218,39 @@ showing a banner. Try saying *"Atlas, brief me"* after turning on **FLOW**.
 
 ---
 
+## Step 9 — Enable real conversation (optional)
+
+Everything above already works without this — Atlas answers a fixed set of
+exact phrases instantly and for free. This step swaps that for genuine Claude
+reasoning: arbitrary phrasing, follow-up questions, and the same actions
+(tasks, email, calendar) driven by real understanding of your day instead of
+templates. Costs a small amount per use and replies take a couple of seconds
+rather than being instant — see **SELF-HOSTING.md → The conversational
+brain** for the honest trade-off before turning it on.
+
+**9.1** **console.anthropic.com** → **API Keys** → **Create Key**. Copy it.
+
+**9.2** Vercel → **Settings → Environment Variables** → add:
+
+| Key | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | the key from 9.1 |
+
+Production + Preview only (Sensitive can't go in Development, same as before).
+
+**9.3 Redeploy** — required, same as every other environment variable here.
+
+**✅ Check:** `https://atlasnew-ten.vercel.app/api/status` now shows
+`"brain": {"configured": true}`. Ask Atlas something you couldn't before —
+an oddly-phrased question, or two asks in one sentence — and it should
+actually understand it.
+
+**To turn it back off:** delete `ANTHROPIC_API_KEY` in Vercel and redeploy.
+Atlas immediately goes back to the exact fixed-phrase behavior from before
+this step — nothing else changes.
+
+---
+
 ## Troubleshooting
 
 Always start at **`https://atlasnew-ten.vercel.app/api/status`** — it tells you which

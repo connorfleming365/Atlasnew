@@ -1822,9 +1822,55 @@ function fullBrief(){
   return `Good ${partOfDay()}${n?`, ${n}`:""}. ${briefCal()} ${briefTasks()} ${briefInbox(true)} ${briefTraining()}`;
 }
 
-function handleUtterance(text){
+/* ================================================================
+   THE BRAIN, ROUTED
+   Real reasoning when there's a backend to call it from (self-hosted);
+   the original rule-based matcher everywhere else, since the claude.ai
+   artifact and a plain file have no server to hold an Anthropic key.
+   That fork isn't indecision — it's a hard capability boundary. The
+   pre-Claude version of this whole function lives unmodified on the
+   `checkpoint/regex-brain-v1` branch if this ever needs undoing.
+   ================================================================ */
+let brainHistory = [];   // the server's own prior `messages` array, replayed verbatim
+const BRAIN_ON = () => ATLAS.hosted && ATLAS.status?.brain?.configured;
+
+async function handleUtterance(text){
   addMsg("user", text);
   Entity.mood="thinking";
+  if (BRAIN_ON()) return askBrain(text);
+  return handleUtteranceClassic(text);
+}
+
+/* Never adds a user-visible bubble itself — only handleUtterance's
+   dispatcher does that. That's what lets a system-triggered prompt (the
+   morning brief) call this directly and skip straight to a spoken
+   reply, with no fake "YOU: ..." bubble for something the user never
+   actually said. */
+async function askBrain(promptText){
+  try{
+    const r = await fetch("/api/brain", {
+      method:"POST", credentials:"same-origin",
+      headers:{ "content-type":"application/json" },
+      body: JSON.stringify({ message: promptText, history: brainHistory }),
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok || j.error){
+      const code = j.error?.code;
+      console.warn(`[Atlas] brain error: ${code || r.status} ${j.error?.message || ""}`);
+      speak(code === "not_configured"
+        ? "My reasoning brain isn't set up on this deployment yet — it needs an Anthropic API key."
+        : "My reasoning brain didn't answer just now — try again in a moment.");
+      return;
+    }
+    if (Array.isArray(j.history)) brainHistory = j.history;
+    speak(j.reply || "…");
+  }catch(err){
+    console.warn("[Atlas] brain request failed:", err);
+    speak("I couldn't reach my reasoning engine just now — try again, or type instead.");
+  }
+}
+
+function handleUtteranceClassic(text){
   const q = text.toLowerCase().replace(/[?!.]/g,"").trim();
 
   // ---- action intents (these do their own speaking) ----
@@ -1984,7 +2030,7 @@ $("#wake").addEventListener("click", async ()=>{
   if (MCP() && h>=5 && h<12 && store.get("autobrief")!==todayKey()){
     // morning: deliver the briefing unprompted, once per day, after data lands
     store.set("autobrief", todayKey());
-    setTimeout(()=>speak(fullBrief()), 3200);
+    setTimeout(()=> BRAIN_ON() ? askBrain("Give me my morning briefing.") : speak(fullBrief()), 3200);
   } else if (MCP() && h>=17 && store.get("debriefOffer")!==todayKey()){
     store.set("debriefOffer", todayKey());
     setTimeout(()=>speak(`Good ${partOfDay()}. Systems linked. Say debrief when you're ready to close out the day.`), 900);
