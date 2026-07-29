@@ -15,12 +15,32 @@ index.html          the dashboard (detects hosted mode at load)
 api/status.js       what this deployment can do
 api/mcp.js          the connector bridge
 api/brain.js        the Claude-powered conversational brain
+api/voices.js       lists your ElevenLabs voices, if configured
+api/tts.js          turns a reply into an mp3 with a chosen cloud voice
 api/auth/*.js       OAuth start / callback / disconnect
 lib/session.js      AES-256-GCM encrypted cookies
 lib/providers.js    OAuth config + token refresh
 lib/tools.js        provider REST → connector payload shapes
 lib/brain.js        context assembly + tool-calling loop for the brain
+lib/tts.js          ElevenLabs voice list + speech synthesis
 ```
+
+## Cloud voices
+
+The voice picker in the dock always offers whatever `speechSynthesis` finds
+installed on your OS/browser. Set `ELEVENLABS_API_KEY` (from
+[elevenlabs.io](https://elevenlabs.io) → Settings → API Keys) and it also
+fetches your ElevenLabs account's voice list — their stock library plus
+anything you've added or cloned there — into a "Cloud" group in the same
+dropdown. Picking one previews it immediately.
+
+Each spoken reply then costs one ElevenLabs API call (billed by their
+per-character pricing) instead of being free and instant like the browser's
+own synthesis, and takes a little longer per reply since audio has to be
+generated and downloaded before it plays. If a request ever fails — bad key,
+account limit, offline — Atlas automatically falls back to the local browser
+voice for that reply rather than staying silent. Leave `ELEVENLABS_API_KEY`
+unset and nothing changes: the picker just doesn't show the Cloud group.
 
 ## The conversational brain
 

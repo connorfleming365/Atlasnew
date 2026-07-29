@@ -251,6 +251,28 @@ this step — nothing else changes.
 
 ---
 
+## Step 10 — Pick a voice online (optional)
+
+The voice dropdown next to VOICE/FLOW already lists whatever's installed on
+your OS. This step adds an **ElevenLabs** voice — pick one from their much
+larger online library instead.
+
+**10.1** [elevenlabs.io](https://elevenlabs.io) → sign up/in → **Settings →
+API Keys** → create one, copy it.
+
+**10.2** Vercel → **Settings → Environment Variables** → add
+`ELEVENLABS_API_KEY` with that value (Production + Preview).
+
+**10.3 Redeploy.**
+
+**✅ Check:** open the voice dropdown — a **Cloud** group now lists your
+ElevenLabs voices. Pick one to hear it preview. Costs a small amount per
+character spoken; if a request ever fails, Atlas just uses the local voice
+for that reply instead of going silent. Delete the key and redeploy to
+remove the Cloud group again.
+
+---
+
 ## Troubleshooting
 
 Always start at **`https://atlasnew-ten.vercel.app/api/status`** — it tells you which

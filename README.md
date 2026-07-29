@@ -43,7 +43,12 @@ Other explored directions live in `character-lab.html`.
 - **Voice picker** — the dropdown next to VOICE/FLOW lists every voice your
   browser has installed. Pick one to hear a preview and lock it in, or leave
   it on **Auto** for the en-GB neural pick above. Choice is remembered per
-  browser via `localStorage`.
+  browser via `localStorage`. Self-hosted with `ELEVENLABS_API_KEY` set, the
+  same dropdown gets a **Cloud** group listing your ElevenLabs voices —
+  pick one to have replies spoken through ElevenLabs instead (small
+  per-character cost, a little more latency, automatic fallback to the
+  local voice if a request ever fails). Details: **SELF-HOSTING.md → Cloud
+  voices**.
 - **FLOW** — hands-free: the mic stays open and only sentences addressed as
   **"Atlas, …"** are acted on (wake word). Atlas pauses the mic while it speaks
   so it never hears itself.

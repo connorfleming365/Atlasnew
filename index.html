@@ -855,14 +855,33 @@ function addMsg(who, text){
 }
 
 let voice=null;
+let cloudVoices=[];   // [{id,name}] — from ElevenLabs via /api/voices, only when hosted+configured
+function selectedCloudVoiceId(){
+  const v = store.get("voiceName", null);
+  return (typeof v==="string" && v.startsWith("cloud:")) ? v.slice(6) : null;
+}
 function populateVoiceSelect(vs){
   const sel = $("#voicesel");
   if (!sel) return;
   const chosen = store.get("voiceName", null);
   const en = vs.filter(v=>/^en/i.test(v.lang)), rest = vs.filter(v=>!/^en/i.test(v.lang));
-  sel.innerHTML = '<option value="">Auto</option>' + [...en, ...rest]
-    .map(v=>`<option value="${esc(v.name)}">${esc(v.name)} — ${esc(v.lang)}</option>`).join("");
-  sel.value = (chosen && vs.some(v=>v.name===chosen)) ? chosen : "";
+  let html = '<option value="">Auto</option>';
+  if (cloudVoices.length)
+    html += '<optgroup label="Cloud">' + cloudVoices
+      .map(v=>`<option value="cloud:${esc(v.id)}">☁ ${esc(v.name)}</option>`).join("") + '</optgroup>';
+  html += [...en, ...rest].map(v=>`<option value="${esc(v.name)}">${esc(v.name)} — ${esc(v.lang)}</option>`).join("");
+  sel.innerHTML = html;
+  const known = new Set([...vs.map(v=>v.name), ...cloudVoices.map(v=>"cloud:"+v.id)]);
+  sel.value = (chosen && known.has(chosen)) ? chosen : "";
+}
+async function loadCloudVoices(){
+  if (!ATLAS.hosted || !ATLAS.status?.tts?.configured) return;
+  try{
+    const r = await fetch("/api/voices", { credentials:"same-origin" });
+    const j = await r.json();
+    cloudVoices = j.voices || [];
+    if (cloudVoices.length) populateVoiceSelect(speechSynthesis.getVoices?.() || []);
+  }catch(_){}
 }
 function pickVoice(){
   const vs = speechSynthesis.getVoices();
@@ -874,7 +893,17 @@ function pickVoice(){
        || vs.find(v=>/^en/i.test(v.lang)) || vs[0];
   populateVoiceSelect(vs);
 }
+async function previewCloud(voiceId){
+  try{
+    const r = await fetch("/api/tts", { method:"POST", credentials:"same-origin",
+      headers:{"content-type":"application/json"}, body: JSON.stringify({ text:"This is Atlas.", voiceId }) });
+    if (!r.ok) throw new Error("http "+r.status);
+    new Audio(URL.createObjectURL(await r.blob())).play().catch(()=>{});
+  }catch(err){ console.warn("cloud voice preview failed:", err.message); }
+}
 function previewVoice(){
+  const cloudId = selectedCloudVoiceId();
+  if (cloudId){ previewCloud(cloudId); return; }
   if (!ENV.hasTTS || !voice) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance("This is Atlas.");
@@ -883,6 +912,7 @@ function previewVoice(){
 }
 if ("speechSynthesis" in window){
   pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
+  hostedReady.then(hosted => { if (hosted) loadCloudVoices(); });
   $("#voicesel").addEventListener("change", e=>{
     store.set("voiceName", e.target.value || null);
     pickVoice();
@@ -904,7 +934,38 @@ function ttsFailed(why){
       }. Atlas will answer in text.`);
 }
 function speak(text, then){
+  const cloudId = selectedCloudVoiceId();
+  if (cloudId && ATLAS.hosted) return speakCloud(text, cloudId, then);
+  speakLocal(text, then);
+}
+async function speakCloud(text, voiceId, then){
   addMsg("atlas", text);
+  if (!S.voiceOn){ Entity.mood="idle"; then?.(); return; }
+  if (S.listening) stopListening();   // don't hear our own voice
+  const finish = (()=>{ let done=false; return ()=>{
+    if (done) return; done = true;
+    Entity.mood = S.listening ? "listening" : "idle";
+    then?.();
+    if (S.flowOn && !S.listening) startListening();
+  }; })();
+  try{
+    const r = await fetch("/api/tts", { method:"POST", credentials:"same-origin",
+      headers:{"content-type":"application/json"}, body: JSON.stringify({ text, voiceId }) });
+    if (!r.ok) throw new Error("http "+r.status);
+    const url = URL.createObjectURL(await r.blob());
+    const audio = new Audio(url);
+    audio.onplay = ()=>{ ENV.ttsProbe = "working"; Entity.mood="speaking"; };
+    audio.onended = ()=>{ URL.revokeObjectURL(url); finish(); };
+    audio.onerror = ()=>{ URL.revokeObjectURL(url); finish(); };
+    await audio.play();
+  }catch(err){
+    // Cloud voice unreachable/misconfigured — fall back rather than go silent.
+    console.warn("cloud voice failed, falling back to local voice:", err.message);
+    speakLocal(text, then, true);
+  }
+}
+function speakLocal(text, then, alreadyLogged){
+  if (!alreadyLogged) addMsg("atlas", text);
   if (!S.voiceOn || !ENV.hasTTS){ Entity.mood="idle"; then?.(); return; }
   if (S.listening) stopListening();   // don't hear our own voice
   speechSynthesis.cancel();
