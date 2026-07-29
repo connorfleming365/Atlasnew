@@ -49,9 +49,10 @@ Other explored directions live in `character-lab.html`.
   per-character cost, a little more latency, automatic fallback to the
   local voice if a request ever fails). Details: **SELF-HOSTING.md → Cloud
   voices**.
-- **FLOW** — hands-free: the mic stays open and only sentences addressed as
-  **"Atlas, …"** are acted on (wake word). Atlas pauses the mic while it speaks
-  so it never hears itself.
+- **FLOW** — hands-free: the mic stays open and everything you say is acted
+  on, no wake word needed. Atlas pauses the mic while it speaks so it never
+  hears itself — but anything else picked up (background conversation, a TV)
+  gets sent as a command too, so it's best in a quiet room.
 - The character's surface and ripples are driven by **real microphone amplitude**
   (WebAudio analyser) while listening, and by speech boundaries while talking.
 - Settings, seen-mail memory, morning-brief marker persist in `localStorage`.

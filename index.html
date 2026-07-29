@@ -994,7 +994,6 @@ function speakLocal(text, then, alreadyLogged){
 
 /* ---- speech recognition ---- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const WAKE_RE = /^(?:hey |ok |okay )?atlas[,!.\s]*(.*)$/i;
 let rec=null, interimEl=null, micBlocked=false, starting=false;
 
 /* The embedding frame can withhold the microphone while still allowing
@@ -1073,20 +1072,8 @@ async function startListening(){
     if (fin){
       interimEl?.remove(); interimEl=null;
       fin = fin.trim();
-      if (S.flowOn){
-        // Hands-free: only sentences addressed to Atlas count. Everything
-        // else is deliberately silent — no banner, no sound — which is
-        // exactly what background conversation should get, but it's also
-        // indistinguishable from "recognition just isn't working" unless
-        // you know to look here. console.log is the one place this is
-        // visible without changing that on-screen silence.
-        const m = fin.match(WAKE_RE);
-        if (!m){ console.log(`[Atlas] heard (no wake word, ignored): "${fin}"`); return; }
-        const cmd = m[1].trim();
-        console.log(`[Atlas] heard: "${fin}"`);
-        if (!cmd){ speak("Yes?"); return; }
-        handleUtterance(cmd);
-      } else { console.log(`[Atlas] heard: "${fin}"`); handleUtterance(fin); }
+      console.log(`[Atlas] heard: "${fin}"`);
+      if (fin) handleUtterance(fin);
     }
   };
   rec.onend = ()=>{
@@ -1140,7 +1127,7 @@ function updateHint(){
     : !SR
     ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE ANY COMMAND BELOW"
     : S.flowOn
-      ? "HANDS-FREE — START WITH “ATLAS …”, E.G. “ATLAS, BRIEF ME” · “ATLAS, BLOCK TIME”"
+      ? "HANDS-FREE — JUST SPEAK, NO WAKE WORD NEEDED · ATLAS PAUSES WHILE IT TALKS"
       : "BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK … · UNDO";
 }
 // The button stays enabled even without support: pressing it explains why,
