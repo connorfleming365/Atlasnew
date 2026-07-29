@@ -47,9 +47,10 @@ unset and nothing changes: the picker just doesn't show the Cloud group.
 By default, voice and typed input are handled by a fixed set of phrase matches
 ("brief me", "add task …") — instant, free, and completely literal. Setting
 `ANTHROPIC_API_KEY` replaces that with real Claude reasoning: arbitrary
-phrasing, follow-up conversation, and tool access to the same actions (add/
-reschedule tasks, archive/delete/read email, create/delete calendar events),
-driven by a fresh snapshot of the day rather than canned templates.
+phrasing, follow-up conversation, and tool access to add/complete/reschedule/
+delete a task, read/archive/delete email, and create/delete/move-or-edit a
+calendar event — driven by a fresh snapshot of the day rather than canned
+templates.
 
 **Cost and latency, honestly.** Each exchange is a few hundred tokens —
 fractions of a cent on the default model (`claude-haiku-4-5-20251001`), more
@@ -66,9 +67,17 @@ this deployment has a key set. To go back to it here too, just remove
 `ANTHROPIC_API_KEY` — the app checks for it at runtime.
 
 **Confirmation policy.** The system prompt instructs Claude to confirm in
-words before archiving/deleting email or deleting a calendar event, and to
-just proceed for everything else (adding a task, rescheduling, creating a
-focus block, reading mail aloud).
+words before archiving/deleting email, deleting a calendar event, or deleting
+a task, and to just proceed for everything else (adding a task, rescheduling,
+moving or editing an event, creating a focus block, reading mail aloud).
+
+**Standing notes (memory).** The **MEMORY** button in the dock opens a small
+panel — one note per line, saved to `localStorage` on your device. Whatever's
+there gets sent along with every message and folded into the brain's system
+prompt as always-true background (e.g. "I hate meetings before 9am"), so you
+don't have to repeat it each session. Nothing is added automatically — only
+what you type there yourself, and only the real Claude brain reads it; the
+fixed-phrase fallback has no use for free-text notes.
 
 Tokens live in encrypted, HttpOnly cookies keyed from `SESSION_SECRET`. There is
 no database, and no token is ever readable by the browser.

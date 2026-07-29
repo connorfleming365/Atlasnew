@@ -60,6 +60,10 @@ right away, as does clicking **VOICE** off, which stops speech outright.
   gets sent as a command too, so it's best in a quiet room.
 - The character's surface and ripples are driven by **real microphone amplitude**
   (WebAudio analyser) while listening, and by speech boundaries while talking.
+- **MEMORY** — a small panel (one note per line) for things Atlas should
+  always know ("I hate meetings before 9am"). Saved to `localStorage`, sent
+  with every message, only read by the real Claude brain — nothing is added
+  to it automatically.
 - Settings, seen-mail memory, morning-brief marker persist in `localStorage`.
 - Boots with personality: a morning wake auto-delivers the briefing (once per
   day); an evening wake offers the day debrief.

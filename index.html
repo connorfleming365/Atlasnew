@@ -207,6 +207,17 @@
   #micnote{display:none;margin:8px 6px 0;padding:8px 12px;border-radius:10px;font-size:12.5px;
            background:var(--bg2);border:1px solid var(--line2);color:var(--ink2)}
   #micnote.show{display:block}
+  #memorypanel{display:none;margin:8px 6px 0;padding:10px 12px;border-radius:10px;
+               background:var(--bg2);border:1px solid var(--line2)}
+  #memorypanel.show{display:block}
+  #memorypanel textarea{width:100%;min-height:64px;resize:vertical;background:var(--bg1);
+               border:1px solid var(--line);border-radius:8px;color:var(--ink);
+               font:13px var(--sans);padding:8px 10px;box-sizing:border-box}
+  #memorypanel textarea::placeholder{color:var(--ink3)}
+  #memorypanel .row{display:flex;align-items:center;gap:10px;padding-top:8px}
+  #memorypanel button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--teal)}
+  #memorypanel .note{font-size:11px;color:var(--ink3);padding-top:6px}
+  #memorystatus{font-size:11px;color:var(--ink3)}
   #micnote b{color:var(--warn);font-weight:600}
   #micnote button{color:var(--teal);font-family:var(--mono);font-size:11px;letter-spacing:.08em;
                   margin-left:8px}
@@ -310,6 +321,13 @@
       <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
       <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
       <select id="voicesel" title="Which voice Atlas speaks with"><option value="">Auto</option></select>
+      <button class="dockbtn" id="memorybtn" title="Notes Atlas always remembers">MEMORY</button>
+    </div>
+    <div id="memorypanel" role="dialog" aria-label="Standing notes for Atlas">
+      <textarea id="memorytext" rows="3"
+        placeholder="One per line — things Atlas should always know, e.g. “I hate meetings before 9am”."></textarea>
+      <div class="row"><button id="memorysave">SAVE</button><span id="memorystatus"></span></div>
+      <div class="note">Only used by the real Claude brain (self-hosted, with a key set) — the fallback matcher can't read these.</div>
     </div>
     <div id="micnote" role="status"></div>
     <div id="hint">BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK …</div>
@@ -1186,6 +1204,19 @@ $("#flowbtn").addEventListener("click", e=>{
 $("#voicebtn").classList.toggle("on", S.voiceOn);
 $("#flowbtn").classList.toggle("on", S.flowOn);
 updateHint();
+
+$("#memorybtn").addEventListener("click", e=>{
+  const panel = $("#memorypanel"), open = panel.classList.toggle("show");
+  e.currentTarget.classList.toggle("on", open);
+  if (open) $("#memorytext").value = store.get("memory", []).join("\n");
+});
+$("#memorysave").addEventListener("click", ()=>{
+  const notes = $("#memorytext").value.split("\n").map(s=>s.trim()).filter(Boolean).slice(0, 20);
+  store.set("memory", notes);
+  const status = $("#memorystatus");
+  status.textContent = notes.length ? `Saved ${notes.length} note${notes.length===1?"":"s"}.` : "Cleared.";
+  setTimeout(()=>{ if (status.textContent.startsWith("Saved") || status.textContent==="Cleared.") status.textContent=""; }, 3000);
+});
 $("#say").addEventListener("keydown", e=>{
   if (e.key==="Enter" && e.target.value.trim()){
     handleUtterance(e.target.value.trim()); e.target.value="";
@@ -1964,7 +1995,7 @@ async function askBrain(promptText){
     const r = await fetch("/api/brain", {
       method:"POST", credentials:"same-origin",
       headers:{ "content-type":"application/json" },
-      body: JSON.stringify({ message: promptText, history: brainHistory }),
+      body: JSON.stringify({ message: promptText, history: brainHistory, notes: store.get("memory", []) }),
     });
     const j = await r.json().catch(()=>({}));
     if (!r.ok || j.error){

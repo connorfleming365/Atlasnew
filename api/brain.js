@@ -17,9 +17,12 @@ export default async function handler(req, res){
   const { message, history } = body || {};
   if (!message || typeof message !== "string")
     return res.status(400).json({ error:{ code:"bad_request", message:"message is required" } });
+  const notes = Array.isArray(body?.notes)
+    ? body.notes.filter(n => typeof n === "string" && n.trim()).slice(0, 20).map(n => n.trim().slice(0, 200))
+    : undefined;
 
   try{
-    res.json(await converse({ message, history }, req, res));
+    res.json(await converse({ message, history, notes }, req, res));
   }catch(e){
     res.status(200).json({ error:{ code:"upstream_error", message:String(e.message).slice(0,300) } });
   }
