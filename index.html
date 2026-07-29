@@ -965,6 +965,10 @@ function speakDispatch(text, then, interrupt){
   speakLocal(text, then, false, interrupt);
 }
 let cloudQueue = [], cloudActive = null;
+// Local TTS reports itself via speechSynthesis.speaking; cloud playback is a
+// plain <audio> element with no such global, so anything gating on "is Atlas
+// currently talking" has to check both, or it only ever sees the local half.
+function atlasIsSpeaking(){ return Boolean(window.speechSynthesis?.speaking) || Boolean(cloudActive); }
 function speakCloud(text, voiceId, then, interrupt){
   addMsg("atlas", text);
   if (!S.voiceOn){ Entity.mood="idle"; then?.(); return; }
@@ -1099,6 +1103,11 @@ async function startListening(){
     console.log(`[Atlas] recognition started (flow=${S.flowOn}, lang=${rec.lang})`);
   };
   rec.onresult = e=>{
+    // The mic is supposed to be closed for the whole time Atlas is talking —
+    // there's no real barge-in. If a stop/start timing race (or an open mic
+    // physically picking up the speakers) lets a result through anyway, drop
+    // it rather than treat Atlas's own voice as a command.
+    if (atlasIsSpeaking()) return;
     let fin="", inter="";
     // In continuous mode (FLOW) e.results keeps every segment for the whole
     // session, not just this event — starting the loop at 0 re-concatenates
@@ -1132,7 +1141,7 @@ async function startListening(){
     // hands-free: reopen the channel unless Atlas is mid-reply (speak() resumes us)
     if (S.flowOn && S.awake && !micBlocked)
       setTimeout(()=>{
-        if (S.flowOn && !S.listening && !window.speechSynthesis?.speaking) startListening();
+        if (S.flowOn && !S.listening && !atlasIsSpeaking()) startListening();
       }, 450);
   };
   rec.onerror = ev=>{
