@@ -193,6 +193,12 @@
            color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:8px 12px}
   .dockbtn.on{color:var(--teal);border-color:rgba(69,224,190,.4)}
   .dockbtn.off,#mic.off{opacity:.4}
+  #voicesel{flex:none;appearance:none;-webkit-appearance:none;font-family:var(--mono);
+            font-size:10px;letter-spacing:.06em;color:var(--ink3);background:var(--bg1);
+            border:1px solid var(--line);border-radius:999px;padding:8px 22px 8px 12px;
+            max-width:118px;text-overflow:ellipsis}
+  #voicesel:hover{border-color:rgba(69,224,190,.4)}
+  #voicesel option{background:var(--bg1);color:var(--ink)}
   #mic.off svg{fill:var(--ink3)}
   #mic.off::before{content:"";position:absolute;left:14px;right:14px;top:50%;height:1.5px;
     background:var(--ink3);transform:rotate(-35deg);border-radius:2px}
@@ -303,6 +309,7 @@
              autocomplete="off">
       <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
       <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
+      <select id="voicesel" title="Which voice Atlas speaks with"><option value="">Auto</option></select>
     </div>
     <div id="micnote" role="status"></div>
     <div id="hint">BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK …</div>
@@ -848,15 +855,41 @@ function addMsg(who, text){
 }
 
 let voice=null;
+function populateVoiceSelect(vs){
+  const sel = $("#voicesel");
+  if (!sel) return;
+  const chosen = store.get("voiceName", null);
+  const en = vs.filter(v=>/^en/i.test(v.lang)), rest = vs.filter(v=>!/^en/i.test(v.lang));
+  sel.innerHTML = '<option value="">Auto</option>' + [...en, ...rest]
+    .map(v=>`<option value="${esc(v.name)}">${esc(v.name)} — ${esc(v.lang)}</option>`).join("");
+  sel.value = (chosen && vs.some(v=>v.name===chosen)) ? chosen : "";
+}
 function pickVoice(){
   const vs = speechSynthesis.getVoices();
   if (!vs.length) return;
-  voice = vs.find(v=>/en[-_]GB/i.test(v.lang) && /google|neural|natural/i.test(v.name))
+  const chosen = store.get("voiceName", null);
+  voice = (chosen && vs.find(v=>v.name===chosen))
+       || vs.find(v=>/en[-_]GB/i.test(v.lang) && /google|neural|natural/i.test(v.name))
        || vs.find(v=>/en[-_]GB/i.test(v.lang))
        || vs.find(v=>/^en/i.test(v.lang)) || vs[0];
+  populateVoiceSelect(vs);
+}
+function previewVoice(){
+  if (!ENV.hasTTS || !voice) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance("This is Atlas.");
+  u.voice = voice; u.rate = 1.02; u.pitch = 1.0;
+  speechSynthesis.speak(u);
 }
 if ("speechSynthesis" in window){
   pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
+  $("#voicesel").addEventListener("change", e=>{
+    store.set("voiceName", e.target.value || null);
+    pickVoice();
+    previewVoice();
+  });
+} else {
+  $("#voicesel").style.display = "none";
 }
 
 let ttsReported = false;

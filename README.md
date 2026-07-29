@@ -39,7 +39,11 @@ Other explored directions live in `character-lab.html`.
 
 ## Voice ("flow")
 
-- **Mic button** — push-to-talk (Chrome/Edge speech recognition). Replies are spoken (en-GB voice preferred); typed input always works.
+- **Mic button** — push-to-talk (Chrome/Edge speech recognition). Replies are spoken (en-GB voice preferred by default); typed input always works.
+- **Voice picker** — the dropdown next to VOICE/FLOW lists every voice your
+  browser has installed. Pick one to hear a preview and lock it in, or leave
+  it on **Auto** for the en-GB neural pick above. Choice is remembered per
+  browser via `localStorage`.
 - **FLOW** — hands-free: the mic stays open and only sentences addressed as
   **"Atlas, …"** are acted on (wake word). Atlas pauses the mic while it speaks
   so it never hears itself.
