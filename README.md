@@ -48,8 +48,9 @@ right away, as does clicking **VOICE** off, which stops speech outright.
 - **Voice picker** — the dropdown next to VOICE/FLOW lists every voice your
   browser has installed. Pick one to hear a preview and lock it in, or leave
   it on **Auto** for the en-GB neural pick above. Choice is remembered per
-  browser via `localStorage`. Self-hosted with `ELEVENLABS_API_KEY` set, the
-  same dropdown gets a **Cloud** group listing your ElevenLabs voices —
+  browser via `localStorage` (or synced across every device you use, with
+  `UPSTASH_REDIS_REST_*` set — see below). Self-hosted with `ELEVENLABS_API_KEY`
+  set, the same dropdown gets a **Cloud** group listing your ElevenLabs voices —
   pick one to have replies spoken through ElevenLabs instead (small
   per-character cost, a little more latency, automatic fallback to the
   local voice if a request ever fails). Details: **SELF-HOSTING.md → Cloud
@@ -61,9 +62,16 @@ right away, as does clicking **VOICE** off, which stops speech outright.
 - The character's surface and ripples are driven by **real microphone amplitude**
   (WebAudio analyser) while listening, and by speech boundaries while talking.
 - **MEMORY** — a small panel (one note per line) for things Atlas should
-  always know ("I hate meetings before 9am"). Saved to `localStorage`, sent
-  with every message, only read by the real Claude brain — nothing is added
-  to it automatically.
+  always know ("I hate meetings before 9am"). Saved to `localStorage` (or
+  synced across devices, same as the voice choice above), sent with every
+  message, only read by the real Claude brain — nothing is added to it
+  automatically.
+- **Cross-device sync** — optional. With `UPSTASH_REDIS_REST_URL` and
+  `UPSTASH_REDIS_REST_TOKEN` set (a free database at upstash.com/redis), your
+  voice choice and memory notes stop being per-browser and instead follow you
+  to every device that opens this deployment. The stored value is encrypted
+  the same way provider tokens already are. Details: **SELF-HOSTING.md →
+  Cross-device sync**.
 - Settings, seen-mail memory, morning-brief marker persist in `localStorage`.
 - Boots with personality: a morning wake auto-delivers the briefing (once per
   day); an evening wake offers the day debrief.

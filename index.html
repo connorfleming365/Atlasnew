@@ -901,6 +901,28 @@ async function loadCloudVoices(){
     if (cloudVoices.length) populateVoiceSelect(speechSynthesis.getVoices?.() || []);
   }catch(_){}
 }
+/* Cross-device settings sync (optional — only when the deployment has
+   UPSTASH_REDIS_REST_URL/TOKEN set). Without it these two settings stay
+   exactly as they've always been: localStorage, one browser at a time. */
+async function loadSyncedSettings(){
+  if (!ATLAS.hosted || !ATLAS.status?.sync?.configured) return;
+  try{
+    const r = await fetch("/api/sync", { credentials:"same-origin" });
+    const j = await r.json().catch(()=>({}));
+    if (!j.configured) return;
+    if (j.voiceName !== undefined) store.set("voiceName", j.voiceName);
+    if (Array.isArray(j.memory)) store.set("memory", j.memory);
+    if ("speechSynthesis" in window) pickVoice();   // reflect a synced voice choice
+  }catch(_){}
+}
+async function pushSyncedSettings(){
+  if (!ATLAS.hosted || !ATLAS.status?.sync?.configured) return;
+  try{
+    await fetch("/api/sync", { method:"POST", credentials:"same-origin",
+      headers:{"content-type":"application/json"},
+      body: JSON.stringify({ voiceName: store.get("voiceName", null), memory: store.get("memory", []) }) });
+  }catch(_){}
+}
 function pickVoice(){
   const vs = speechSynthesis.getVoices();
   if (!vs.length) return;
@@ -935,10 +957,14 @@ if ("speechSynthesis" in window){
     store.set("voiceName", e.target.value || null);
     pickVoice();
     previewVoice();
+    pushSyncedSettings();
   });
 } else {
   $("#voicesel").style.display = "none";
 }
+// Not gated on speechSynthesis support — memory notes matter to the brain
+// regardless of whether this browser can speak replies aloud.
+hostedReady.then(hosted => { if (hosted) loadSyncedSettings(); });
 
 let ttsReported = false;
 function ttsFailed(why){
@@ -1261,6 +1287,7 @@ $("#memorybtn").addEventListener("click", e=>{
 $("#memorysave").addEventListener("click", ()=>{
   const notes = $("#memorytext").value.split("\n").map(s=>s.trim()).filter(Boolean).slice(0, 20);
   store.set("memory", notes);
+  pushSyncedSettings();
   const status = $("#memorystatus");
   status.textContent = notes.length ? `Saved ${notes.length} note${notes.length===1?"":"s"}.` : "Cleared.";
   setTimeout(()=>{ if (status.textContent.startsWith("Saved") || status.textContent==="Cleared.") status.textContent=""; }, 3000);

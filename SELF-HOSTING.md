@@ -17,12 +17,14 @@ api/mcp.js          the connector bridge
 api/brain.js        the Claude-powered conversational brain
 api/voices.js       lists your ElevenLabs voices, if configured
 api/tts.js          turns a reply into an mp3 with a chosen cloud voice
+api/sync.js         cross-device voice choice + memory notes, if configured
 api/auth/*.js       OAuth start / callback / disconnect
 lib/session.js      AES-256-GCM encrypted cookies
 lib/providers.js    OAuth config + token refresh
 lib/tools.js        provider REST → connector payload shapes
 lib/brain.js        context assembly + tool-calling loop for the brain
 lib/tts.js          ElevenLabs voice list + speech synthesis
+lib/sync.js         Upstash Redis read/write for the synced settings
 ```
 
 ## Cloud voices
@@ -78,7 +80,8 @@ a task, and to just proceed for everything else (adding a task, rescheduling,
 moving or editing an event, creating a focus block, reading mail aloud).
 
 **Standing notes (memory).** The **MEMORY** button in the dock opens a small
-panel — one note per line, saved to `localStorage` on your device. Whatever's
+panel — one note per line, saved to `localStorage` on your device (or synced
+across devices with the two `UPSTASH_REDIS_REST_*` variables below). Whatever's
 there gets sent along with every message and folded into the brain's system
 prompt as always-true background (e.g. "I hate meetings before 9am"), so you
 don't have to repeat it each session. Nothing is added automatically — only
@@ -87,6 +90,22 @@ fixed-phrase fallback has no use for free-text notes.
 
 Tokens live in encrypted, HttpOnly cookies keyed from `SESSION_SECRET`. There is
 no database, and no token is ever readable by the browser.
+
+## Cross-device sync
+
+Voice choice and memory notes normally live only in `localStorage` — one
+browser, one device. Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
+(a free database at [upstash.com/redis](https://upstash.com/redis) — create
+one, copy both values from its REST API section) and they instead sync
+through a single small record shared by every device that opens this
+deployment, since there's only one of you using it.
+
+This is the one exception to "nothing persisted server-side" above — but the
+stored value is sealed with the same AES-256-GCM/`SESSION_SECRET` mechanism
+already protecting provider tokens before it's ever sent to Upstash, so a
+leaked Upstash token alone doesn't hand over plaintext notes. Leave the two
+variables unset and nothing changes: each device just keeps its own settings,
+exactly as before.
 
 ---
 
@@ -97,7 +116,10 @@ stored in `HttpOnly; Secure; SameSite=Lax` cookies, so page scripts can't read
 them and a cross-site POST can't spend them. `/api/mcp` and `/api/auth/disconnect`
 additionally refuse any request that isn't same-origin. The OAuth handshake is
 bound by a random state nonce compared in constant time. Nothing is logged or
-persisted server-side; a deployment with no cookie has no access to anything.
+persisted server-side beyond that; a deployment with no cookie has no access
+to anything. The one exception is voice choice + memory notes, and only if
+you've opted in with `UPSTASH_REDIS_REST_*` — see **Cross-device sync** above
+for what that stores and how it's protected.
 
 **The deployment is public, and that is the thing to understand.** There is no
 login. Anyone with the URL can load the dashboard — they will see the *connect*

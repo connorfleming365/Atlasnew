@@ -273,6 +273,29 @@ remove the Cloud group again.
 
 ---
 
+## Step 11 — Sync settings across devices (optional)
+
+Without this, your voice choice and MEMORY notes each live only in the
+browser you set them in. This step makes them follow you everywhere.
+
+**11.1** [upstash.com](https://upstash.com) → sign up/in → **Create Database**
+→ pick the free tier, any region → **Create**.
+
+**11.2** On the database's page, find **REST API** → copy the **UPSTASH_REDIS_REST_URL**
+and **UPSTASH_REDIS_REST_TOKEN** values shown there.
+
+**11.3** Vercel → **Settings → Environment Variables** → add both
+(Production + Preview).
+
+**11.4 Redeploy.**
+
+**✅ Check:** `https://atlasnew-ten.vercel.app/api/status` now shows
+`"sync": {"configured": true}`. Pick a voice or save a MEMORY note on one
+device, then open the dashboard on another — it should already be there.
+Delete the two variables and redeploy to go back to per-device only.
+
+---
+
 ## Troubleshooting
 
 Always start at **`https://atlasnew-ten.vercel.app/api/status`** — it tells you which
