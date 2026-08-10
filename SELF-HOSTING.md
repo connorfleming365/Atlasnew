@@ -183,9 +183,12 @@ At [console.cloud.google.com](https://console.cloud.google.com):
 3. **OAuth consent screen** — User Type **External**, then leave it in **Testing**
    and add your own Google address under **Test users**.
    *Gmail's scopes are "restricted", so a published app would need Google's
-   verification review. An app left in Testing works immediately and
-   indefinitely for the test users you list — which for a personal dashboard is
-   the right setup, not a workaround.*
+   verification review. An app left in Testing works immediately for the test
+   users you list, with one real limitation worth knowing: Google expires the
+   **refresh token** itself after 7 days for apps in Testing status, so
+   roughly weekly you'll need to reconnect Google here (Todoist and Strava
+   don't have this restriction). `/api/status` will show `"connected": false`
+   for Google when that's happened — reconnecting takes ten seconds.*
 4. **Credentials → Create credentials → OAuth client ID → Web application**.
    Authorised redirect URI:
    `https://YOUR-DOMAIN/api/auth/callback`

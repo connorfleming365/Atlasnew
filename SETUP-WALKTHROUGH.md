@@ -112,8 +112,12 @@ scopes at connect time.
 
 Leave publishing status as **Testing**. Gmail's scopes are "restricted", so a
 *published* app needs Google's verification review; a Testing app works
-immediately and indefinitely for the users listed here. That's the right setup
-for a personal dashboard.
+immediately for the users listed here. That's the right setup for a personal
+dashboard — the one thing to know is Google expires the **refresh token**
+after 7 days for apps still in Testing, so roughly weekly Google (not
+Todoist or Strava, which don't have this limit) will need reconnecting from
+the dashboard. Ten seconds each time, and `/api/status` will show it plainly
+when it's due.
 
 **✅ Check:** your address is listed under Test users.
 
@@ -311,6 +315,7 @@ authorised them).
 | `status` says `configured: false` | Key missing or misspelled, or you didn't redeploy after adding it |
 | `sessionReady: false` | `SESSION_SECRET` isn't set for this environment |
 | Panels still say *Connect…* after connecting | Token rejected on first use. Visit `/api/auth/disconnect?provider=google` then reconnect |
+| Gmail/Calendar panels go OFFLINE after ~a week, `status` shows `google.connected: false` | Expected — Google expires Testing-mode refresh tokens after 7 days. Reconnect Google from the dashboard; Todoist and Strava don't do this |
 | Mic button still struck through | You're on the artifact, not your own domain — check the URL |
 
 ### Undoing things
