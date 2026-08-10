@@ -1365,12 +1365,6 @@ function watchSection(key, tool, input, render, opts={}){
       `<div class="degraded"><span class="ic">◌</span><span>Connector link needs the claude.ai artifact viewer. Open this page from your Claude artifacts to go live.</span></div>`;
     return;
   }
-  if (ATLAS.hosted && ATLAS.status?.servers?.[SERVERS[key]]?.connected === false){
-    setMeta(key,{status:"err", code:"server_not_connected"});
-    $("#p-"+key+" .body").innerHTML =
-      `<div class="degraded"><span class="ic">⚠</span><span>${esc(errCopy("server_not_connected", SERVERS[key]))}</span></div>`;
-    return;
-  }
   const unsub = mcp.watchTool(SERVERS[key], tool, input, ev=>{
     if (ev.type==="data"){
       const res = ev.result;
@@ -2199,9 +2193,16 @@ tickClock(); setInterval(tickClock, 15000);
 })();
 
 /* Hosted mode: offer the providers that still need linking. Everything
-   already connected stays out of the way. */
-function renderConnectBar(){
+   already connected stays out of the way. Refetches status fresh rather
+   than trusting the one snapshot taken at page load — a token that was
+   still mid-refresh at that exact instant shouldn't leave a stray
+   "CONNECT ..." banner sitting there for the rest of the session. */
+async function renderConnectBar(){
   if (!ATLAS.hosted) return;
+  try{
+    const r = await fetch("/api/status", { credentials:"same-origin" });
+    if (r.ok) ATLAS.status = await r.json();
+  }catch(_){}
   const provs = Object.entries(ATLAS.status?.providers || {});
   const pending = provs.filter(([,p]) => !p.connected);
   document.getElementById("connectbar")?.remove();
