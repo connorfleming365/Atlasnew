@@ -300,6 +300,46 @@ Delete the two variables and redeploy to go back to per-device only.
 
 ---
 
+## Step 12 — Stop reconnecting Google every week (optional, recommended)
+
+Google expires the refresh token behind your Google connection after **7
+days** while your OAuth app's publishing status is **Testing** (step 4d) —
+Todoist and Strava don't have this limit. This step removes it permanently.
+No code change, no redeploy — it's entirely a Google Console setting.
+
+**12.1** [console.cloud.google.com](https://console.cloud.google.com), with
+your **Atlas** project selected (check the project dropdown at the top).
+
+**12.2 APIs & Services → OAuth consent screen** (a newer console may show
+this as **Google Auth Platform → Audience** instead — same setting).
+
+**12.3** Find **Publishing status** — it currently says **Testing**. Click
+**Publish App** (or **Push to production** on the newer layout).
+
+**12.4** A dialog warns that verification isn't required to publish, only
+recommended for apps with many users. Click **Confirm**.
+
+**12.5** Reconnect Google so the token you're using was actually issued
+*under* Production status: visit
+`https://atlasnew-ten.vercel.app/api/auth/disconnect?provider=google`, then
+connect it again from the dashboard.
+
+**✅ Check:** Publishing status reads **In production**. You'll still see
+the "Google hasn't verified this app" warning each time you connect — that's
+unrelated and expected, it only goes away with full verification, which
+isn't worth pursuing for a single-user personal dashboard. What's gone is
+the 7-day expiry.
+
+*Worth knowing:* Testing mode's test-user list also doubles as an access
+control — only those listed addresses can even reach Google's consent
+screen. Publishing removes that, so in principle a stranger who found your
+deployment's URL could connect their own Google account through it. If
+you've already enabled **Vercel Deployment Protection** (step 3), this is
+moot — nobody outside your own logged-in Vercel session can reach the
+connect flow at all either way.
+
+---
+
 ## Troubleshooting
 
 Always start at **`https://atlasnew-ten.vercel.app/api/status`** — it tells you which
@@ -315,7 +355,7 @@ authorised them).
 | `status` says `configured: false` | Key missing or misspelled, or you didn't redeploy after adding it |
 | `sessionReady: false` | `SESSION_SECRET` isn't set for this environment |
 | Panels still say *Connect…* after connecting | Token rejected on first use. Visit `/api/auth/disconnect?provider=google` then reconnect |
-| Gmail/Calendar panels go OFFLINE after ~a week, `status` shows `google.connected: false` | Expected — Google expires Testing-mode refresh tokens after 7 days. Reconnect Google from the dashboard; Todoist and Strava don't do this |
+| Gmail/Calendar panels go OFFLINE after ~a week, `status` shows `google.connected: false` | Google expires Testing-mode refresh tokens after 7 days (Todoist/Strava don't). Reconnect Google to fix it now — **Step 12** removes this permanently |
 | Mic button still struck through | You're on the artifact, not your own domain — check the URL |
 
 ### Undoing things

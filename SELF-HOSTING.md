@@ -188,7 +188,8 @@ At [console.cloud.google.com](https://console.cloud.google.com):
    **refresh token** itself after 7 days for apps in Testing status, so
    roughly weekly you'll need to reconnect Google here (Todoist and Strava
    don't have this restriction). `/api/status` will show `"connected": false`
-   for Google when that's happened — reconnecting takes ten seconds.*
+   for Google when that's happened. This is fully avoidable — see
+   **Publishing Google to stop the 7-day expiry** below.*
 4. **Credentials → Create credentials → OAuth client ID → Web application**.
    Authorised redirect URI:
    `https://YOUR-DOMAIN/api/auth/callback`
@@ -197,6 +198,29 @@ At [console.cloud.google.com](https://console.cloud.google.com):
 
 Scopes requested: `calendar` and `gmail.modify` — enough to read mail, label,
 archive and trash, and to create and delete calendar events.
+
+### Publishing Google to stop the 7-day expiry
+
+The 7-day refresh-token expiry above is tied specifically to publishing
+status **Testing** — moving to **Production** removes it, with no code
+change and no Google verification review required:
+
+1. [console.cloud.google.com](https://console.cloud.google.com), Atlas
+   project selected → **APIs & Services → OAuth consent screen** (newer
+   console: **Google Auth Platform → Audience**).
+2. **Publishing status** → **Publish App** (newer: **Push to production**)
+   → **Confirm** on the dialog warning that verification is optional.
+3. Reconnect Google (`/api/auth/disconnect?provider=google`, then connect
+   again) so the token in use was actually issued under Production status.
+
+The "Google hasn't verified this app" warning on connect stays either way —
+only full verification removes that, and for `gmail.modify`'s restricted
+scope category that's a genuinely heavy process not worth it for a
+single-user dashboard. The one thing Testing mode's test-user list was also
+doing is gating *who* can even reach Google's consent screen; publishing
+removes that gate. If **Vercel Deployment Protection** (see Security model
+above) is on, that's moot — nothing behind it is reachable by anyone but you
+regardless.
 
 ## 4. Todoist
 
