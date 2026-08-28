@@ -288,7 +288,7 @@
   <div id="topbar">
     <div id="wordmark">ATL<b>A</b>S</div>
     <div id="clock">—</div>
-    <div id="pills">
+    <div id="pills" aria-live="polite" aria-atomic="false">
       <span class="pill" id="pill-cal"><i></i>CALENDAR</span>
       <span class="pill" id="pill-gmail"><i></i>GMAIL</span>
       <span class="pill" id="pill-todo"><i></i>TODOIST</span>
@@ -297,12 +297,12 @@
   </div>
 
   <div class="col" id="left">
-    <section class="panel" id="p-cal">
-      <header><h2>TODAY</h2><span class="src">Google Calendar</span><span class="upd"></span></header>
+    <section class="panel" id="p-cal" aria-labelledby="h-cal">
+      <header><h2 id="h-cal">TODAY</h2><span class="src">Google Calendar</span><span class="upd"></span></header>
       <div class="body"><div class="empty">Waiting for calendar…</div></div>
     </section>
-    <section class="panel" id="p-todo">
-      <header><h2>TASKS</h2><span class="src">Todoist</span><span class="upd"></span></header>
+    <section class="panel" id="p-todo" aria-labelledby="h-todo">
+      <header><h2 id="h-todo">TASKS</h2><span class="src">Todoist</span><span class="upd"></span></header>
       <div class="body"><div class="empty">Waiting for tasks…</div></div>
       <form id="addtask"><input id="newtask" placeholder="Capture a task… (or say “add task …”)"
         autocomplete="off"><button type="submit">ADD</button></form>
@@ -334,12 +334,12 @@
   </div>
 
   <div class="col" id="right">
-    <section class="panel" id="p-gmail">
-      <header><h2>INBOX</h2><span class="src">Gmail</span><span class="upd"></span></header>
+    <section class="panel" id="p-gmail" aria-labelledby="h-gmail">
+      <header><h2 id="h-gmail">INBOX</h2><span class="src">Gmail</span><span class="upd"></span></header>
       <div class="body"><div class="empty">Waiting for inbox…</div></div>
     </section>
-    <section class="panel" id="p-strava">
-      <header><h2>TRAINING</h2><span class="src">Strava</span><span class="upd"></span></header>
+    <section class="panel" id="p-strava" aria-labelledby="h-strava">
+      <header><h2 id="h-strava">TRAINING</h2><span class="src">Strava</span><span class="upd"></span></header>
       <div class="body"><div class="empty">Waiting for training data…</div></div>
     </section>
   </div>
@@ -358,6 +358,19 @@ const $  = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Makes a custom clickable <div> row (event/mail/task/chart-bar) behave like a
+// real control for keyboard and screen-reader users, without changing its
+// mouse behaviour. Guarded on e.target!==el so Enter/Space on a *nested* real
+// <button> (archive, delete, reschedule…) fires only that button, not the row.
+function activatable(el){
+  el.tabIndex = 0;
+  if (!el.hasAttribute("role")) el.setAttribute("role","button");
+  el.addEventListener("keydown", e=>{
+    if (e.target !== el) return;
+    if (e.key==="Enter" || e.key===" "){ e.preventDefault(); el.click(); }
+  });
+}
 const MCP = () => window.claude?.mcp;
 
 /* ================================================================
@@ -477,7 +490,21 @@ const store = {
 };
 S.voiceOn = store.get("voice", true);
 S.flowOn  = store.get("flow", false);
-let lastAction = null;   // most recent undoable action ({type:"focus"|"archive", ...})
+
+// Most recent undoable action ({type:"focus"|"archive"|"trash", ...}). Kept in
+// localStorage (not just memory) so a reload mid-undo-window doesn't strand
+// it — "say undo" and the promise it makes should survive a refresh. Expires
+// after UNDO_TTL_MS: a stale undo replayed long after the fact against data
+// that's since moved on is worse than just saying "nothing to undo."
+const UNDO_TTL_MS = 10 * 60000;
+let lastAction = (() => {
+  const a = store.get("lastAction", null);
+  return (a && Date.now() - a.at < UNDO_TTL_MS) ? a : null;
+})();
+function setLastAction(a){
+  lastAction = a ? { ...a, at: Date.now() } : null;
+  store.set("lastAction", lastAction);
+}
 
 /* ---------------- live mic analysis (drives the entity) ----------------
    One long-lived capture, opened on the wake gesture and kept alive: it
@@ -1453,14 +1480,17 @@ function renderCal(){
       const m=Math.round((e.start-now)/60000);
       chip=`<span class="chip">${m<60?`IN ${m}M`:`IN ${Math.round(m/60)}H`}</span>`;
     }
-    html += `<div class="ev${e===next?" next":""}${isPast?" past":""}" data-i="${i}" title="Click to hear details">
+    html += `<div class="ev${e===next?" next":""}${isPast?" past":""}" data-i="${i}"
+      title="Click to hear details" aria-label="${esc(e.title)}, hear details">
       <div class="t">${e.allday?"ALL DAY":fmtT(e.start)}</div>
       <div><div class="name">${esc(e.title)}${chip}</div>
       ${e.loc?`<div class="loc">${esc(e.loc)}</div>`:""}</div></div>`;
   });
   body.innerHTML = html;
-  body.querySelectorAll(".ev").forEach(el=>
-    el.addEventListener("click", ()=>speakEvent(evs[+el.dataset.i])));
+  body.querySelectorAll(".ev").forEach(el=>{
+    el.addEventListener("click", ()=>speakEvent(evs[+el.dataset.i]));
+    activatable(el);
+  });
 }
 
 /* --- todoist --- */
@@ -1481,7 +1511,7 @@ function renderTodo(){
   const row = (t, od) => `
     <div class="task" data-id="${esc(t.id)}">
       <button class="tick" aria-label="Complete: ${esc(t.content)}"></button>
-      <div class="c" title="Click for options">
+      <div class="c" title="Click for options" aria-label="${esc(t.content)}, show options" aria-expanded="false">
         ${t.priority && t.priority!=="p4" ? `<span class="pri ${t.priority}">${t.priority.toUpperCase()}</span>`:""}
         ${esc(t.content)}
         <div class="meta">${od?`<span class="od">overdue · ${esc((t.dueDate||t.deadlineDate||"").slice(0,10))}</span>`
@@ -1506,8 +1536,10 @@ function renderTodo(){
   body.querySelectorAll(".task .c").forEach(el=>{
     el.addEventListener("click", ev=>{
       if (ev.target.closest(".actchip")) return;
-      el.closest(".task").classList.toggle("open");
+      const open = el.closest(".task").classList.toggle("open");
+      el.setAttribute("aria-expanded", String(open));
     });
+    activatable(el);
   });
   body.querySelectorAll(".task .actchip").forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -1634,7 +1666,7 @@ async function focusBlock(dayOffset=0){
       startTime:cursor.toISOString(), endTime:end.toISOString(),
       notificationLevel:"NONE",
     });
-    lastAction = {type:"focus", eventId:r.payload?.id};
+    setLastAction({type:"focus", eventId:r.payload?.id});
     await mcp.invalidate("Google Calendar","list_events").catch(()=>{});
     speak(`Blocked ${fmtT(cursor)} to ${fmtT(end)}${dayOffset?" tomorrow":""} for: ${target.content}. Say undo to remove it.`);
   }catch(err){
@@ -1645,7 +1677,7 @@ async function focusBlock(dayOffset=0){
 async function undoLast(){
   if (!lastAction){ speak("Nothing to undo."); return; }
   const mcp=MCP(); if (!mcp) return;
-  const a = lastAction; lastAction=null;
+  const a = lastAction; setLastAction(null);
   try{
     if (a.type==="focus"){
       await mcp.callTool("Google Calendar","delete_event",{eventId:a.eventId, notificationLevel:"NONE"});
@@ -1692,14 +1724,15 @@ function renderGmail(){
   if (!items.length){ body.innerHTML=`<div class="empty">Inbox quiet — nothing in the last 48 hours.</div>`; return; }
   const when = d => !d ? "" :
     (d.toDateString()===new Date().toDateString() ? fmtT(d) : d.toLocaleDateString([], {weekday:"short"}));
-  const row = m => `<div class="mail${m.unread?" unread":""}" data-tid="${esc(m.threadId)}" title="Click for actions">
+  const row = m => `<div class="mail${m.unread?" unread":""}" data-tid="${esc(m.threadId)}"
+      title="Click for actions" aria-label="${esc(m.subj)}, from ${esc(m.from)}, show actions" aria-expanded="false">
       <div class="row1"><span class="from">${esc(m.from)}</span><span class="when">${when(m.date)}</span></div>
       <div class="subj">${esc(m.subj)}</div>
       <div class="snip">${esc(m.snip.slice(0,110))}</div>
       <div class="acts">
         <button class="actchip" data-act="read">▷ READ ALOUD</button>
         <button class="actchip warn" data-act="archive">ARCHIVE</button>
-        <button class="actchip crit" data-act="delete">DELETE</button>
+        <button class="actchip crit" data-act="delete" aria-live="polite">DELETE</button>
       </div></div>`;
   const pri = items.filter(m=>!m.low), low = items.filter(m=>m.low);
   body.innerHTML = `
@@ -1713,11 +1746,16 @@ function renderGmail(){
   body.querySelectorAll(".mail").forEach(el=>{
     el.addEventListener("click", ev=>{
       const chip = ev.target.closest(".actchip");
-      if (!chip){ el.classList.toggle("open"); return; }
+      if (!chip){
+        const open = el.classList.toggle("open");
+        el.setAttribute("aria-expanded", String(open));
+        return;
+      }
       if (chip.dataset.act==="read") readMail(el.dataset.tid, false);
       else if (chip.dataset.act==="archive") archiveMail(el);
       else deleteMail(el, chip);
     });
+    activatable(el);
   });
 }
 async function readMail(threadId, interrupt=true){
@@ -1743,10 +1781,17 @@ async function readMail(threadId, interrupt=true){
 }
 let pendingDelete = null;   // threadId awaiting a spoken "yes"
 function deleteMail(el, chip){
-  // Two-press confirm: deletion is the one action here that leaves the inbox
+  // Two-press confirm: deletion is the one action here that leaves the inbox.
+  // The button's own text change (plus its aria-live) announces the "press
+  // again" state to screen readers; Escape offers an explicit way out instead
+  // of making everyone wait out the 4s auto-reset.
   if (!chip.dataset.confirm){
     chip.dataset.confirm="1"; chip.textContent="CONFIRM DELETE";
-    setTimeout(()=>{ if (chip.isConnected){ delete chip.dataset.confirm; chip.textContent="DELETE"; } }, 4000);
+    const reset = () => { if (chip.isConnected){ delete chip.dataset.confirm; chip.textContent="DELETE"; } };
+    const timer = setTimeout(reset, 4000);
+    chip.addEventListener("keydown", function onKey(e){
+      if (e.key==="Escape"){ clearTimeout(timer); reset(); chip.removeEventListener("keydown", onKey); }
+    });
     return;
   }
   trashThread(el.dataset.tid, el, chip, false);
@@ -1758,7 +1803,7 @@ async function trashThread(threadId, el, chip, interrupt=true){
   if (el) el.style.opacity=".3";
   try{
     await mcp.callTool("Gmail","apply_sensitive_thread_label",{threadId, labelOption:"TRASH"});
-    lastAction = {type:"trash", threadId};
+    setLastAction({type:"trash", threadId});
     await mcp.invalidate("Gmail","search_threads").catch(()=>{});
     el?.remove();
     Entity.pulse(.6);
@@ -1775,7 +1820,7 @@ async function archiveMail(el){
   el.style.opacity=".3";
   try{
     await mcp.callTool("Gmail","unlabel_thread",{threadId, labelIds:["INBOX"]});
-    lastAction = {type:"archive", threadId};
+    setLastAction({type:"archive", threadId});
     await mcp.invalidate("Gmail","search_threads").catch(()=>{});
     el.remove();
     Entity.pulse(.6);
@@ -1835,11 +1880,12 @@ function renderStrava(){
   const bars = days.map(d=>{
     const h = Math.round(d.effort/max*100);
     const hot = d.key===tk || d.effort===max;
-    return `<div class="bar${d.effort? (hot?" hot":""):" zero"}" title="${d.key}: effort ${d.effort}, ${d.mins} min">
+    const label = `${d.key}: effort ${d.effort}, ${d.mins} minutes`;
+    return `<div class="bar${d.effort? (hot?" hot":""):" zero"}" title="${label}" aria-label="${label}">
       ${hot&&d.effort?`<span class="v">${d.effort}</span>`:""}
       <i style="height:${Math.max(h,2)}%"></i></div>`;
   }).join("");
-  const lastLine = last ? `<div class="lastact" title="Click to hear details">Last: <b>${esc(last.name)}</b> — ${
+  const lastLine = last ? `<div class="lastact" title="Click to hear details" aria-label="Last activity: ${esc(last.name)}, hear details">Last: <b>${esc(last.name)}</b> — ${
     last.summary?.distance ? (last.summary.distance/1000).toFixed(1)+" km, " : ""}${
     Math.round((last.summary?.moving_time||0)/60)} min${
     last.summary?.pr_count?`, ${last.summary.pr_count} PRs 🏅`:""}</div>` : "";
@@ -1852,14 +1898,16 @@ function renderStrava(){
       <div class="stat"><div class="n">${wk.n}</div><div class="l">SESSIONS</div></div>
     </div>
     <div class="daylabel">RELATIVE EFFORT · 14 DAYS${focus?` · FOCUS: ${esc(String(focus).toUpperCase())}`:""}</div>
-    <div class="chart" role="img" aria-label="Daily relative training effort, last 14 days">${bars}</div>
+    <div class="chart" role="group" aria-label="Daily relative training effort, last 14 days">${bars}</div>
     <div class="xlab">${days.map(d=>`<span>${d.lab}</span>`).join("")}</div>
     ${lastLine}
     ${rd ? `<div class="readiness"><b>${rd.verdict.toUpperCase().split(" — ")[0]}</b> — ${esc(rd.verdict.split(" — ")[1]||"")}
       · 7-day effort ${rd.acute} vs ${rd.prior} prior${pace5k?` · 5K ref ${esc(pace5k)}`:""}</div>` : ""}`;
-  body.querySelector(".lastact")?.addEventListener("click", ()=>speakActivity(last));
+  const lastEl = body.querySelector(".lastact");
+  if (lastEl){ lastEl.addEventListener("click", ()=>speakActivity(last)); activatable(lastEl); }
   body.querySelectorAll(".bar").forEach((el,i)=>{
     el.addEventListener("click", ()=>speakDay(days[i]));
+    activatable(el);
   });
 }
 function speakActivity(a){
