@@ -23,7 +23,7 @@ export default async function handler(req, res){
     configured("todoist") ? getTokenForLauncher("todoist") : null,
   ]);
 
-  let nextEventTitle = null, nextEventTime = null;
+  let nextEventTitle = null, nextEventTime = null, nextEventLink = null;
   if (calendarToken){
     try{
       const now = new Date();
@@ -37,6 +37,7 @@ export default async function handler(req, res){
       if (next){
         nextEventTitle = next.summary || null;
         nextEventTime = next.start?.dateTime || next.start?.date || null;
+        nextEventLink = next.htmlLink || null;
       }
     }catch(_){ /* leave nulls - the launcher shows "no data" rather than erroring */ }
   }
@@ -55,5 +56,5 @@ export default async function handler(req, res){
     }catch(_){ /* same - degrade to no data instead of a broken home screen */ }
   }
 
-  res.json({ nextEventTitle, nextEventTime, topTaskTitle, overdueTaskCount });
+  res.json({ nextEventTitle, nextEventTime, nextEventLink, topTaskTitle, overdueTaskCount });
 }
