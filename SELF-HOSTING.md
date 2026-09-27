@@ -100,12 +100,36 @@ one, copy both values from its REST API section) and they instead sync
 through a single small record shared by every device that opens this
 deployment, since there's only one of you using it.
 
-This is the one exception to "nothing persisted server-side" above — but the
+This is one exception to "nothing persisted server-side" above — but the
 stored value is sealed with the same AES-256-GCM/`SESSION_SECRET` mechanism
 already protecting provider tokens before it's ever sent to Upstash, so a
 leaked Upstash token alone doesn't hand over plaintext notes. Leave the two
 variables unset and nothing changes: each device just keeps its own settings,
 exactly as before.
+
+---
+
+## Android launcher
+
+The Atlas Launcher Android app (a separate repo) shows a small dashboard card
+— next calendar event, top task, overdue count — on your phone's home screen.
+It has no browser, so it can't carry the cookie the web dashboard uses; it
+polls one small endpoint instead: `GET /api/launcher/summary`.
+
+That endpoint needs two things set:
+
+- **`UPSTASH_REDIS_REST_URL`** and **`UPSTASH_REDIS_REST_TOKEN`** (see
+  **Cross-device sync** above) — this is what lets the server hold a copy of
+  your Google/Todoist tokens to read from without a cookie. Sealed the same
+  way as everything else here.
+- **`LAUNCHER_API_KEY`** — any long random string you make up yourself (a
+  password manager's generator is fine). The launcher sends it back as an
+  `x-launcher-key` header on every request; without a match, the endpoint
+  returns 401. Put the same value in the Android app's own config before you
+  build it.
+
+Leave `LAUNCHER_API_KEY` unset and the endpoint always answers 401 — the rest
+of this deployment is unaffected either way.
 
 ---
 
@@ -116,10 +140,10 @@ stored in `HttpOnly; Secure; SameSite=Lax` cookies, so page scripts can't read
 them and a cross-site POST can't spend them. `/api/mcp` and `/api/auth/disconnect`
 additionally refuse any request that isn't same-origin. The OAuth handshake is
 bound by a random state nonce compared in constant time. Nothing is logged or
-persisted server-side beyond that; a deployment with no cookie has no access
-to anything. The one exception is voice choice + memory notes, and only if
-you've opted in with `UPSTASH_REDIS_REST_*` — see **Cross-device sync** above
-for what that stores and how it's protected.
+persisted server-side beyond that unless you've opted in with
+`UPSTASH_REDIS_REST_*` — see **Cross-device sync** and **Android launcher**
+above for the two things that store (voice/memory settings, and a copy of
+provider tokens the launcher's endpoint reads), both sealed the same way.
 
 **The deployment is public, and that is the thing to understand.** There is no
 login. Anyone with the URL can load the dashboard — they will see the *connect*

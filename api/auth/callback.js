@@ -1,5 +1,6 @@
 import { PROVIDERS, cookieName, exchangeCode } from "../../lib/providers.js";
 import { parseCookies, seal, setCookie, clearCookie, sameToken } from "../../lib/session.js";
+import { setStoredToken } from "../../lib/tokenStore.js";
 
 const esc = s => String(s).replace(/[&<>"']/g, c =>
   ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -44,6 +45,7 @@ export default async function handler(req, res){
     // 4 KB is the per-cookie ceiling; fail loudly rather than silently dropping it
     if (sealed.length > 3800) throw new Error("token bundle too large to store in a cookie");
     setCookie(res, cookieName(provider), sealed);
+    setStoredToken(provider, tokens).catch(() => {}); // best-effort; the browser flow doesn't depend on this
     res.writeHead(302, { Location: `/?connected=${encodeURIComponent(provider)}` }).end();
   }catch(e){
     res.status(502).send(page("Failed",
