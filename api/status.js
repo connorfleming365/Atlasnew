@@ -2,7 +2,7 @@
    load to decide whether to install the hosted connector shim. */
 import { PROVIDERS, SERVER_PROVIDER, configured, envVar, getToken } from "../lib/providers.js";
 import { brainConfigured } from "../lib/brain.js";
-import { ttsConfigured } from "../lib/tts.js";
+import { ttsConfigured, pinnedVoice } from "../lib/tts.js";
 import { syncConfigured } from "../lib/sync.js";
 
 export default async function handler(req, res){
@@ -29,6 +29,7 @@ export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
   res.json({ hosted: true, sessionReady: hasSecret, providers, servers,
     brain: { configured: brainConfigured() },
-    tts: { configured: ttsConfigured() },
+    // pinned: the site-wide voice (ATLAS_VOICE) as {id, name}, {error}, or null
+    tts: { configured: ttsConfigured(), pinned: await pinnedVoice() },
     sync: { configured: syncConfigured() } });
 }

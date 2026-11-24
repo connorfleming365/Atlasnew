@@ -44,6 +44,25 @@ account limit, offline — Atlas automatically falls back to the local browser
 voice for that reply rather than staying silent. Leave `ELEVENLABS_API_KEY`
 unset and nothing changes: the picker just doesn't show the Cloud group.
 
+### One voice on every device
+
+A choice made in the picker belongs to that one browser, and device voices
+differ between phones, laptops and browsers — so to have Atlas always sound
+the same, pin a cloud voice for the whole deployment:
+
+1. Audition voices with the picker (each one previews when picked) and note
+   the name of the one you want, as it appears after the ☁.
+2. Set `ATLAS_VOICE` to that name (e.g. `Brian`). A voice ID from ElevenLabs
+   works too. Names match case-insensitively, and a prefix is enough —
+   `Brian` matches "Brian - Deep, Resonant".
+3. Redeploy.
+
+Every device then speaks with that voice, the picker disappears, and the
+server enforces it even for a tab left open from before. If a cloud request
+fails, Atlas retries once, then uses the device's voice for that one reply and
+says so on screen. If `ATLAS_VOICE` doesn't match a voice in your account, the
+dashboard says that too instead of silently ignoring it.
+
 ## The conversational brain
 
 By default, voice and typed input are handled by a fixed set of phrase matches
