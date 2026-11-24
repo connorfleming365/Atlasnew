@@ -33,33 +33,32 @@
   /* ---------- the view through the window ---------- */
   #space{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;pointer-events:none}
 
-  /* ---------- shell grid ---------- */
-  #app{position:relative;z-index:1;display:grid;height:100dvh;
-       grid-template-rows:auto minmax(0,1fr);
-       grid-template-columns:minmax(290px,350px) minmax(380px,1fr) minmax(290px,350px);
-       grid-template-areas:"top top top" "left mid right";gap:0 14px;padding:0 14px 14px}
+  [hidden]{display:none!important}
+
+  /* ---------- shell grid ----------
+     DECK (the master view): the rail down the left, the Day Line across
+     the top of the window, Atlas and the gauge console below it.
+     Opening a view (.viewing) adds a third column: the view takes the
+     middle and Atlas moves into the right column with the chat.
+     HUD: no panels at all; the window belongs to Atlas and the readouts.
+     Breakpoints live at the end of the stylesheet, after the component
+     rules they need to override. */
+  #app{position:relative;z-index:1;display:grid;height:100dvh;gap:12px 14px;padding:0 14px 14px;
+       grid-template-columns:auto minmax(0,1fr);
+       grid-template-rows:auto auto minmax(0,1fr);
+       grid-template-areas:"top top" "rail line" "rail mid"}
+  #app.viewing{grid-template-columns:auto minmax(0,1fr) minmax(300px,380px);
+       grid-template-areas:"top top top" "rail line line" "rail view mid"}
+  #app[data-mode="hud"]{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);
+       grid-template-areas:"top" "mid"}
   #topbar{grid-area:top;display:flex;align-items:center;gap:18px;padding:10px 16px;
           margin-top:14px;border-radius:16px}
-  .col{display:flex;flex-direction:column;gap:14px;min-height:0;padding-top:14px}
-  #left{grid-area:left}#right{grid-area:right}
-  #mid{grid-area:mid;display:flex;flex-direction:column;min-height:0;padding-top:6px}
-
-  @media (max-width:1080px){
-    body{overflow:auto}
-    #app{height:auto;grid-template-columns:1fr 1fr;
-         grid-template-areas:"top top" "mid mid" "left right"}
-    #mid{min-height:70dvh}
-  }
-  @media (max-width:660px){
-    /* minmax(0,…) so no single row's content can push the page wider than
-       the phone; the top bar and dock wrap instead of overflowing. */
-    #app{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "mid" "left" "right"}
-    #topbar{flex-wrap:wrap;gap:8px 14px}
-    /* doubled-up selectors: these sit above the base rules in the file */
-    #topbar #pills{margin-left:0}
-    #dock{flex-wrap:wrap}
-    #dock #say{min-width:0;flex:1 1 calc(100% - 64px)}   /* mic + ask on one row, toggles below */
-  }
+  #rail{grid-area:rail}
+  #dayline{grid-area:line}
+  #views{grid-area:view;display:flex;flex-direction:column;min-height:0}
+  #mid{grid-area:mid;display:flex;flex-direction:column;min-height:0}
+  #app:not(.viewing) #views,#app.viewing #deck{display:none}
+  #app[data-mode="hud"] :is(#rail,#dayline,#views,#deck){display:none}
 
   /* ---------- top bar ---------- */
   #wordmark{font-family:var(--mono);font-size:17px;letter-spacing:.55em;
@@ -182,7 +181,7 @@
   .lastact b{color:var(--ink);font-weight:600}
 
   /* ---------- center: the entity ---------- */
-  #stage{position:relative;flex:1;min-height:220px}
+  #stage{position:relative;flex:1;min-height:220px;container-type:size}   /* size container: the HUD reticle scales with the orb */
   #orb{position:absolute;inset:0;width:100%;height:100%}
   #transcript{height:148px;overflow-y:auto;padding:6px 10px;display:flex;
               flex-direction:column;gap:8px;mask-image:linear-gradient(transparent,#000 18px)}
@@ -273,13 +272,155 @@
   .readiness b{color:var(--teal);font-weight:600}
   .streak{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;margin-left:auto}
 
+  /* ---------- layout toggle (top bar) ---------- */
+  #modes{display:flex;gap:2px;padding:2px;border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
+  #modes button{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);
+                padding:4px 12px;border-radius:999px;transition:background .2s,color .2s}
+  #modes button:hover{color:var(--ink)}
+  #modes button[aria-pressed="true"]{color:#03100c;background:var(--teal);box-shadow:0 0 12px rgba(69,224,190,.45)}
+
+  /* ---------- rail ---------- */
+  #rail{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 7px;border-radius:18px;width:56px}
+  #rail button{position:relative;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+               color:var(--ink2);border:1px solid transparent;transition:background .15s,border-color .15s,color .15s}
+  #rail button:hover{background:rgba(255,255,255,.06);color:var(--ink)}
+  #rail button[aria-current]{color:var(--teal);background:rgba(69,224,190,.14);border-color:rgba(69,224,190,.45);
+                             box-shadow:0 0 14px rgba(69,224,190,.25)}
+  #rail svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .rail-sep{width:22px;height:1px;background:var(--line2);margin:2px 0}
+  .badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;
+         background:var(--teal);color:#03100c;font:700 9.5px/16px var(--mono);text-align:center}
+  .badge.crit{background:var(--serious);color:#1d0904}
+
+  /* ---------- Day Line: today on one strip ---------- */
+  #dayline{display:grid;grid-template-columns:minmax(150px,190px) minmax(0,1fr);gap:12px;align-items:center;
+           padding:10px 16px 6px;border-radius:16px}
+  .dl-sum{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .dl-lab{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--ink3)}
+  .dl-head{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dl-sub{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dl-scroll{overflow-x:auto;overflow-y:hidden;min-width:0;scrollbar-width:thin}
+  .dl-track{position:relative;height:84px;min-width:620px;margin:0 16px}
+  .dl-lbl{position:absolute;top:0;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dl-ev{position:absolute;top:18px;height:20px;min-width:6px;border-radius:7px;cursor:pointer;
+         background:linear-gradient(rgba(255,255,255,.34),rgba(255,255,255,.12));border:1px solid rgba(255,255,255,.24)}
+  .dl-ev:hover{border-color:rgba(69,224,190,.7)}
+  .dl-ev.act{background:linear-gradient(#7df5db,#1f9e86);border-color:rgba(125,245,219,.6)}
+  .dl-ev.cur{border-color:var(--teal);box-shadow:0 0 10px rgba(69,224,190,.5)}
+  .dl-ev.past,.dl-lbl.past,.dl-pin.past{opacity:.42}
+  .dl-free{position:absolute;top:18px;height:20px;border:1px dashed rgba(69,224,190,.7);border-radius:7px;
+           background:rgba(69,224,190,.07);font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.08em;
+           color:var(--teal);text-transform:uppercase;display:grid;place-items:center;overflow:hidden;white-space:nowrap}
+  button.dl-free{cursor:pointer}
+  button.dl-free:hover{background:rgba(69,224,190,.2)}
+  .dl-axis{position:absolute;left:0;right:0;top:46px;height:1px;background:rgba(255,255,255,.2)}
+  .dl-hr{position:absolute;top:50px;font-family:var(--mono);font-size:10px;color:var(--ink3);transform:translateX(-50%)}
+  .dl-now{position:absolute;top:0;bottom:20px;width:2px;margin-left:-1px;background:var(--teal);
+          box-shadow:0 0 8px var(--teal);pointer-events:none}
+  /* the label rides on the axis, clear of the event names above it */
+  .dl-now b{position:absolute;top:45px;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:9px;
+            line-height:12px;letter-spacing:.1em;color:#03100c;background:var(--teal);padding:0 5px;border-radius:99px;
+            box-shadow:0 0 8px rgba(69,224,190,.6)}
+  .dl-pin{position:absolute;top:66px;font-size:11px;color:var(--ink2);display:flex;gap:5px;align-items:center;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dl-pin i{flex:none;width:7px;height:7px;transform:rotate(45deg);background:var(--warn)}
+  .dl-pin.p1 i{background:var(--crit)}
+  .dl-pin.od{color:#ff9b93}
+  .dl-empty{position:absolute;top:20px;left:0;font-size:12px;color:var(--ink3)}
+
+  /* ---------- gauge console ---------- */
+  #deck{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;width:100%;max-width:1120px;
+        margin:0 auto;padding:16px 4px 2px}
+  .gauge{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;
+         text-align:left;padding:12px 16px 13px;border-radius:16px;transition:translate .2s,border-color .2s}
+  /* a shallow arc: outer gauges raised and tilted in, like a console */
+  .gauge:nth-child(1){rotate:-3deg;translate:0 -12px}
+  .gauge:nth-child(2){rotate:-1deg}
+  .gauge:nth-child(3){rotate:1deg}
+  .gauge:nth-child(4){rotate:3deg;translate:0 -12px}
+  .gauge:hover{border-color:rgba(69,224,190,.55)}
+  .gauge::after{content:"↗";position:absolute;top:9px;right:12px;font-size:12px;color:var(--ink3)}
+  .gauge:hover::after{color:var(--teal)}
+  .gl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.2em;color:var(--ink3);text-transform:uppercase}
+  .gv{font-size:28px;line-height:1.05;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
+      text-overflow:ellipsis;max-width:100%}
+  .gv small{font-size:12px;font-weight:400;color:var(--ink2);margin-left:5px}
+  .gs{font-size:12.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .gs .od{color:var(--serious);font-style:normal}
+  .gauge[data-view="strava"]{padding-right:66px}
+  .gbars{position:absolute;right:14px;bottom:14px;display:flex;align-items:flex-end;gap:2px;height:26px}
+  .gbars i{width:5px;border-radius:2px 2px 1px 1px;background:rgba(255,255,255,.3)}
+  .gbars i.hot{background:var(--teal);box-shadow:0 0 6px rgba(69,224,190,.6)}
+  #app:not(.viewing):not([data-mode="hud"]) #transcript{height:104px}
+  /* on the deck, chat, console and dock share one centred column under Atlas */
+  #app:not(.viewing):not([data-mode="hud"]) #mid > :not(#stage){width:100%;max-width:1120px;margin-left:auto;margin-right:auto;
+                                                                box-sizing:border-box}
+
+  /* ---------- expanded views ---------- */
+  #views .panel{flex:1;min-height:0;scroll-margin-top:12px}
+  #views .panel header{padding:14px 18px 10px;align-items:center}
+  #views .panel h2{font-size:12px;outline-offset:4px}
+  #views .panel .body{padding:12px 18px 16px}
+  #views .chart{height:170px}
+  .vclose{margin-left:10px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
+          font-size:18px;line-height:1;color:var(--ink2);border:1px solid var(--line2)}
+  .vclose:hover{color:var(--teal);border-color:rgba(69,224,190,.5)}
+  #app.viewing #dock{flex-wrap:wrap}
+  #app.viewing #say{min-width:0;flex:1 1 calc(100% - 64px)}
+
+  /* ---------- heads-up display ---------- */
+  #reticle{display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none;--m:min(100cqw,100cqh)}
+  #app[data-mode="hud"] #reticle{display:block}
+  .rt{position:absolute;left:50%;top:50%;translate:-50% -50%;aspect-ratio:1;border-radius:50%;
+      width:calc(var(--m)*.56);border:1px solid rgba(69,224,190,.4)}
+  .rt.o{width:calc(var(--m)*.78);border-style:dashed;border-color:rgba(69,224,190,.3)}
+  .lad{position:absolute;top:50%;height:1px;width:calc(var(--m)*.4);background:rgba(69,224,190,.45)}
+  .lad.l{right:calc(50% + var(--m)*.43)} .lad.r{left:calc(50% + var(--m)*.43)}
+  .lad.l2,.lad.r2,.lad.l3,.lad.r3{width:calc(var(--m)*.15);opacity:.55}
+  .lad.l2,.lad.l3{right:calc(50% + var(--m)*.43)} .lad.r2,.lad.r3{left:calc(50% + var(--m)*.43)}
+  .lad.l2,.lad.r2{top:calc(50% - var(--m)*.15)} .lad.l3,.lad.r3{top:calc(50% + var(--m)*.15)}
+  #hud{display:none}
+  #app[data-mode="hud"] #hud{display:block;position:absolute;inset:0;pointer-events:none}
+  .ro{position:absolute;isolation:isolate;max-width:min(28vw,340px);font-family:var(--mono);color:#dffaf3;
+      text-transform:uppercase;text-shadow:0 0 .6em rgba(69,224,190,.55),0 1px 2px #000}
+  /* a soft dark scrim keeps readouts legible over the bright planet */
+  .ro::before{content:"";position:absolute;inset:-28px -40px;z-index:-1;
+              background:radial-gradient(closest-side,rgba(2,4,10,.6),rgba(2,4,10,0))}
+  .ro-tl{left:max(44px,4.5vw);top:104px} .ro-tr{right:max(44px,4.5vw);top:104px;text-align:right}
+  .ro-bl{left:max(44px,4.5vw);bottom:260px} .ro-br{right:max(44px,4.5vw);bottom:260px;text-align:right}
+  .ro .k{font-size:10.5px;letter-spacing:.2em;color:var(--teal)}
+  .ro .v{font-size:19px;font-weight:600;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ro .t{font-size:26px;font-weight:600;color:var(--teal);letter-spacing:.04em}
+  .ro .row{font-size:12px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ro .row.od{color:#ffb4ae}
+  .ro .spark{display:block;width:180px;max-width:100%;height:40px;margin:6px 0 0 auto;color:var(--teal);
+             filter:drop-shadow(0 0 4px rgba(69,224,190,.6))}
+  .ro-tl .spark,.ro-bl .spark{margin-left:0}
+  .br{position:absolute;width:56px;height:56px;border:0 solid rgba(69,224,190,.7)}
+  .br.tl{left:24px;top:88px;border-top-width:2px;border-left-width:2px}
+  .br.tr{right:24px;top:88px;border-top-width:2px;border-right-width:2px}
+  .br.bl{left:24px;bottom:22px;border-bottom-width:2px;border-left-width:2px}
+  .br.bri{right:24px;bottom:22px;border-bottom-width:2px;border-right-width:2px}
+  /* the chrome steps back: no glass, readout type, a command line instead of a field */
+  #app[data-mode="hud"] #mid{justify-self:center;width:min(780px,100%)}
+  #app[data-mode="hud"] #topbar{background:none;border-color:transparent;box-shadow:none;
+                                -webkit-backdrop-filter:none;backdrop-filter:none}
+  #app[data-mode="hud"] :is(#wordmark,#clock){text-shadow:0 0 10px rgba(69,224,190,.55)}
+  #app[data-mode="hud"] .msg{background:rgba(2,6,12,.55);border-color:rgba(69,224,190,.25);
+                             font-family:var(--mono);font-size:12.5px;letter-spacing:.02em}
+  #app[data-mode="hud"] #say{background:rgba(2,6,12,.35);border:none;border-bottom:1px solid rgba(69,224,190,.6);
+                             border-radius:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+                             font-family:var(--mono);font-size:13px;letter-spacing:.06em}
+  #app[data-mode="hud"] :is(#mic,.dockbtn,#voicesel){background:rgba(2,6,12,.4);box-shadow:none;
+                             -webkit-backdrop-filter:none;backdrop-filter:none}
+
   /* ---------- glass ----------
      One material for every surface that floats directly over the view.
      Declared after the component rules so it supplies their background,
      border and edge light; state rules (#mic.on, .dockbtn.on, :focus) are
      more specific and still win. Fills nested *inside* glass stay plain
      translucent tints — stacking blurs costs GPU for no visible gain. */
-  .panel,#topbar,.banner,#micnote,#memorypanel,#mic,#say,.dockbtn,#voicesel{
+  .panel,#topbar,#rail,#dayline,.gauge,.banner,#micnote,#memorypanel,#mic,#say,.dockbtn,#voicesel{
     background:var(--glass);
     -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
     border:1px solid var(--glass-line);
@@ -317,14 +458,55 @@
   /* No backdrop blur available, or the user asked for less transparency /
      more contrast: same layout, near-opaque surfaces, view still framed. */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
-    .panel,#topbar,.banner,#micnote,#memorypanel,#mic,#say,.dockbtn,#voicesel{background:rgba(9,14,24,.93)}
+    .panel,#topbar,#rail,#dayline,.gauge,.banner,#micnote,#memorypanel,#mic,#say,.dockbtn,#voicesel{background:rgba(9,14,24,.93)}
     #boot{background:var(--bg0)}
   }
   @media (prefers-reduced-transparency:reduce), (prefers-contrast:more){
-    .panel,#topbar,.banner,#micnote,#memorypanel,#mic,#say,.dockbtn,#voicesel{
+    .panel,#topbar,#rail,#dayline,.gauge,.banner,#micnote,#memorypanel,#mic,#say,.dockbtn,#voicesel{
       background:rgba(9,14,24,.95);-webkit-backdrop-filter:none;backdrop-filter:none}
     .msg.atlas,.msg.user{background:rgba(9,14,24,.95)}
     #boot{background:var(--bg0);-webkit-backdrop-filter:none;backdrop-filter:none}
+  }
+
+  /* ---------- breakpoints (last, so they override the component rules) ---------- */
+  @media (max-width:1080px){
+    body{overflow:auto}
+    #app{height:auto;min-height:100dvh}
+    #app:not(.viewing) #mid,#app[data-mode="hud"] #mid{min-height:78dvh}
+    #app.viewing{grid-template-columns:auto minmax(0,1fr);
+                 grid-template-areas:"top top" "rail line" "rail view" "rail mid"}
+    #app.viewing #views{min-height:62dvh}
+    #app.viewing #stage{min-height:200px}
+    /* heads-up readouts leave the corners for a grid under Atlas */
+    #app[data-mode="hud"]{grid-template-rows:auto auto auto;grid-template-areas:"top" "mid" "hud"}
+    #app[data-mode="hud"] #hud{position:static;display:grid;grid-area:hud;
+                               grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 20px;padding:8px 8px 12px}
+    /* relative, not static: the scrim must stay anchored to its own readout */
+    .ro{position:relative;inset:auto;max-width:none}
+    .ro::before{inset:-10px -8px}
+    .ro-tr,.ro-br{text-align:left}
+    /* the dock wraps its toggles under the ask field once space runs short */
+    #dock{flex-wrap:wrap}
+    #say{min-width:0;flex:1 1 260px}
+    .ro-tr .spark,.ro-br .spark{margin-left:0}
+    .br{display:none}
+  }
+  @media (max-width:660px){
+    /* minmax(0,…) so no row's content can push the page wider than the phone */
+    #app,#app.viewing{grid-template-columns:minmax(0,1fr)}
+    #app{grid-template-areas:"top" "rail" "line" "mid"}
+    #app.viewing{grid-template-areas:"top" "rail" "line" "view" "mid"}
+    #app[data-mode="hud"]{grid-template-areas:"top" "mid" "hud"}
+    #topbar{flex-wrap:wrap;gap:8px 14px}
+    #pills{margin-left:0}
+    #dock{flex-wrap:wrap}
+    #say{min-width:0;flex:1 1 calc(100% - 64px)}   /* mic + ask on one row, toggles below */
+    #rail{flex-direction:row;justify-content:space-around;width:auto;padding:6px 8px}
+    .rail-sep{width:1px;height:22px;margin:0}
+    #dayline{grid-template-columns:minmax(0,1fr)}
+    #deck{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .gauge:nth-child(n){rotate:none;translate:none}
+    #app[data-mode="hud"] #hud{grid-template-columns:minmax(0,1fr)}
   }
 </style>
 
@@ -339,34 +521,88 @@
   </div>
 </div>
 
-<div id="app">
-  <div id="topbar">
+<div id="app" data-mode="deck" data-view="deck">
+  <header id="topbar">
     <div id="wordmark">ATL<b>A</b>S</div>
     <div id="clock">—</div>
+    <div id="modes" role="group" aria-label="Layout">
+      <button type="button" data-mode="deck" aria-pressed="true" title="Flight deck: gauges, Day Line and full views">DECK</button>
+      <button type="button" data-mode="hud" aria-pressed="false" title="Heads-up display: readouts on the window, no panels">HUD</button>
+    </div>
     <div id="pills" aria-live="polite" aria-atomic="false">
       <span class="pill" id="pill-cal"><i></i>CALENDAR</span>
       <span class="pill" id="pill-gmail"><i></i>GMAIL</span>
       <span class="pill" id="pill-todo"><i></i>TODOIST</span>
       <span class="pill" id="pill-strava"><i></i>STRAVA</span>
     </div>
-  </div>
+  </header>
 
-  <div class="col" id="left">
-    <section class="panel" id="p-cal" aria-labelledby="h-cal">
-      <header><h2 id="h-cal">TODAY</h2><span class="src">Google Calendar</span><span class="upd"></span></header>
+  <nav id="rail" aria-label="Views">
+    <button type="button" data-view="deck" aria-label="Flight deck" title="Flight deck" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg></button>
+    <span class="rail-sep" aria-hidden="true"></span>
+    <button type="button" data-view="cal" aria-label="Today" title="Today" aria-controls="p-cal">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg></button>
+    <button type="button" data-view="todo" aria-label="Tasks" title="Tasks" aria-controls="p-todo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="m8.5 12.2 2.4 2.4 4.8-5.2"/></svg><b class="badge" id="rb-todo" hidden></b></button>
+    <button type="button" data-view="gmail" aria-label="Inbox" title="Inbox" aria-controls="p-gmail">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4.5 7 7.5 6 7.5-6"/></svg><b class="badge" id="rb-gmail" hidden></b></button>
+    <button type="button" data-view="strava" aria-label="Training" title="Training" aria-controls="p-strava">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12.5h4l2.5-6 5 12 2.5-6H21"/></svg></button>
+  </nav>
+
+  <section id="dayline" aria-labelledby="dl-head">
+    <div class="dl-sum">
+      <div class="dl-lab" id="dl-date">TODAY</div>
+      <div class="dl-head" id="dl-head">Day Line</div>
+      <div class="dl-sub" id="dl-sub">Waiting for calendar…</div>
+    </div>
+    <div class="dl-scroll"><div class="dl-track" id="dl-track"></div></div>
+  </section>
+
+  <div id="views">
+    <section class="panel" id="p-cal" aria-labelledby="h-cal" hidden>
+      <header><h2 id="h-cal" tabindex="-1">TODAY</h2><span class="src">Google Calendar</span><span class="upd"></span>
+        <button type="button" class="vclose" aria-label="Close Today and return to the deck" title="Back to the deck (Esc)">×</button></header>
       <div class="body"><div class="empty">Waiting for calendar…</div></div>
     </section>
-    <section class="panel" id="p-todo" aria-labelledby="h-todo">
-      <header><h2 id="h-todo">TASKS</h2><span class="src">Todoist</span><span class="upd"></span></header>
+    <section class="panel" id="p-todo" aria-labelledby="h-todo" hidden>
+      <header><h2 id="h-todo" tabindex="-1">TASKS</h2><span class="src">Todoist</span><span class="upd"></span>
+        <button type="button" class="vclose" aria-label="Close Tasks and return to the deck" title="Back to the deck (Esc)">×</button></header>
       <div class="body"><div class="empty">Waiting for tasks…</div></div>
       <form id="addtask"><input id="newtask" placeholder="Capture a task… (or say “add task …”)"
         autocomplete="off"><button type="submit">ADD</button></form>
     </section>
+    <section class="panel" id="p-gmail" aria-labelledby="h-gmail" hidden>
+      <header><h2 id="h-gmail" tabindex="-1">INBOX</h2><span class="src">Gmail</span><span class="upd"></span>
+        <button type="button" class="vclose" aria-label="Close Inbox and return to the deck" title="Back to the deck (Esc)">×</button></header>
+      <div class="body"><div class="empty">Waiting for inbox…</div></div>
+    </section>
+    <section class="panel" id="p-strava" aria-labelledby="h-strava" hidden>
+      <header><h2 id="h-strava" tabindex="-1">TRAINING</h2><span class="src">Strava</span><span class="upd"></span>
+        <button type="button" class="vclose" aria-label="Close Training and return to the deck" title="Back to the deck (Esc)">×</button></header>
+      <div class="body"><div class="empty">Waiting for training data…</div></div>
+    </section>
   </div>
 
   <div id="mid">
-    <div id="stage"><canvas id="orb"></canvas></div>
+    <div id="stage">
+      <div id="reticle" aria-hidden="true"><i class="rt o"></i><i class="rt"></i>
+        <i class="lad l"></i><i class="lad r"></i><i class="lad l2"></i><i class="lad r2"></i><i class="lad l3"></i><i class="lad r3"></i></div>
+      <canvas id="orb"></canvas>
+    </div>
     <div id="transcript" aria-live="polite"></div>
+    <div id="deck" role="group" aria-label="Today at a glance">
+      <button type="button" class="gauge" data-view="cal" aria-controls="p-cal" aria-expanded="false" title="Open Today">
+        <span class="gl">Next</span><span class="gv" id="gv-cal">—</span><span class="gs" id="gs-cal">Waiting for calendar…</span></button>
+      <button type="button" class="gauge" data-view="todo" aria-controls="p-todo" aria-expanded="false" title="Open Tasks">
+        <span class="gl">Tasks due</span><span class="gv" id="gv-todo">—</span><span class="gs" id="gs-todo">Waiting for tasks…</span></button>
+      <button type="button" class="gauge" data-view="gmail" aria-controls="p-gmail" aria-expanded="false" title="Open Inbox">
+        <span class="gl">Inbox</span><span class="gv" id="gv-gmail">—</span><span class="gs" id="gs-gmail">Waiting for inbox…</span></button>
+      <button type="button" class="gauge" data-view="strava" aria-controls="p-strava" aria-expanded="false" title="Open Training">
+        <span class="gl">Training</span><span class="gv" id="gv-strava">—</span><span class="gs" id="gs-strava">Waiting for training…</span>
+        <span class="gbars" id="gb-strava" aria-hidden="true"></span></button>
+    </div>
     <div id="dock">
       <button id="mic" aria-label="Toggle voice input" title="Talk to Atlas">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
@@ -385,18 +621,16 @@
       <div class="note">Only used by the real Claude brain (self-hosted, with a key set) — the fallback matcher can't read these.</div>
     </div>
     <div id="micnote" role="status"></div>
-    <div id="hint">BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK …</div>
+    <div id="hint">BRIEF ME · WHAT’S NEXT · BLOCK TIME · SHOW INBOX · HEADS-UP MODE · ADD TASK …</div>
   </div>
 
-  <div class="col" id="right">
-    <section class="panel" id="p-gmail" aria-labelledby="h-gmail">
-      <header><h2 id="h-gmail">INBOX</h2><span class="src">Gmail</span><span class="upd"></span></header>
-      <div class="body"><div class="empty">Waiting for inbox…</div></div>
-    </section>
-    <section class="panel" id="p-strava" aria-labelledby="h-strava">
-      <header><h2 id="h-strava">TRAINING</h2><span class="src">Strava</span><span class="upd"></span></header>
-      <div class="body"><div class="empty">Waiting for training data…</div></div>
-    </section>
+  <div id="hud" role="region" aria-label="Heads-up readouts">
+    <i class="br tl" aria-hidden="true"></i><i class="br tr" aria-hidden="true"></i>
+    <i class="br bl" aria-hidden="true"></i><i class="br bri" aria-hidden="true"></i>
+    <div class="ro ro-tl" id="ro-next"></div>
+    <div class="ro ro-tr" id="ro-inbox"></div>
+    <div class="ro ro-bl" id="ro-tasks"></div>
+    <div class="ro ro-br" id="ro-load"></div>
   </div>
 </div>
 
@@ -589,17 +823,13 @@ const Space = (() => {
     g.fillStyle = sh; g.fillRect(0,0,W,H);
     g.globalCompositeOperation = "source-over";
 
-    // Struts sit in the gutters between the columns, so they read sharp in
-    // the gaps and soft behind the glass. Panes taper upward: each strut
-    // leans in toward the top, the way flight-deck windows converge.
+    // Two struts frame the centre pane. They're placed by fraction of the
+    // window rather than measured from the layout, so opening a view or
+    // switching to the HUD never needs a repaint; behind glass they read
+    // soft. Panes taper upward: each strut leans in toward the top, the
+    // way flight-deck windows converge.
     const struts = [];                                       // [x at top, x at bottom]
-    const left = $("#left"), right = $("#right");
-    if (W > 1080 && left && right){
-      const gl = left.getBoundingClientRect().right + 7, gr = right.getBoundingClientRect().left - 7;
-      struts.push([gl + 18, gl - 18], [gr - 18, gr + 18]);
-    } else if (W > 660){
-      struts.push([W*.17 + 14, W*.17 - 14], [W*.83 - 14, W*.83 + 14]);
-    }
+    if (W > 660) struts.push([W*.19 + 16, W*.19 - 16], [W*.81 - 16, W*.81 + 16]);
     const bez = 8, rad = 34;
     const win = new Path2D();
     if (win.roundRect) win.roundRect(bez, bez, W - 2*bez, H - 2*bez, rad);
@@ -1576,7 +1806,7 @@ function updateHint(){
     ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE ANY COMMAND BELOW"
     : S.flowOn
       ? "HANDS-FREE — JUST SPEAK, NO WAKE WORD NEEDED · ATLAS PAUSES WHILE IT TALKS"
-      : "BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING · ADD TASK … · UNDO";
+      : "BRIEF ME · WHAT’S NEXT · BLOCK TIME · SHOW INBOX · HEADS-UP MODE · ADD TASK … · UNDO";
 }
 // The button stays enabled even without support: pressing it explains why,
 // which is far better than a dead control the user has to guess about.
@@ -1661,6 +1891,7 @@ function setMeta(key, patch){
     : s==="stale" ? `${SERVERS[key]}: showing last good data, retrying automatically` : "";
   renderUpdated(key);
   checkPageCondition();
+  renderDeck();          // gauges, Day Line and HUD follow every connector update
 }
 function renderUpdated(key){
   const el = $("#p-"+key+" .upd"); if (!el) return;
@@ -2095,7 +2326,11 @@ function deleteMail(el, chip){
     const reset = () => { if (chip.isConnected){ delete chip.dataset.confirm; chip.textContent="DELETE"; } };
     const timer = setTimeout(reset, 4000);
     chip.addEventListener("keydown", function onKey(e){
-      if (e.key==="Escape"){ clearTimeout(timer); reset(); chip.removeEventListener("keydown", onKey); }
+      if (e.key==="Escape"){
+        // cancel the delete only — don't let the same Escape also close the Inbox view
+        e.preventDefault(); e.stopPropagation();
+        clearTimeout(timer); reset(); chip.removeEventListener("keydown", onKey);
+      }
     });
     return;
   }
@@ -2236,6 +2471,370 @@ function speakDay(d){
   speakWidget(`${d.key}: ${acts.length} session${acts.length===1?"":"s"} — ${
     acts.map(a=>a.name).join(", ")}. Total effort ${d.effort}, ${d.mins} minutes.`);
 }
+
+/* ================================================================
+   THE MASTER VIEW — gauge console, Day Line, expanding views and the
+   heads-up readouts. Nothing here fetches: it's all derived from the
+   same S.data the panels render, redrawn on every connector update
+   (setMeta) and every clock tick, so "in 40m", the countdown and the
+   NOW needle keep moving between fetches. The four panels themselves
+   are the expanded views; they render whether or not they're open.
+   ================================================================ */
+const VIEWS = { cal:"Today", todo:"Tasks", gmail:"Inbox", strava:"Training" };
+S.view = "deck";
+S.mode = store.get("mode", "deck") === "hud" ? "hud" : "deck";
+let viewOpener = null;   // what to hand focus back to when a view closes
+
+const pad2 = n => String(Math.max(0, Math.floor(n))).padStart(2, "0");
+const durLabel = ms => { const m = Math.round(ms/60000), h = Math.floor(m/60), r = m % 60;
+                         return h ? `${h}h${r ? ` ${r}m` : ""}` : `${r}m`; };
+function untilLabel(d){
+  const m = Math.round((d - Date.now())/60000);
+  if (m < 1) return "now";
+  if (m < 60) return `in ${m}m`;
+  if (d.toDateString() === new Date().toDateString()) return `in ${durLabel(m*60000)}`;
+  const tm = new Date(); tm.setDate(tm.getDate() + 1);
+  return d.toDateString() === tm.toDateString() ? "tomorrow" : d.toLocaleDateString([], {weekday:"short"});
+}
+function waitingCopy(key){
+  const m = S.meta[key] || {};
+  if (m.status === "err") return AUTHZ.has(m.code) ? "Needs reconnecting" : "Offline — retrying";
+  return MCP() ? "Waiting…" : "Not linked here";
+}
+const loadWord = rd => rd.ratio > 1.35 ? "Recover" : rd.ratio < .75 ? "Fresh" : "Steady";
+function nextUp(){
+  const now = new Date(), evs = calEvents().filter(e => !e.allday);
+  return { cur: evs.find(e => e.start <= now && e.end > now), nxt: evs.find(e => e.start > now) };
+}
+const byPriority = ts => [...ts].sort((a,b) => (a.priority||"p4").localeCompare(b.priority||"p4"));
+
+/* Free hours from now to 21:30, found exactly the way focusBlock() looks
+   for its slot — so the first gap drawn is the one "block time" books. */
+function freeGaps(){
+  const now = new Date(), dur = 60*60000, gaps = [];
+  let cursor = new Date(now); cursor.setHours(8,0,0,0);
+  if (now > cursor) cursor = new Date(Math.ceil(now.getTime()/900000)*900000);
+  const dayEnd = new Date(now); dayEnd.setHours(21,30,0,0);
+  const evs = calEvents().filter(e => !e.allday && e.end > cursor && e.start < dayEnd).sort((a,b) => a.start - b.start);
+  for (const e of evs){
+    if (e.start - cursor >= dur) gaps.push([new Date(cursor), new Date(e.start)]);
+    if (e.end > cursor) cursor = new Date(e.end);
+  }
+  if (dayEnd - cursor >= dur) gaps.push([new Date(cursor), dayEnd]);
+  return gaps;
+}
+
+/* ---- gauges + rail badges ---- */
+function setGauge(key, value, sub){
+  const v = $("#gv-"+key), s = $("#gs-"+key);
+  if (v) v.innerHTML = value;
+  if (s) s.innerHTML = sub;
+}
+function railBadge(key, n, crit, noun){
+  const b = $("#rb-"+key); if (!b) return;
+  b.hidden = !n; b.textContent = n > 9 ? "9+" : String(n);
+  b.classList.toggle("crit", !!crit);
+  b.parentElement.setAttribute("aria-label", n ? `${VIEWS[key]}, ${n} ${noun}` : VIEWS[key]);
+}
+function renderGauges(){
+  if (!S.data.cal) setGauge("cal", "—", esc(waitingCopy("cal")));
+  else {
+    const {cur, nxt} = nextUp();
+    if (cur) setGauge("cal", "Now", `${esc(cur.title)} · until ${fmtT(cur.end)}`);
+    else if (nxt) setGauge("cal", fmtT(nxt.start), `${esc(nxt.title)} · ${untilLabel(nxt.start)}`);
+    else setGauge("cal", "Clear", "Nothing else scheduled");
+  }
+
+  if (!S.data.todo){ setGauge("todo", "—", esc(waitingCopy("todo"))); railBadge("todo", 0); }
+  else {
+    const {overdue, today} = taskBuckets(), n = overdue.length + today.length;
+    const top = byPriority([...overdue, ...today])[0];
+    setGauge("todo", n ? String(n) : "Clear", n
+      ? `${overdue.length ? `<em class="od">${overdue.length} overdue</em> · ` : ""}${esc(top.content)}`
+      : "Nothing due today");
+    railBadge("todo", n, overdue.length > 0, "due");
+  }
+
+  if (!S.data.gmail){ setGauge("gmail", "—", esc(waitingCopy("gmail"))); railBadge("gmail", 0); }
+  else {
+    const items = mailItems(), un = items.filter(m => m.unread), first = un.find(m => !m.low) || un[0];
+    setGauge("gmail", `${un.length}<small>unread</small>`,
+      first ? `${esc(first.from)} · ${esc(first.subj)}` : items.length ? "Nothing unread" : "Inbox quiet");
+    railBadge("gmail", un.length, false, "unread");
+  }
+
+  const bars = $("#gb-strava");
+  if (!S.data.strava){ setGauge("strava", "—", esc(waitingCopy("strava"))); bars.innerHTML = ""; }
+  else {
+    const rd = readiness();
+    setGauge("strava", rd ? loadWord(rd) : "—", rd ? `7-day effort ${rd.acute} vs ${rd.prior}` : "No recent activities");
+    const days = trainingDigest().days.slice(-7), max = Math.max(1, ...days.map(d => d.effort)), tk = todayKey();
+    bars.innerHTML = days.map(d =>
+      `<i class="${d.key === tk && d.effort ? "hot" : ""}" style="height:${Math.max(8, Math.round(d.effort/max*100))}%"></i>`).join("");
+  }
+}
+
+/* ---- Day Line ---- */
+let dlItems = [], dlHtml = "";
+function renderDayLine(){
+  const track = $("#dl-track"); if (!track) return;
+  const now = new Date(), tk = todayKey();
+  $("#dl-date").textContent = "TODAY · " + now.toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"}).toUpperCase();
+
+  const all = S.data.cal ? calEvents() : [];
+  const evs = all.filter(e => !e.allday && dayKey(e.start) === tk);
+  const allday = all.filter(e => e.allday && dayKey(e.start) === tk);
+  const acts = (S.data.strava?.activities || []).map(a => {
+    const s = new Date(a.start_local);
+    return {title:a.name, start:s, end:new Date(+s + (a.summary?.moving_time || 1800)*1000), a};
+  }).filter(x => dayKey(x.start) === tk);
+  const {overdue, today} = S.data.todo ? taskBuckets() : {overdue:[], today:[]};
+  const timed = today.filter(t => (t.dueDate || "").length > 10)
+                     .map(t => ({t, at:new Date(t.dueDate)})).sort((a,b) => a.at - b.at);
+
+  // 08:00–22:00, stretched to take in anything earlier or later
+  const hrs = d => d.getHours() + d.getMinutes()/60;
+  let h0 = 8, h1 = 22;
+  for (const x of [...evs, ...acts]){
+    h0 = Math.min(h0, Math.floor(hrs(x.start)));
+    h1 = dayKey(x.end) === tk ? Math.max(h1, Math.ceil(hrs(x.end))) : 24;
+  }
+  for (const p of timed){ h0 = Math.min(h0, Math.floor(hrs(p.at))); h1 = Math.max(h1, Math.ceil(hrs(p.at) + .01)); }
+  h1 = Math.min(24, h1);
+  const base = new Date(now); base.setHours(h0, 0, 0, 0);
+  const span = (h1 - h0) * 3600e3;
+  const X = d => Math.max(0, Math.min(100, (d - base) / span * 100));
+  const f = n => n.toFixed(2);
+
+  // events and workouts share one row; each label gets the room up to the next item
+  dlItems = [
+    ...evs.map(e => ({kind:"ev", start:e.start, end:e.end, title:e.title, e})),
+    ...acts.map(x => ({kind:"act", start:x.start, end:x.end, title:x.title, a:x.a})),
+  ].sort((a,b) => a.start - b.start);
+  const gaps = S.data.cal ? freeGaps() : [];
+  let html = "";
+  dlItems.forEach((it, i) => {
+    const x = X(it.start), room = (i + 1 < dlItems.length ? X(dlItems[i+1].start) : 100) - x - .8;
+    const past = it.end <= now, cur = it.start <= now && it.end > now;
+    const when = `${fmtT(it.start)}–${fmtT(it.end)}`;
+    if (room >= 2.5) html += `<span class="dl-lbl${past ? " past" : ""}" style="left:${f(x)}%;max-width:${f(room)}%">${esc(it.title)}</span>`;
+    html += `<button type="button" class="dl-ev${it.kind === "act" ? " act" : ""}${past ? " past" : ""}${cur ? " cur" : ""}"
+      data-i="${i}" style="left:${f(x)}%;width:${f(Math.max(.6, X(it.end) - x))}%"
+      title="${esc(it.title)} · ${when}" aria-label="${esc(it.title)}, ${when}. Hear details"></button>`;
+  });
+  gaps.forEach((g, i) => {
+    const label = `free ${durLabel(g[1] - g[0])}`, st = `left:${f(X(g[0]))}%;width:${f(X(g[1]) - X(g[0]))}%`;
+    html += i === 0
+      ? `<button type="button" class="dl-free" id="dl-block" style="${st}" title="Block an hour from ${fmtT(g[0])} for your top task"
+           aria-label="${label}, ${fmtT(g[0])} to ${fmtT(g[1])}. Block an hour for your top task">${label}</button>`
+      : `<span class="dl-free" style="${st}" title="${label}, ${fmtT(g[0])}–${fmtT(g[1])}">${label}</span>`;
+  });
+  html += `<div class="dl-axis"></div>`;
+  for (let h = h0; h <= h1; h += 2){
+    const d = new Date(base); d.setHours(h, 0, 0, 0);
+    html += `<span class="dl-hr" style="left:${f(X(d))}%">${pad2(h % 24)}</span>`;
+  }
+  if (overdue.length){
+    const room = timed.length ? X(timed[0].at) - 1 : 40;
+    html += `<span class="dl-pin od p1" style="left:0;max-width:${f(Math.max(room, 2))}%" title="${overdue.length} overdue"><i></i>${overdue.length} overdue</span>`;
+  }
+  timed.forEach((p, i) => {
+    const x = X(p.at), room = (i + 1 < timed.length ? X(timed[i+1].at) : 100) - x - .8;
+    html += `<span class="dl-pin${p.t.priority === "p1" ? " p1" : ""}${p.at <= now ? " past" : ""}"
+      style="left:${f(x)}%;max-width:${f(Math.max(room, 1.5))}%" title="${esc(p.t.content)} · due ${fmtT(p.at)}"><i></i>${
+      room >= 3 ? `${esc(p.t.content)} · ${fmtT(p.at)}` : ""}</span>`;
+  });
+  if (!S.data.cal) html += `<span class="dl-empty">${esc(waitingCopy("cal"))}</span>`;
+
+  // Only touch the DOM when the strip actually changed, so keyboard focus on
+  // a block survives the 15-second clock tick. The needle moves on its own.
+  if (html !== dlHtml){
+    dlHtml = html;
+    track.innerHTML = html + `<div class="dl-now" id="dl-now" hidden><b>NOW</b></div>`;
+    track.querySelectorAll(".dl-ev").forEach(b => b.addEventListener("click", () => {
+      const it = dlItems[+b.dataset.i]; if (!it) return;
+      it.kind === "ev" ? speakEvent(it.e) : speakActivity(it.a);
+    }));
+    $("#dl-block")?.addEventListener("click", () => focusBlock(0));
+  }
+  const needle = $("#dl-now");
+  if (needle){ needle.hidden = !(now >= base && now - base <= span); needle.style.left = f(X(now)) + "%"; }
+
+  const left = evs.filter(e => e.end > now).length, due = overdue.length + today.length;
+  $("#dl-head").textContent = !S.data.cal && !S.data.todo ? "Day Line"
+    : left || due ? [left && `${left} event${left > 1 ? "s" : ""}`, due && `${due} task${due > 1 ? "s" : ""}`].filter(Boolean).join(" · ") + " left"
+    : "Day's clear";
+  $("#dl-sub").textContent = (!S.data.cal ? waitingCopy("cal")
+    : gaps.length ? `Free ${fmtT(gaps[0][0])}–${fmtT(gaps[0][1])}` : "No free hour left today")
+    + (allday.length ? ` · All day: ${allday[0].title}` : "");
+}
+
+/* ---- heads-up readouts ---- */
+function renderHud(){
+  if (S.mode !== "hud") return;          // only painted while it's on screen
+  const k = s => `<div class="k">${s}</div>`;
+
+  let next = k("Next event");
+  if (!S.data.cal) next += `<div class="v">—</div><div class="row">${esc(waitingCopy("cal"))}</div>`;
+  else {
+    const {cur, nxt} = nextUp();
+    if (cur) next += `<div class="v">${esc(cur.title)}</div><div class="t">In progress</div><div class="row">Until ${fmtT(cur.end)}</div>`;
+    else if (nxt){
+      const m = Math.max(0, Math.round((nxt.start - Date.now())/60000));
+      next += `<div class="v">${esc(nxt.title)}</div><div class="t">T−${pad2(m/60)}:${pad2(m%60)}</div>
+        <div class="row">${fmtT(nxt.start)}${nxt.loc ? " · " + esc(nxt.loc.split(",")[0]) : ""}</div>`;
+    } else next += `<div class="v">Clear</div><div class="row">Nothing else scheduled</div>`;
+  }
+  $("#ro-next").innerHTML = next;
+
+  let inbox = k("Inbox");
+  if (!S.data.gmail) inbox += `<div class="v">—</div><div class="row">${esc(waitingCopy("gmail"))}</div>`;
+  else {
+    const items = mailItems(), un = items.filter(m => m.unread).length, low = items.filter(m => m.low).length;
+    inbox += `<div class="v">${pad2(un)} unread</div><div class="row">${pad2(items.length)} / 48h · ${pad2(low)} low</div>`;
+  }
+  $("#ro-inbox").innerHTML = inbox;
+
+  let tasks;
+  if (!S.data.todo) tasks = k("Tasks") + `<div class="row">${esc(waitingCopy("todo"))}</div>`;
+  else {
+    const {overdue, today} = taskBuckets(), n = overdue.length + today.length;
+    const rows = [...overdue.map(t => ({t, od:true})), ...byPriority(today).map(t => ({t}))];
+    tasks = k(`Tasks · ${n} due`) + (n ? rows.slice(0, 4).map(({t, od}) =>
+      `<div class="row${od ? " od" : ""}">${od ? "[!]" : "[ ]"} ${esc(t.content)}${
+        od ? " · overdue" : t.priority && t.priority !== "p4" ? " · " + t.priority : ""}</div>`).join("")
+      + (n > 4 ? `<div class="row">+${n - 4} more</div>` : "") : `<div class="row">All clear</div>`);
+  }
+  $("#ro-tasks").innerHTML = tasks;
+
+  let load = k("Load · 7 day");
+  const rd = S.data.strava ? readiness() : null;
+  if (!rd) load += `<div class="v">—</div><div class="row">${esc(S.data.strava ? "No recent activities" : waitingCopy("strava"))}</div>`;
+  else {
+    const arrow = rd.ratio > 1.1 ? "▲" : rd.ratio < .9 ? "▼" : "►";
+    const days = trainingDigest().days, max = Math.max(1, ...days.map(d => d.effort));
+    const pts = days.map((d, i) => [i/(days.length - 1)*100, 22 - d.effort/max*19]);
+    const end = pts[pts.length - 1];
+    load += `<div class="v">${rd.ratio.toFixed(2)} ${arrow}</div>
+      <div class="row">${loadWord(rd)} · ${esc(rd.verdict.split(" — ")[1] || "")}</div>
+      <svg class="spark" viewBox="-3 0 106 24" preserveAspectRatio="none" aria-hidden="true">
+        <polyline fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"
+          points="${pts.map(p => p.map(n => n.toFixed(1)).join(",")).join(" ")}"/>
+        <circle cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="2" fill="currentColor"/></svg>`;
+  }
+  $("#ro-load").innerHTML = load;
+}
+
+function renderDeck(){
+  // decoration over the data, never in its way: a failure here must not
+  // interrupt setMeta or the clock
+  try{ renderGauges(); renderDayLine(); renderHud(); }
+  catch(err){ console.warn("[Atlas] deck render failed:", err); }
+}
+
+/* ---- expanding views ---- */
+function syncNav(){
+  document.querySelectorAll("#rail button").forEach(b => {
+    if (b.dataset.view === S.view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  document.querySelectorAll(".gauge").forEach(g => g.setAttribute("aria-expanded", String(g.dataset.view === S.view)));
+}
+function openView(key, {from, opener} = {}){
+  if (!VIEWS[key]) return;
+  if (S.mode === "hud") setMode("deck");
+  const app = $("#app"), fromDeck = S.view === "deck";
+  // measure the gauge before the layout changes underneath it
+  const r1 = from && from.offsetParent ? from.getBoundingClientRect() : null;
+  S.view = key;
+  app.classList.add("viewing"); app.dataset.view = key;
+  for (const k of Object.keys(VIEWS)) $("#p-"+k).hidden = k !== key;
+  syncNav();
+  viewOpener = opener || from || null;
+  const panel = $("#p-"+key);
+  // Stacked layouts (≤1080px) scroll to the view, which would throw off a
+  // grow-from-the-gauge animation, so they get a plain fade instead.
+  const stacked = innerWidth <= 1080;
+  if (stacked) panel.scrollIntoView({block:"start", behavior: REDUCED ? "auto" : "smooth"});   // before any transform
+  if (!REDUCED && panel.animate){
+    const r2 = panel.getBoundingClientRect();
+    if (fromDeck && !stacked && r1 && r2.width && r2.height){
+      // the gauge grows into the full view
+      panel.animate([
+        {transformOrigin:"0 0", opacity:.3,
+         transform:`translate(${r1.left - r2.left}px,${r1.top - r2.top}px) scale(${r1.width/r2.width},${r1.height/r2.height})`},
+        {transformOrigin:"0 0", opacity:1, transform:"none"},
+      ], {duration:420, easing:"cubic-bezier(.2,.8,.2,1)"});
+    } else {
+      panel.animate([{opacity:0, transform:"translateY(10px)"}, {opacity:1, transform:"none"}], {duration:220, easing:"ease-out"});
+    }
+  }
+  $("#h-"+key)?.focus({preventScroll:true});
+}
+function closeView({focus = true} = {}){
+  if (S.view === "deck") return;
+  const key = S.view;
+  S.view = "deck";
+  const app = $("#app"); app.classList.remove("viewing"); app.dataset.view = "deck";
+  for (const k of Object.keys(VIEWS)) $("#p-"+k).hidden = true;
+  syncNav();
+  if (focus){
+    const back = viewOpener && viewOpener.isConnected && viewOpener.offsetParent ? viewOpener : $(`.gauge[data-view="${key}"]`);
+    back?.focus({preventScroll: innerWidth > 1080});   // stacked layouts scroll back to it
+  }
+  viewOpener = null;
+}
+function setMode(mode){
+  S.mode = mode === "hud" ? "hud" : "deck";
+  store.set("mode", S.mode);
+  if (S.mode === "hud") closeView({focus:false});
+  $("#app").dataset.mode = S.mode;
+  document.querySelectorAll("#modes button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === S.mode)));
+  renderDeck();
+}
+
+/* ---- voice and typed layout commands ---- */
+function uiIntent(text){
+  const q = text.toLowerCase().replace(/[?!.,]/g, "").replace(/\s+/g, " ").trim();
+  if (/^(?:(?:switch|change|go) to |show |turn on |enable )?(?:the )?(?:heads[- ]?up|hud)(?: mode| view| display)?$/.test(q)){
+    setMode("hud"); speak("Heads-up display on."); return true;
+  }
+  if (/^(?:(?:switch|change|go|get) (?:back )?to |back to |show )?(?:the )?(?:flight )?(?:deck|master view|normal view|dashboard)(?: mode| view)?$/.test(q)){
+    const was = S.mode; setMode("deck"); closeView({focus:false});
+    speak(was === "hud" ? "Back to the flight deck." : "Here's the deck."); return true;
+  }
+  // "open email" stays with the existing intent (read the latest message)
+  if (/^open (?:my |the )?(?:emails?|mail)$/.test(q)) return false;
+  const m = q.match(/^(?:show|open|go to|bring up)(?: me)? (?:my |the )?(today|calendar|schedule|agenda|day|tasks?|to-?dos?|todo list|inbox|emails?|mail|training|strava|workouts?)$/);
+  if (m){
+    const w = m[1];
+    const key = /today|calendar|schedule|agenda|day/.test(w) ? "cal" : /task|to-?do/.test(w) ? "todo"
+              : /inbox|mail/.test(w) ? "gmail" : "strava";
+    openView(key, {from: $(`.gauge[data-view="${key}"]`)});
+    speak(key === "cal" ? "Here's today." : `Here's your ${VIEWS[key].toLowerCase()}.`);
+    return true;
+  }
+  if (S.view !== "deck" && /^(?:close(?: (?:it|that|this|the view|the panel))?|go back|back|done)$/.test(q)){
+    closeView({focus:false}); speak("Closed."); return true;
+  }
+  return false;
+}
+
+document.querySelectorAll(".gauge").forEach(g => g.addEventListener("click", () =>
+  S.view === g.dataset.view ? closeView() : openView(g.dataset.view, {from:g})));
+document.querySelectorAll("#rail button").forEach(b => b.addEventListener("click", () => {
+  const v = b.dataset.view;
+  if (v === "deck" || v === S.view){ closeView({focus:false}); b.focus({preventScroll:true}); return; }
+  openView(v, {from: S.view === "deck" ? $(`.gauge[data-view="${v}"]`) : null, opener:b});
+}));
+document.querySelectorAll(".vclose").forEach(b => b.addEventListener("click", () => closeView()));
+document.querySelectorAll("#modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+addEventListener("keydown", e => {
+  if (e.key !== "Escape" || e.defaultPrevented || S.view === "deck") return;
+  const t = e.target;
+  if (t?.matches?.("input,textarea,select") && t.value) return;   // let a field clear itself first
+  closeView();
+});
+setMode(S.mode);
 
 /* ---------------- boot the watches ---------------- */
 function startWatches(){
@@ -2402,6 +3001,9 @@ const BRAIN_ON = () => ATLAS.hosted && ATLAS.status?.brain?.configured;
 
 async function handleUtterance(text){
   addMsg("user", text);
+  // Layout commands ("show inbox", "heads-up mode") are handled here in
+  // every mode: they move this page, which the remote brain can't do.
+  if (uiIntent(text)) return;
   Entity.mood="thinking";
   if (BRAIN_ON()) return askBrain(text);
   return handleUtteranceClassic(text);
@@ -2510,7 +3112,7 @@ function handleUtteranceClassic(text){
     else if (/\b(who are you|what are you|your name)\b/.test(q))
       reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training. I can capture and move tasks, block focus time, archive email, and read messages out loud.";
     else if (/\b(help|what can you do|commands)\b/.test(q))
-      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Debrief. Or undo.";
+      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Debrief. Or undo. To move around: show my inbox, show my tasks, close, heads-up mode, or back to the deck.";
     else
       reply = "Not sure I caught that. Say help for everything I can do — or try 'brief me'.";
     speak(reply);
@@ -2524,6 +3126,7 @@ function tickClock(){
   const d=new Date();
   $("#clock").textContent = d.toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"})
     .toUpperCase() + "  ·  " + fmtT(d);
+  renderDeck();          // keeps "in 40m", the countdown and the NOW needle moving between fetches
 }
 tickClock(); setInterval(tickClock, 15000);
 
