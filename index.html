@@ -2698,12 +2698,12 @@ function renderHud(){
   let tasks;
   if (!S.data.todo) tasks = k("Tasks") + `<div class="row">${esc(waitingCopy("todo"))}</div>`;
   else {
-    const {overdue, today} = taskBuckets(), n = overdue.length + today.length;
-    const rows = [...overdue.map(t => ({t, od:true})), ...byPriority(today).map(t => ({t}))];
-    tasks = k(`Tasks · ${n} due`) + (n ? rows.slice(0, 4).map(({t, od}) =>
-      `<div class="row${od ? " od" : ""}">${od ? "[!]" : "[ ]"} ${esc(t.content)}${
-        od ? " · overdue" : t.priority && t.priority !== "p4" ? " · " + t.priority : ""}</div>`).join("")
-      + (n > 4 ? `<div class="row">+${n - 4} more</div>` : "") : `<div class="row">All clear</div>`);
+    // The HUD lists only what's due today; overdue items stay on the deck.
+    const today = byPriority(taskBuckets().today), n = today.length;
+    tasks = k(`Tasks · ${n} due today`) + (n ? today.slice(0, 4).map(t =>
+      `<div class="row">[ ] ${esc(t.content)}${(t.dueDate || "").length > 10 ? " · " + fmtT(new Date(t.dueDate)) : ""}${
+        t.priority && t.priority !== "p4" ? " · " + t.priority : ""}</div>`).join("")
+      + (n > 4 ? `<div class="row">+${n - 4} more</div>` : "") : `<div class="row">Nothing due today</div>`);
   }
   $("#ro-tasks").innerHTML = tasks;
 
