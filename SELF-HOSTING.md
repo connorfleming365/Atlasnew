@@ -258,6 +258,33 @@ At [strava.com/settings/api](https://www.strava.com/settings/api): create an app
 **Authorisation Callback Domain** is just the bare domain — `YOUR-DOMAIN`, with no
 `https://` and no path. Copy into `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET`.
 
+## 5b. WHOOP (optional — readiness and the training week)
+
+Adds this morning's recovery (with HRV and resting heart rate against your own
+30-day average), sleep, today's strain, and "this week so far" against last
+week to the Training view, the Readiness gauge, the HUD and the spoken brief.
+Read-only: Atlas never writes anything to WHOOP. Without these two variables
+everything else works exactly as before, on Strava alone.
+
+1. Sign in at [developer-dashboard.whoop.com](https://developer-dashboard.whoop.com)
+   with your WHOOP account. If it asks you to create a team first, do — it's free.
+2. **Create App**:
+   - **Name**: anything, e.g. `Atlas`.
+   - **Scopes**: tick `read:recovery`, `read:cycles`, `read:workout`,
+     `read:sleep` and `read:profile`. (Atlas also asks for `offline` when you
+     connect — that's what keeps the connection alive past the first hour.)
+   - **Redirect URL**: `https://YOUR-DOMAIN/api/auth/callback` — exactly, with
+     `https://`, e.g. `https://atlasnew-ten.vercel.app/api/auth/callback`.
+   - If the form asks for a **privacy policy** or other URLs, your dashboard's
+     own address is fine for a personal app only you will use.
+3. Copy the app's **Client ID** and **Client Secret** into `WHOOP_CLIENT_ID`
+   and `WHOOP_CLIENT_SECRET`.
+4. Redeploy, open the dashboard and press **CONNECT WHOOP**.
+
+Recovery appears once WHOOP has scored last night's sleep — usually a few
+minutes after the strap syncs in the morning. Until then the Readiness gauge
+says "No recovery yet" and shows your last score with its date.
+
 ## 6. Redeploy and connect
 
 Redeploy so the new variables are picked up, open the site, press **WAKE ATLAS**,
