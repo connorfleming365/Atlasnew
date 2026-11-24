@@ -55,7 +55,7 @@
           margin-top:14px;border-radius:16px}
   #rail{grid-area:rail}
   #dayline{grid-area:line}
-  #views{grid-area:view;display:flex;flex-direction:column;min-height:0}
+  #views{grid-area:view;display:flex;flex-direction:column;gap:14px;min-height:0}
   #mid{grid-area:mid;display:flex;flex-direction:column;min-height:0}
   #app:not(.viewing) #views,#app.viewing #deck{display:none}
   #app[data-mode="hud"] :is(#rail,#dayline,#views,#deck){display:none}
@@ -368,6 +368,45 @@
   #app.viewing #dock{flex-wrap:wrap}
   #app.viewing #say{min-width:0;flex:1 1 calc(100% - 64px)}
 
+  /* ---------- WHOOP readiness (top of the Training view) ---------- */
+  #views #p-whoop{flex:0 1 auto;max-height:66%}
+  .band-green{--band:#4cdb8f} .band-yellow{--band:var(--warn)} .band-red{--band:var(--crit)}
+  .gv .band-green,.gv .band-yellow,.gv .band-red{color:var(--band)}
+  .gbars i[class^="band-"]{background:var(--band);opacity:.85}
+  .rd{display:flex;gap:18px;align-items:center;padding:4px 0 10px}
+  .rd-ring{flex:none;width:104px;height:104px;border-radius:50%;display:grid;place-content:center;text-align:center;
+           background:radial-gradient(closest-side,rgba(8,13,22,.92) 78%,transparent 80% 100%),
+                      conic-gradient(var(--band) calc(var(--p)*1%),rgba(255,255,255,.08) 0);
+           box-shadow:0 0 22px color-mix(in srgb,var(--band) 30%,transparent)}
+  .rd-ring b{font-size:26px;font-weight:600;line-height:1;color:var(--ink)}
+  .rd-ring span{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--band);text-transform:uppercase;margin-top:3px}
+  .rd-facts{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+  .rd-lab{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink3)}
+  .rd-row{display:grid;grid-template-columns:86px auto minmax(0,1fr);gap:10px;align-items:baseline;font-size:13px}
+  .rd-row span{color:var(--ink2)}
+  .rd-row b{font-weight:600;white-space:nowrap}
+  .rd-row em{font-style:normal;font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rd-row em.good{color:var(--teal)} .rd-row em.low{color:var(--warn)}
+  .rd-say{font-size:13px;color:var(--ink2);padding:8px 12px;border-radius:10px;background:var(--bg1);
+          border-left:3px solid var(--band)}
+  .rd-say b{color:var(--band);font-weight:600}
+  .rtrend{display:flex;align-items:flex-end;gap:3px;height:34px}
+  .rtrend i{flex:1;border-radius:3px 3px 1px 1px;background:var(--band);opacity:.8;min-height:3px}
+  .stat .vs{font-size:10.5px;color:var(--ink3);padding-top:2px}
+  .zbar{display:flex;height:10px;border-radius:99px;overflow:hidden;margin:4px 0 6px;background:var(--bg1)}
+  .zbar i{display:block}
+  .z1{background:#5b8ff9} .z2{background:#45e0be} .z3{background:#e8d44d} .z4{background:#f39a4a} .z5{background:#ec5a5a}
+  .zleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:10.5px;color:var(--ink2);padding-bottom:8px}
+  .zleg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+  .wsports{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink2);padding-bottom:6px}
+  .wsports b{color:var(--ink);font-weight:500;text-transform:capitalize}
+  .wrow{display:grid;grid-template-columns:40px 110px minmax(0,1fr);gap:10px;font-size:12.5px;padding:5px 0;
+        border-bottom:1px solid var(--line)}
+  .wrow:last-child{border-bottom:none}
+  .wrow .wd{font-family:var(--mono);color:var(--ink3);font-size:11px}
+  .wrow .ws{text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wrow .wm{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
   /* ---------- heads-up display ---------- */
   #reticle{display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none;--m:min(100cqw,100cqh)}
   #app[data-mode="hud"] #reticle{display:block}
@@ -507,6 +546,9 @@
     #deck{grid-template-columns:repeat(2,minmax(0,1fr))}
     .gauge:nth-child(n){rotate:none;translate:none}
     #app[data-mode="hud"] #hud{grid-template-columns:minmax(0,1fr)}
+    /* ring above the figures so each baseline comparison gets the full width */
+    .rd{flex-direction:column;align-items:flex-start}
+    .rd-facts{width:100%}
   }
 </style>
 
@@ -534,6 +576,7 @@
       <span class="pill" id="pill-gmail"><i></i>GMAIL</span>
       <span class="pill" id="pill-todo"><i></i>TODOIST</span>
       <span class="pill" id="pill-strava"><i></i>STRAVA</span>
+      <span class="pill" id="pill-whoop" hidden><i></i>WHOOP</span>
     </div>
   </header>
 
@@ -577,6 +620,11 @@
       <header><h2 id="h-gmail" tabindex="-1">INBOX</h2><span class="src">Gmail</span><span class="upd"></span>
         <button type="button" class="vclose" aria-label="Close Inbox and return to the deck" title="Back to the deck (Esc)">×</button></header>
       <div class="body"><div class="empty">Waiting for inbox…</div></div>
+    </section>
+    <section class="panel" id="p-whoop" aria-labelledby="h-whoop" hidden>
+      <header><h2 id="h-whoop" tabindex="-1">READINESS</h2><span class="src">WHOOP</span><span class="upd"></span>
+        <button type="button" class="vclose" aria-label="Close Training and return to the deck" title="Back to the deck (Esc)">×</button></header>
+      <div class="body"><div class="empty">Waiting for WHOOP…</div></div>
     </section>
     <section class="panel" id="p-strava" aria-labelledby="h-strava" hidden>
       <header><h2 id="h-strava" tabindex="-1">TRAINING</h2><span class="src">Strava</span><span class="upd"></span>
@@ -1009,14 +1057,14 @@ const hostedReady = (async () => {
 /* ---------------- shared state ---------------- */
 const S = {
   awake: false,
-  data:   { cal:null, gmail:null, todo:null, strava:null, profile:null },
+  data:   { cal:null, gmail:null, todo:null, strava:null, whoop:null, profile:null },
   meta:   {},           // per section: {status:'ok'|'stale'|'err'|'off', code, storedAt}
   voiceOn: true,
   flowOn:  false,
   listening: false,
   unsubs: [],
 };
-["cal","gmail","todo","strava"].forEach(k => S.meta[k] = {status:"off"});
+["cal","gmail","todo","strava","whoop"].forEach(k => S.meta[k] = {status:"off"});
 
 /* ---------------- persistence (survives reloads) ---------------- */
 const store = {
@@ -1863,9 +1911,13 @@ $("#say").addEventListener("keydown", e=>{
 /* ================================================================
    CONNECTORS — window.claude.mcp watch/call layer
    ================================================================ */
-const SERVERS = { cal:"Google Calendar", gmail:"Gmail", todo:"Todoist", strava:"Strava" };
+const SERVERS = { cal:"Google Calendar", gmail:"Gmail", todo:"Todoist", strava:"Strava", whoop:"WHOOP" };
 
 function errCopy(code, server){
+  // self-hosted, and this deployment has no keys for it yet: no button would help
+  const prov = ATLAS.hosted && Object.values(ATLAS.status?.providers || {}).find(p => p.servers?.includes(server));
+  if (prov && !prov.configured)
+    return `${server} isn't set up on this deployment yet — add its keys (see SELF-HOSTING.md).`;
   if (ATLAS.hosted && (code === "needs_reauth" || code === "server_not_connected"))
     return `Connect ${server} using the button at the top of the page.`;
   switch(code){
@@ -1904,7 +1956,8 @@ function renderUpdated(key){
 setInterval(()=>Object.keys(S.meta).forEach(renderUpdated), 30000);
 
 function checkPageCondition(){
-  const ms = Object.values(S.meta);
+  // the four core connectors only: optional WHOOP mustn't mask (or fake) an outage
+  const ms = ["cal","gmail","todo","strava"].map(k => S.meta[k]);
   const codes = ms.map(m=>m.status==="err"?m.code:null);
   const allSame = codes.every(c=>c && c===codes[0]);
   let b = $("#pagebanner");
@@ -2524,6 +2577,125 @@ function freeGaps(){
   return gaps;
 }
 
+/* ---- WHOOP: readiness and the week so far ----
+   Recovery bands are WHOOP's own: green 67–100, yellow 34–66, red 0–33.
+   Baselines are this athlete's average over the 30 scored mornings before
+   the latest one. Strain is WHOOP's 0–21 logarithmic scale: it averages
+   across days but never sums, so the week is shown as sessions, time,
+   heart-rate zones and *average* daily strain — never a strain total. */
+const W_BAND = s => s >= 67 ? {k:"green", word:"Green", say:"ready for a hard session"}
+                  : s >= 34 ? {k:"yellow", word:"Yellow", say:"train moderately and keep intensity in check"}
+                  :           {k:"red", word:"Red", say:"prioritise recovery today"};
+const fmtMin = m => m >= 60 ? `${Math.floor(m/60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`;
+const shortDay = iso => new Date(iso + "T12:00:00").toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"});
+const signed = n => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n);
+
+function whoopModel(){
+  const w = S.data.whoop; if (!w) return null;
+  const tk = todayKey();
+  const scored = (w.recoveries || []).filter(r => r.score_state === "SCORED" && r.wake_date && r.recovery_score != null);
+  const latest = scored[0] || null;
+  const today = latest && latest.wake_date === tk ? latest : null;
+  const base = scored.slice(1, 31);
+  const avg = key => { const v = base.map(r => r[key]).filter(x => x != null);
+                       return v.length >= 4 ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+  // the week so far (Mon → today) against last week up to the same weekday
+  const now = new Date(), dow = (now.getDay() + 6) % 7;            // Monday = 0
+  const mon = new Date(now); mon.setDate(now.getDate() - dow);
+  const lastMon = new Date(mon); lastMon.setDate(mon.getDate() - 7);
+  const lastSame = new Date(lastMon); lastSame.setDate(lastMon.getDate() + dow);
+  const span = (from, to, completedBefore) => {
+    const a = dayKey(from), b = dayKey(to);
+    const ws = (w.workouts || []).filter(x => x.date && x.date >= a && x.date <= b);
+    // average strain over finished days only: today's cycle is still running
+    const cs = (w.cycles || []).filter(c => c.day && c.day >= a && c.day < completedBefore && c.strain != null);
+    const zones = [0, 0, 0, 0, 0, 0];
+    ws.forEach(x => (x.zone_min || []).forEach((m, i) => zones[i] += m || 0));
+    const sports = {};
+    ws.forEach(x => { const s = sports[x.sport] ||= {n:0, min:0}; s.n++; s.min += x.duration_min || 0; });
+    return { list:ws, n:ws.length, min:ws.reduce((t, x) => t + (x.duration_min || 0), 0), zones, sports,
+             strain: cs.length ? cs.reduce((t, c) => t + c.strain, 0) / cs.length : null };
+  };
+  return {
+    latest, today, calibrating: Boolean(latest?.calibrating),
+    hrvBase: avg("hrv_ms"), rhrBase: avg("resting_hr"),
+    cycle: (w.cycles || []).find(c => c.day === tk) || null,
+    trend: scored.slice(0, 14).reverse(),
+    mon: dayKey(mon),
+    week: span(mon, now, tk),
+    last: span(lastMon, lastSame, dayKey(lastSame)),
+  };
+}
+const hrvDelta = (r, wm) => wm.hrvBase != null && r.hrv_ms != null ? Math.round(r.hrv_ms - wm.hrvBase) : null;
+const rhrDelta = (r, wm) => wm.rhrBase != null && r.resting_hr != null ? Math.round(r.resting_hr - wm.rhrBase) : null;
+
+function renderWhoop(){
+  const body = $("#p-whoop .body"); if (!body) return;
+  const wm = whoopModel();
+  if (!wm || (!wm.latest && !wm.week.n && !wm.last.n)){
+    body.innerHTML = `<div class="empty">No WHOOP data in the last five weeks. Wear the strap and sync the WHOOP app.</div>`;
+    return;
+  }
+  let html = "";
+  const r = wm.today;
+  if (r){
+    const b = W_BAND(r.recovery_score), dh = hrvDelta(r, wm), dr = rhrDelta(r, wm);
+    html += `<div class="rd">
+      <div class="rd-ring band-${b.k}" style="--p:${r.recovery_score}" role="img" aria-label="Recovery ${r.recovery_score} percent, ${b.word}">
+        <b>${r.recovery_score}%</b><span>${b.word}</span></div>
+      <div class="rd-facts">
+        <div class="rd-lab">RECOVERY · THIS MORNING</div>
+        <div class="rd-row"><span>HRV</span><b>${r.hrv_ms ?? "—"} ms</b>${dh != null
+          ? `<em class="${dh >= 0 ? "good" : "low"}">${signed(dh)} vs 30-day avg</em>` : `<em>baseline still building</em>`}</div>
+        <div class="rd-row"><span>Resting HR</span><b>${r.resting_hr ?? "—"} bpm</b>${dr != null
+          ? `<em class="${dr <= 0 ? "good" : "low"}">${signed(dr)} vs avg</em>` : ""}</div>
+        ${r.sleep ? `<div class="rd-row"><span>Sleep</span><b>${r.sleep.performance ?? "—"}%</b><em>${
+          r.sleep.asleep_h != null ? `${r.sleep.asleep_h} h asleep` : "performance"}</em></div>` : ""}
+        ${wm.cycle?.strain != null ? `<div class="rd-row"><span>Strain today</span><b>${wm.cycle.strain}</b><em>so far · 0–21 scale</em></div>` : ""}
+      </div></div>
+      <div class="rd-say band-${b.k}"><b>${b.word}</b> — ${b.say}.${wm.calibrating ? " WHOOP is still calibrating your baselines." : ""}</div>`;
+  } else {
+    html += `<div class="degraded"><span class="ic">◌</span><span>No recovery scored yet this morning — sync the WHOOP app${
+      wm.latest ? `. Last scored: <b>${wm.latest.recovery_score}%</b> on ${esc(shortDay(wm.latest.wake_date))}` : ""}.</span></div>`;
+  }
+
+  if (wm.trend.length > 1){
+    html += `<div class="daylabel">RECOVERY · LAST ${wm.trend.length} MORNINGS</div>
+      <div class="rtrend" role="img" aria-label="Recovery over the last ${wm.trend.length} mornings">${wm.trend.map(x =>
+        `<i class="band-${W_BAND(x.recovery_score).k}" style="height:${Math.max(6, x.recovery_score)}%"
+           title="${esc(shortDay(x.wake_date))}: ${x.recovery_score}%"></i>`).join("")}</div>`;
+  }
+
+  // this week so far
+  const W = wm.week, L = wm.last;
+  const vs = (a, b, f) => b ? `<div class="vs">${f(b)} by now last week</div>` : `<div class="vs">none by now last week</div>`;
+  html += `<div class="daylabel">THIS WEEK · ${esc(shortDay(wm.mon).toUpperCase())} → TODAY</div>
+    <div class="stats">
+      <div class="stat"><div class="n">${W.n}</div><div class="l">SESSIONS</div>${vs(W.n, L.n, x => x)}</div>
+      <div class="stat"><div class="n">${(W.min/60).toFixed(1)}<small> h</small></div><div class="l">TRAINING TIME</div>${
+        vs(W.min, L.min, x => (x/60).toFixed(1) + " h")}</div>
+      <div class="stat"><div class="n">${W.strain != null ? W.strain.toFixed(1) : "—"}</div><div class="l">AVG DAY STRAIN</div>${
+        L.strain != null ? `<div class="vs">${L.strain.toFixed(1)} last week</div>` : `<div class="vs">finished days only</div>`}</div>
+    </div>`;
+  const zt = W.zones.slice(1).reduce((a, b) => a + b, 0);
+  if (zt){
+    html += `<div class="zbar" role="img" aria-label="Heart-rate zone minutes this week: ${
+      W.zones.slice(1).map((m, i) => `zone ${i+1} ${m} minutes`).join(", ")}">${W.zones.slice(1).map((m, i) =>
+      m ? `<i class="z${i+1}" style="flex:${m}" title="Zone ${i+1}: ${fmtMin(m)}"></i>` : "").join("")}</div>
+      <div class="zleg">${W.zones.slice(1).map((m, i) => `<span><i class="z${i+1}"></i>Z${i+1} ${fmtMin(m)}</span>`).join("")}</div>`;
+  }
+  const sports = Object.entries(W.sports).sort((a, b) => b[1].min - a[1].min);
+  if (sports.length) html += `<div class="wsports">${sports.map(([s, v]) =>
+    `<span><b>${esc(s.replace(/[-_]/g, " "))}</b> ${v.n} · ${fmtMin(v.min)}</span>`).join("")}</div>`;
+  if (W.list.length) html += W.list.slice(0, 6).map(x => `<div class="wrow">
+      <span class="wd">${esc(new Date(x.start_local).toLocaleDateString([], {weekday:"short"}))}</span>
+      <span class="ws">${esc(x.sport.replace(/[-_]/g, " "))}</span>
+      <span class="wm">${fmtMin(x.duration_min)}${x.strain != null ? ` · strain ${x.strain}` : ""}${x.avg_hr ? ` · ${x.avg_hr} bpm avg` : ""}</span></div>`).join("");
+  else html += `<div class="empty">No WHOOP workouts logged yet this week.</div>`;
+  body.innerHTML = html;
+}
+
 /* ---- gauges + rail badges ---- */
 function setGauge(key, value, sub){
   const v = $("#gv-"+key), s = $("#gs-"+key);
@@ -2563,8 +2735,20 @@ function renderGauges(){
     railBadge("gmail", un.length, false, "unread");
   }
 
-  const bars = $("#gb-strava");
-  if (!S.data.strava){ setGauge("strava", "—", esc(waitingCopy("strava"))); bars.innerHTML = ""; }
+  // the fourth gauge is Readiness when WHOOP has scored a recovery, Training (Strava) otherwise
+  const bars = $("#gb-strava"), label = $('.gauge[data-view="strava"] .gl'), wm = whoopModel();
+  label.textContent = wm?.latest ? "Readiness" : "Training";
+  if (wm?.latest){
+    const r = wm.today;
+    if (r){
+      const b = W_BAND(r.recovery_score), dh = hrvDelta(r, wm);
+      setGauge("strava", `<span class="band-${b.k}">${r.recovery_score}%</span> <small>${b.word}</small>`,
+        `HRV ${r.hrv_ms ?? "—"}${dh != null ? ` (${signed(dh)})` : ""} · RHR ${r.resting_hr ?? "—"}`);
+    } else setGauge("strava", "—", `No recovery yet · last ${wm.latest.recovery_score}% ${esc(shortDay(wm.latest.wake_date))}`);
+    bars.innerHTML = wm.trend.slice(-7).map(x =>
+      `<i class="band-${W_BAND(x.recovery_score).k}" style="height:${Math.max(8, x.recovery_score)}%"></i>`).join("");
+  }
+  else if (!S.data.strava){ setGauge("strava", "—", esc(waitingCopy("strava"))); bars.innerHTML = ""; }
   else {
     const rd = readiness();
     setGauge("strava", rd ? loadWord(rd) : "—", rd ? `7-day effort ${rd.acute} vs ${rd.prior}` : "No recent activities");
@@ -2722,6 +2906,26 @@ function renderHud(){
           points="${pts.map(p => p.map(n => n.toFixed(1)).join(",")).join(" ")}"/>
         <circle cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="2" fill="currentColor"/></svg>`;
   }
+  // WHOOP recovery takes this corner when there's a score to show
+  const wm = whoopModel();
+  if (wm?.latest){
+    const r = wm.today;
+    load = k("Recovery");
+    if (r){
+      const b = W_BAND(r.recovery_score), dh = hrvDelta(r, wm);
+      load += `<div class="v">${r.recovery_score}% ${b.word}</div>
+        <div class="row">HRV ${r.hrv_ms ?? "—"}${dh != null ? ` (${signed(dh)})` : ""} · RHR ${r.resting_hr ?? "—"}</div>
+        ${wm.cycle?.strain != null ? `<div class="row">Strain ${wm.cycle.strain} today</div>` : ""}`;
+    } else load += `<div class="v">No score yet</div><div class="row">Last ${wm.latest.recovery_score}% · ${esc(shortDay(wm.latest.wake_date))}</div>`;
+    if (wm.trend.length > 1){
+      const pts = wm.trend.map((x, i) => [i/(wm.trend.length - 1)*100, 22 - x.recovery_score/100*20]);
+      const end = pts[pts.length - 1];
+      load += `<svg class="spark" viewBox="-3 0 106 24" preserveAspectRatio="none" aria-hidden="true">
+        <polyline fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"
+          points="${pts.map(p => p.map(n => n.toFixed(1)).join(",")).join(" ")}"/>
+        <circle cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="2" fill="currentColor"/></svg>`;
+    }
+  }
   $("#ro-load").innerHTML = load;
 }
 
@@ -2747,35 +2951,48 @@ function openView(key, {from, opener} = {}){
   const r1 = from && from.offsetParent ? from.getBoundingClientRect() : null;
   S.view = key;
   app.classList.add("viewing"); app.dataset.view = key;
-  for (const k of Object.keys(VIEWS)) $("#p-"+k).hidden = k !== key;
+  const shown = panelsFor(key);
+  for (const k of ALL_PANELS) $("#p-"+k).hidden = !shown.includes(k);
   syncNav();
   viewOpener = opener || from || null;
-  const panel = $("#p-"+key);
+  const panels = shown.map(k => $("#p-"+k));
   // Stacked layouts (≤1080px) scroll to the view, which would throw off a
   // grow-from-the-gauge animation, so they get a plain fade instead.
   const stacked = innerWidth <= 1080;
-  if (stacked) panel.scrollIntoView({block:"start", behavior: REDUCED ? "auto" : "smooth"});   // before any transform
-  if (!REDUCED && panel.animate){
-    const r2 = panel.getBoundingClientRect();
-    if (fromDeck && !stacked && r1 && r2.width && r2.height){
-      // the gauge grows into the full view
-      panel.animate([
-        {transformOrigin:"0 0", opacity:.3,
-         transform:`translate(${r1.left - r2.left}px,${r1.top - r2.top}px) scale(${r1.width/r2.width},${r1.height/r2.height})`},
-        {transformOrigin:"0 0", opacity:1, transform:"none"},
-      ], {duration:420, easing:"cubic-bezier(.2,.8,.2,1)"});
+  if (stacked) panels[0].scrollIntoView({block:"start", behavior: REDUCED ? "auto" : "smooth"});   // before any transform
+  if (!REDUCED && panels[0].animate){
+    const rs = panels.map(p => p.getBoundingClientRect());
+    // the view's whole footprint, which may be more than one panel
+    const U = { left: Math.min(...rs.map(r => r.left)), top: Math.min(...rs.map(r => r.top)) };
+    U.width = Math.max(...rs.map(r => r.right)) - U.left;
+    U.height = Math.max(...rs.map(r => r.bottom)) - U.top;
+    if (fromDeck && !stacked && r1 && U.width && U.height){
+      // the gauge grows into the full view: every panel scales about the
+      // view's top-left corner, so they move as one block
+      panels.forEach((p, i) => {
+        const origin = `${U.left - rs[i].left}px ${U.top - rs[i].top}px`;
+        p.animate([
+          {transformOrigin:origin, opacity:.3,
+           transform:`translate(${r1.left - U.left}px,${r1.top - U.top}px) scale(${r1.width/U.width},${r1.height/U.height})`},
+          {transformOrigin:origin, opacity:1, transform:"none"},
+        ], {duration:420, easing:"cubic-bezier(.2,.8,.2,1)"});
+      });
     } else {
-      panel.animate([{opacity:0, transform:"translateY(10px)"}, {opacity:1, transform:"none"}], {duration:220, easing:"ease-out"});
+      panels.forEach(p => p.animate([{opacity:0, transform:"translateY(10px)"}, {opacity:1, transform:"none"}],
+                                     {duration:220, easing:"ease-out"}));
     }
   }
-  $("#h-"+key)?.focus({preventScroll:true});
+  $("#h-"+shown[0])?.focus({preventScroll:true});
 }
+// Training is two panels on the self-hosted site: WHOOP readiness above Strava
+const ALL_PANELS = ["cal", "todo", "gmail", "whoop", "strava"];
+const panelsFor = key => key === "strava" && ATLAS.hosted ? ["whoop", "strava"] : [key];
 function closeView({focus = true} = {}){
   if (S.view === "deck") return;
   const key = S.view;
   S.view = "deck";
   const app = $("#app"); app.classList.remove("viewing"); app.dataset.view = "deck";
-  for (const k of Object.keys(VIEWS)) $("#p-"+k).hidden = true;
+  for (const k of ALL_PANELS) $("#p-"+k).hidden = true;
   syncNav();
   if (focus){
     const back = viewOpener && viewOpener.isConnected && viewOpener.offsetParent ? viewOpener : $(`.gauge[data-view="${key}"]`);
@@ -2848,6 +3065,11 @@ function startWatches(){
   watchSection("todo","find-tasks-by-date",
     {startDate:"today", limit:100}, renderTodo, {refetch:180000});
   watchSection("strava","list_activities", {first:30}, renderStrava, {refetch:600000});
+  // WHOOP only exists on the self-hosted backend; the claude.ai artifact has no WHOOP connector
+  if (ATLAS.hosted){
+    $("#pill-whoop").hidden = false;
+    watchSection("whoop","get_overview", {days:35}, renderWhoop, {refetch:600000});
+  }
   // one-shot reads: profile + zones flavour the briefings and readiness line
   MCP()?.callTool("Strava","get_athlete_profile",{}, {cache:{staleTime:300000}})
     .then(r=>{ S.data.profile=r.payload; renderStrava(); })
@@ -2966,8 +3188,20 @@ function briefTasks(){
   else if (overdue[0]) s += ` Oldest: ${overdue[0].content}.`;
   return s;
 }
+/* One spoken line of WHOOP readiness, or "" when there's no score for today. */
+function briefRecovery(){
+  const wm = whoopModel(), r = wm?.today;
+  if (!r) return "";
+  const b = W_BAND(r.recovery_score), dh = hrvDelta(r, wm);
+  let s = `Recovery is ${r.recovery_score} percent, ${b.word.toLowerCase()} — ${b.say}.`;
+  if (r.hrv_ms != null) s += ` HRV ${Math.round(r.hrv_ms)}${dh != null && dh !== 0
+    ? `, ${Math.abs(dh)} ${dh > 0 ? "above" : "below"} your average` : ""}.`;
+  if (wm.week.n) s += ` This week so far: ${wm.week.n} session${wm.week.n === 1 ? "" : "s"}, ${(wm.week.min/60).toFixed(1)} hours.`;
+  return s;
+}
 function briefTraining(){
-  if (S.meta.strava.status==="err"||!S.data.strava) return "I can't reach Strava right now.";
+  const rec = briefRecovery();
+  if (S.meta.strava.status==="err"||!S.data.strava) return rec || "I can't reach Strava right now.";
   const {wk, last} = trainingDigest();
   let s = `Last 7 days: ${wk.n} session${wk.n===1?"":"s"}, ${wk.km.toFixed(0)} kilometres, ${(wk.mins/60).toFixed(1)} hours.`;
   if (last){
@@ -2978,7 +3212,7 @@ function briefTraining(){
   }
   const f = S.data.profile?.current_focus?.focus_type;
   if (f) s += ` Current training focus: ${f}.`;
-  return s;
+  return rec ? `${rec} ${s}` : s;
 }
 function fullBrief(){
   const n = firstName();
@@ -3090,10 +3324,12 @@ function handleUtteranceClassic(text){
       reply = debrief();
     else if (/\b(brief|briefing|my day|good (morning|afternoon|evening)|status|report|catch me up)\b/.test(q))
       reply = fullBrief();
-    else if (/\b(ready|readiness|recover|rest day|should i train)\b/.test(q)){
-      const rd = readiness();
-      reply = rd ? `Training readiness: ${rd.verdict}. Seven-day effort ${rd.acute} against ${rd.prior} the week before.`
-                 : "I don't have enough training data for a readiness read yet.";
+    else if (/\b(ready|readiness|recover|recovery|recovered|hrv|whoop|rest day|should i train)\b/.test(q)){
+      // WHOOP's morning score first; Strava's week-on-week load as the fallback
+      const rec = briefRecovery(), rd = readiness();
+      reply = rec ? rec
+            : rd ? `Training readiness: ${rd.verdict}. Seven-day effort ${rd.acute} against ${rd.prior} the week before.`
+            : "I don't have enough training data for a readiness read yet.";
     }
     else if (/\b(what'?s next|next (up|event|meeting)|upcoming)\b/.test(q))
       reply = briefCal();
@@ -3166,9 +3402,11 @@ async function renderConnectBar(){
   const bar = document.createElement("div");
   bar.className = "banner"; bar.id = "connectbar";
   const unconfigured = pending.filter(([,p]) => !p.configured);
+  // name what's missing: "WHOOP needs API keys" reads very differently from "everything's broken"
+  const needKeys = unconfigured.map(([,p]) => p.label);
   bar.innerHTML =
     `<span>${unconfigured.length === pending.length
-      ? "This deployment still needs its API keys — see SELF-HOSTING.md."
+      ? `${esc(needKeys.join(", "))} ${needKeys.length > 1 ? "need" : "needs"} API keys on this deployment — see SELF-HOSTING.md.`
       : "Connect your accounts to bring Atlas to life:"}</span>` +
     pending.filter(([,p]) => p.configured)
       .map(([id,p]) => `<a class="connect" href="/api/auth/start?provider=${id}">CONNECT ${p.label.toUpperCase()}</a>`)
