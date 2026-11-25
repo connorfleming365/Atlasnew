@@ -403,6 +403,8 @@
   .sat-card .sc-acts{display:flex;gap:6px;flex-wrap:wrap}
   @media (prefers-reduced-motion:reduce){ .sat.od::before{animation:none} }
   .sat{touch-action:none;cursor:grab} .sat:active{cursor:grabbing}
+  .orbit-fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+  .moon.falling{pointer-events:none}
   .drop-core{position:absolute;left:50%;top:50%;width:min(48%,48vh);aspect-ratio:1;border-radius:50%;pointer-events:none;
              transform:translate(-50%,-50%);border:2px dashed rgba(69,224,190,.45);transition:border-color .15s,box-shadow .15s}
   .drop-core.hot{border-color:var(--teal);box-shadow:0 0 30px rgba(69,224,190,.45),inset 0 0 30px rgba(69,224,190,.25)}
@@ -1487,291 +1489,130 @@ function showDiagnostics(){
 }
 
 /* ================================================================
-   THE ENTITY — SHOAL. A flock of liquid-metal droplets painted into a
-   single metaball matte; coherence is the only dial. Gathered, they
-   fuse into a body carrying the face. Let go, and the face doesn't
-   fade — it stops existing, because there is no longer one surface for
-   it to sit on. Waking is the flock arriving and agreeing.
+   THE ENTITY — HORIZON. A small, tame black hole wrapped in a ring of
+   bent light. The bright side of the ring travels slowly round; it races
+   while Atlas thinks, swells with the voice while it listens or speaks,
+   and flares wherever a finished task or an ended meeting falls in.
+   Asleep, the light dims to an ember and the eyes close.
    `level` (0..1) carries real speech/mic energy from the app.
    ================================================================ */
 const Entity = (() => {
-  const cv = $("#orb"), vis = cv.getContext("2d");
-  const buf = () => { const c = document.createElement("canvas");
-                      return {el:c, ctx:c.getContext("2d")}; };
-  const scene = buf(), bloomBuf = buf(), matte = buf();
-  let W=0, H=0, DPR=1, t=0;
-  let mood="asleep", level=0, levelTarget=0, boost=0;
-  let wake=0, coh=0, hueMix=.25;
-  let blink=1, blinkNext=2.5, gaze={x:0,y:0}, gazeT={x:0,y:0};
-
-  const BLOOM = typeof vis.filter === "string";
-  const COH = {asleep:0, idle:.74, listening:1, thinking:.70, speaking:.64};
-
-  const glow = (()=>{
-    const cache = {}, S = 160;
-    return (color) => cache[color] || (cache[color] = (()=>{
-      const c=document.createElement("canvas"); c.width=c.height=S;
-      const g=c.getContext("2d"), r=g.createRadialGradient(S/2,S/2,0,S/2,S/2,S/2);
-      r.addColorStop(0,"rgba(255,255,255,.98)");
-      r.addColorStop(.06,"rgba(255,255,255,.85)");
-      r.addColorStop(.14,color);
-      r.addColorStop(.30,color.replace(/[\d.]+\)$/,"0.30)"));
-      r.addColorStop(.52,color.replace(/[\d.]+\)$/,"0.08)"));
-      r.addColorStop(1,"rgba(0,0,0,0)");
-      g.fillStyle=r; g.fillRect(0,0,S,S); return c;
-    })());
-  })();
-
-  const N = REDUCED ? 20 : 42;
-  const drops = Array.from({length:N}, (_,i)=>({
-    x:0, y:0, px:0, py:0, set:false,
-    a: i/N*6.283 + Math.random()*.4, r: Math.random(),
-    ph: Math.random()*6.28, sz: .55 + Math.random()*.5,
-  }));
-  const halo = Array.from({length: REDUCED ? 60 : 190}, ()=>({
-    r:.55 + .45*Math.pow(Math.random(),.65), th:Math.random()*Math.PI*2,
-    incl:Math.acos(2*Math.random()-1), sp:(.12+Math.random()*.35)*(Math.random()<.82?1:-1),
-    sz:.7+Math.random()*1.9, tw:Math.random()*Math.PI*2, hue:Math.random(),
-  }));
-
-  // One white sprite for every droplet, instead of building 40-odd radial
-  // gradients per frame. The ramp holds full alpha almost to the rim so the
-  // fused silhouette stays crisp; the blur below only knits the necks.
-  const MATTE_SPRITE = (()=>{
-    const S = 256, c = document.createElement("canvas"); c.width = c.height = S;
-    const g = c.getContext("2d"), r = g.createRadialGradient(S/2,S/2,0, S/2,S/2,S/2);
-    r.addColorStop(0,  "rgba(255,255,255,1)");
-    r.addColorStop(.90,"rgba(255,255,255,1)");
-    r.addColorStop(.97,"rgba(255,255,255,.88)");
-    r.addColorStop(1,  "rgba(255,255,255,0)");
-    g.fillStyle = r; g.fillRect(0,0,S,S); return c;
-  })();
+  const cv = $("#orb"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1, t = 0, spin = 0;
+  let mood = "asleep", level = 0, levelTarget = 0, boost = 0;
+  let wake = 0, think = 0;
+  let blink = 1, blinkNext = 2.5, gaze = { x: 0, y: 0 }, gazeT = { x: 0, y: 0 };
+  const flares = [];                     // {ang, s} — where something just crossed
+  const RINGS = REDUCED ? 10 : 16;
 
   function resize(){
     const b = cv.parentElement.getBoundingClientRect();
     if (!b.width || !b.height) return;
     W = b.width; H = b.height;
-    // Bound the pixel budget: this runs all day beside everything else on the
-    // machine, and the creature is soft enough that upscaling doesn't show.
-    DPR = Math.min(devicePixelRatio||1, 1.75, 900/Math.max(W,H));
-    const pw = Math.round(W*DPR), ph = Math.round(H*DPR);
-    for (const c of [cv, scene.el]){ c.width = pw; c.height = ph; }
-    vis.setTransform(DPR,0,0,DPR,0,0);
-    scene.ctx.setTransform(DPR,0,0,DPR,0,0);
-    bloomBuf.el.width  = Math.max(1, Math.round(pw*.22));
-    bloomBuf.el.height = Math.max(1, Math.round(ph*.22));
-    matte.el.width  = Math.max(1, Math.round(pw*.6));
-    matte.el.height = Math.max(1, Math.round(ph*.6));
+    DPR = Math.min(devicePixelRatio || 1, 1.75, 900 / Math.max(W, H));   // bounded pixel budget
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   new ResizeObserver(resize).observe(cv.parentElement);
   resize();
 
-  addEventListener("pointermove", e=>{
-    const b=cv.getBoundingClientRect();
-    gazeT.x = Math.max(-1,Math.min(1,(e.clientX-b.left-W/2)/(W/2)));
-    gazeT.y = Math.max(-1,Math.min(1,(e.clientY-b.top-H/2)/(H/2)));
-  }, {passive:true});
+  addEventListener("pointermove", e => {
+    const b = cv.getBoundingClientRect();
+    gazeT.x = Math.max(-1, Math.min(1, (e.clientX - b.left - W / 2) / (W / 2)));
+    gazeT.y = Math.max(-1, Math.min(1, (e.clientY - b.top - H / 2) / (H / 2)));
+  }, { passive: true });
 
-  const PACE = {asleep:.35, idle:.85, listening:1.15, thinking:2.3, speaking:1.45};
+  const PACE = { asleep: .15, idle: .6, listening: .9, thinking: 2.6, speaking: 1.1 };
+  const radial = (x, y, r, stops) => { const h = g.createRadialGradient(x, y, 0, x, y, r); stops.forEach(([o, c]) => h.addColorStop(o, c)); g.fillStyle = h; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
 
-  function draw(g, dt){
-    const think = mood === "thinking";
-    const pace = PACE[mood] ?? 1;
-    const R = Math.min(W,H)*.20 * (.45 + .55*wake);
-    const bob = REDUCED ? 0 : Math.sin(t*1.4)*R*.04;
-    const gx = gaze.x*R*.12, gy = gaze.y*R*.10;
-    const bx = W/2 + gx, by = H/2 + bob + gy;
-    const beat = think ? Math.sin(t*2.4) : 0;
-    const violet = think ? .8 : .25;
-    hueMix += (violet - hueMix) * dt * 2.5;
+  function draw(){
+    const R = Math.min(W, H) * .20 * (.8 + .2 * wake);
+    const bob = REDUCED ? 0 : Math.sin(t * 1.1) * R * .03;
+    const cx = W / 2, cy = H / 2 + bob;
+    const voice = mood === "speaking" || mood === "listening" ? level : 0;
+    const lit = (.18 + .82 * wake) * (1 + voice * .7 + boost * .6);
+    // amber at rest, shading towards violet-white while thinking
+    const col = (i, a) => `rgba(${255 - 45 * think | 0},${(205 - i * 6) * (1 - think) + (175 - i * 3) * think | 0},${(130 - i * 5) * (1 - think) + (255 - i * 4) * think | 0},${a})`;
+    const fl = flares.reduce((m, f) => Math.max(m, f.s), 0);
 
-    /* vapour halo */
-    g.globalCompositeOperation = "lighter";
-    for (const p of halo){
-      p.th += p.sp * dt * pace * (REDUCED?.3:1);
-      const sr = p.r * R*2.6;
-      const x = sr*Math.sin(p.incl)*Math.cos(p.th+t*.5),
-            z = sr*Math.sin(p.incl)*Math.sin(p.th+t*.5),
-            y = sr*Math.cos(p.incl)*.8;
-      const persp = 1/(1 - z/(R*9));
-      const a = (.11+.38*((z/(sr||1))*.5+.5)) * (.55+.45*Math.sin(t*2+p.tw)) * wake;
-      const sz = p.sz*persp*(1+level*.5)*(Math.min(W,H)/340);
-      g.globalAlpha = a;
-      g.drawImage(glow(p.hue*.55 + hueMix*.7 > .5 ? "rgba(150,158,255,.5)"
-                                                  : "rgba(120,225,215,.5)"),
-                  bx + x*persp - sz*2, by + y*persp - sz*2, sz*4, sz*4);
-    }
-    g.globalAlpha = 1;
-    g.globalCompositeOperation = "source-over";
-    if (R < 1) return;
-
-    /* the flock, painted into one matte */
-    const o = matte.ctx, ow = matte.el.width, oh = matte.el.height, k = ow/W;
-    o.setTransform(1,0,0,1,0,0);
-    o.globalCompositeOperation = "source-over";
-    o.filter = "none";
-    o.clearRect(0,0,ow,oh);
-    const paint = (x,y,r)=>{
-      if (r <= 0) return;
-      const rr = r*k;
-      o.drawImage(MATTE_SPRITE, x*k-rr, y*k-rr, rr*2, rr*2);
-    };
-    paint(bx, by, R*(.15 + .78*coh) * (1 + level*.08) * (1 + beat*.055));
-    for (const d of drops){
-      const swirl = t*pace*(.5 + d.r*.75);
-      const pulse = mood === "speaking" ? .13*Math.sin(t*4.2 - d.r*7)*(.4+level)
-                  : think               ? .10*Math.sin(t*2.4 - d.r*4.5)
-                  : 0;
-      const rr = R*(.20 + (1-coh)*(.55 + d.r*.62) + pulse);
-      const tx = bx + Math.cos(d.a + swirl)*rr;
-      const ty = by + Math.sin(d.a + swirl)*rr*.90
-               + (mood === "idle" ? Math.cos(t*.5 + d.ph)*R*.05 : 0);
-      if (!d.set){ d.x = tx; d.y = ty; d.set = true; }
-      d.px = d.x; d.py = d.y;
-      const ease = 1 - Math.pow(.004, dt);
-      d.x += (tx - d.x)*ease;
-      d.y += (ty - d.y)*ease;
-      paint(d.x, d.y, R*(.095 + .205*coh)*d.sz);
-    }
-    o.globalCompositeOperation = "copy";
-    o.filter = `blur(${Math.max(2, ow*.011)}px)`;
-    o.drawImage(matte.el, 0, 0);
-    o.filter = "none";
-    o.globalCompositeOperation = "source-in";
-    const mg = o.createLinearGradient(0, (by - R*1.15)*k, 0, (by + R*1.25)*k);
-    mg.addColorStop(0,   "#e9fcf7");
-    mg.addColorStop(.24, "#93d6d2");
-    mg.addColorStop(.52, "#2f7681");
-    mg.addColorStop(.76, "#17454e");
-    mg.addColorStop(1,   "#58a7a0");
-    o.fillStyle = mg; o.fillRect(0,0,ow,oh);
-    o.globalCompositeOperation = "source-over";
-    g.globalAlpha = wake;
-    g.drawImage(matte.el, 0, 0, W, H);
-    g.globalAlpha = 1;
-
-    /* motion streaks — the flock's signature */
-    g.globalCompositeOperation = "lighter";
-    g.lineCap = "round";
-    for (const d of drops){
-      const spd = Math.hypot(d.x-d.px, d.y-d.py);
-      if (spd < .25) continue;
-      g.beginPath();
-      g.moveTo(d.px - (d.x-d.px)*3.2, d.py - (d.y-d.py)*3.2);
-      g.lineTo(d.x, d.y);
-      g.strokeStyle = `rgba(175,240,235,${Math.min(.5, spd*.05)*(1-coh*.5)*wake})`;
-      g.lineWidth = Math.max(1, Math.min(W,H)*.004*d.sz);
-      g.stroke();
-    }
-    g.lineCap = "butt";
-
-    /* ripple carrying real speech energy */
-    if (level > .28){
-      const ph = (t*1.6) % 1;
-      g.strokeStyle = `rgba(150,225,220,${.20*(1-ph)*level*wake})`;
-      g.lineWidth = Math.max(1.2, Math.min(W,H)*.005*(1-ph*.5));
-      g.beginPath(); g.arc(bx, by, R*(.95 + ph*.65), 0, Math.PI*2); g.stroke();
-    }
-
-    /* lighting, gated on coherence: a specular and a rim only mean
-       anything while there is a single surface to sit on */
-    const lit = (.15 + .85*coh) * wake;
-    const hx = bx - R*.34, hy = by - R*.42;
-    const sg = g.createRadialGradient(hx, hy, 0, hx, hy, R*.5);
-    sg.addColorStop(0,`rgba(255,255,255,${.42*lit})`);
-    sg.addColorStop(.35,`rgba(230,255,250,${.11*lit})`);
-    sg.addColorStop(1,"rgba(255,255,255,0)");
-    g.fillStyle = sg; g.beginPath(); g.arc(hx, hy, R*.5, 0, Math.PI*2); g.fill();
-    const rg = g.createRadialGradient(bx, by, R*.72, bx, by, R*1.16);
-    rg.addColorStop(0,"rgba(90,150,190,0)");
-    rg.addColorStop(.62,`rgba(120,180,225,${.20*coh*wake})`);
-    rg.addColorStop(1,"rgba(90,150,190,0)");
-    g.fillStyle = rg; g.beginPath(); g.arc(bx, by, R*1.16, 0, Math.PI*2); g.fill();
-    g.globalCompositeOperation = "source-over";
-
-    /* the face, which only exists while the flock is together */
-    const face = Math.max(0, Math.min(1, (coh - .34)/.34)) * wake;
-    if (face > .02){
-      const eyeOpen = (mood==="listening" ? 1.18 : 1) * blink * face;
-      const eh = R*.42*Math.min(eyeOpen,1.3), ew = Math.max(2.5, eh*.34);
-      // thinking: the gaze lifts and wanders, and the glow breathes with the body
-      const liftY  = think ? -R*.15 : 0;
-      const drift  = think ? Math.sin(t*.45)*R*.11 + Math.sin(t*.19)*R*.05 : 0;
-      const eyeBeat = think ? .70 + .30*(beat*.5 + .5) : 1;
-      const ex = R*.40;
-      const px = bx + gx*.5 + drift, py = by - R*.06 + liftY + gy*.5;
-      for (const s of [-1,1]){
-        const x = px + s*ex;
-        const sock = g.createRadialGradient(x, py, 0, x, py, eh*1.5);
-        sock.addColorStop(0,`rgba(6,20,24,${.62*face})`);
-        sock.addColorStop(1,"rgba(6,20,24,0)");
-        g.fillStyle = sock; g.beginPath(); g.arc(x, py, eh*1.5, 0, Math.PI*2); g.fill();
+    g.save(); g.globalCompositeOperation = "lighter";
+    radial(cx, cy, R * 3, [[0, `rgba(255,120,40,${.12 * lit})`], [1, "rgba(0,0,0,0)"]]);
+    radial(cx, cy, R * (1.9 + voice * .25), [[0, `rgba(255,140,60,${.22 * lit})`], [1, "rgba(0,0,0,0)"]]);
+    for (let i = 0; i < RINGS; i++){
+      const r = R * (1.03 + i * .03 * 18 / RINGS) * (1 + voice * .04 * Math.sin(t * 9 + i)), fade = 1 - i / RINGS;
+      const cg = g.createConicGradient(0, cx, cy);
+      for (let k = 0; k <= 36; k++){
+        const a = k / 36 * Math.PI * 2;
+        let bright = 1 + .75 * Math.cos(a - spin) + .15 * Math.sin(a * 5 + t * 1.7 - i * .4);
+        for (const f of flares){ const da = Math.atan2(Math.sin(a - f.ang), Math.cos(a - f.ang)); bright += 6 * f.s * Math.exp(-da * da / .2); }
+        cg.addColorStop(k / 36, col(i, Math.max(0, Math.min(1, .26 * fade * bright * lit)).toFixed(3)));
       }
-      if (eh > 1){
-        g.save();
-        g.shadowColor = "rgba(120,255,232,.9)";
-        g.shadowBlur = 16 * (think ? .8 + eyeBeat*.9 : 1);
-        g.fillStyle = `rgba(238,255,250,${.97*face*eyeBeat})`;
-        for (const s of [-1,1]){
-          const x = px + s*ex - ew/2, y = py - eh/2;
-          g.beginPath();
-          g.roundRect ? g.roundRect(x, y, ew, eh, ew/2) : g.rect(x, y, ew, eh);
-          g.fill();
-        }
-        g.restore();
+      g.strokeStyle = cg; g.lineWidth = R * .034 * 18 / RINGS; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+    }
+    g.restore();
+
+    // the hole
+    g.fillStyle = "#000"; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+    g.save(); g.globalCompositeOperation = "lighter";
+    for (const f of flares){
+      const fx = cx + Math.cos(f.ang) * R, fy = cy + Math.sin(f.ang) * R;
+      radial(fx, fy, R * (.5 + .6 * (1 - f.s)), [[0, `rgba(255,235,200,${.85 * f.s})`], [1, "rgba(0,0,0,0)"]]);
+    }
+    g.shadowColor = "#ffd9a0"; g.shadowBlur = 14;
+    g.strokeStyle = col(0, Math.min(1, .9 * Math.max(.25, lit)).toFixed(3)); g.lineWidth = 1.2 + fl * 1.5;
+    g.beginPath(); g.arc(cx, cy, R * 1.01, 0, Math.PI * 2); g.stroke();
+    g.restore();
+
+    // the eyes: closed while asleep, lifted and wandering while thinking, wider while listening
+    const open = Math.max(.06, Math.min(1, (wake - .15) / .6)) * blink * (mood === "listening" ? 1.15 : 1) * (1 + fl * .15);
+    const eh = R * .42 * open, ew = Math.max(2.5, R * .13);
+    const liftY = -R * .14 * think, drift = think * (Math.sin(t * .45) * R * .11 + Math.sin(t * .19) * R * .05);
+    const px = cx + gaze.x * R * .1 + drift, py = cy - R * .04 + liftY + gaze.y * R * .08;
+    const beat = think ? .75 + .25 * Math.sin(t * 2.4) : 1;
+    g.save(); g.globalCompositeOperation = "lighter";
+    g.fillStyle = `rgba(238,255,250,${(.35 + .62 * wake) * beat})`; g.shadowColor = "rgba(120,255,225,1)";
+    for (const [blur, alpha] of [[16, 1], [36, .45]]){
+      g.shadowBlur = blur; g.globalAlpha = alpha;
+      for (const s of [-1, 1]){
+        const x = px + s * R * .4 - ew / 2, y = py - eh / 2;
+        g.beginPath(); g.roundRect ? g.roundRect(x, y, ew, eh, ew / 2) : g.rect(x, y, ew, eh); g.fill();
       }
     }
+    g.restore();
   }
 
   let last = performance.now();
   function frame(now){
     requestAnimationFrame(frame);
     if (document.hidden || !W){ last = now; return; }
-    const dt = Math.min(.05,(now-last)/1000); last = now;
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
     t += dt * (REDUCED ? .25 : 1);
-
-    wake += ((mood==="asleep" ? 0 : 1) - wake) * dt*1.9;
-    coh  += ((COH[mood] ?? .74) - coh) * dt*2.6;   // morph between states
-    if (mood==="speaking" && !REDUCED){
-      if (Math.random()<.12) levelTarget = .25+Math.random()*.65;
-    } else if (mood==="listening" && AtlasAudio.ready){
-      levelTarget = Math.max(.16, AtlasAudio.level());   // real voice amplitude
-    } else levelTarget = mood==="speaking" ? .5 : .06;
-    boost -= boost*dt*3.5;
-    level += (Math.min(1, levelTarget+boost)-level)*dt*8;
-    gaze.x += (gazeT.x-gaze.x)*dt*3; gaze.y += (gazeT.y-gaze.y)*dt*3;
-
+    wake += ((mood === "asleep" ? 0 : 1) - wake) * dt * 1.9;
+    think += ((mood === "thinking" ? 1 : 0) - think) * dt * 2.5;
+    spin += dt * (PACE[mood] ?? .6) * (REDUCED ? .3 : 1);
+    if (mood === "speaking" && !REDUCED){ if (Math.random() < .12) levelTarget = .25 + Math.random() * .65; }
+    else if (mood === "listening" && AtlasAudio.ready) levelTarget = Math.max(.16, AtlasAudio.level());
+    else levelTarget = mood === "speaking" ? .5 : .06;
+    boost -= boost * dt * 3.5;
+    level += (Math.min(1, levelTarget + boost) - level) * dt * 8;
+    gaze.x += (gazeT.x - gaze.x) * dt * 3; gaze.y += (gazeT.y - gaze.y) * dt * 3;
     blinkNext -= dt;
-    if (blinkNext<=0) blinkNext = 2.2+Math.random()*4.5;
-    blink = blinkNext<.14 ? Math.max(.05, blinkNext/.14) : 1;
-
-    const g = scene.ctx;
-    g.setTransform(DPR,0,0,DPR,0,0);
-    g.clearRect(0,0,W,H);
-    g.save(); draw(g, dt); g.restore();
-
-    vis.clearRect(0,0,W,H);
-    vis.drawImage(scene.el, 0, 0, W, H);
-    if (BLOOM){
-      const b = bloomBuf.ctx, bw = bloomBuf.el.width, bh = bloomBuf.el.height;
-      b.setTransform(1,0,0,1,0,0);
-      b.clearRect(0,0,bw,bh);
-      b.filter = `blur(${Math.max(1.5, bw*.030)}px)`;
-      b.drawImage(scene.el, 0, 0, bw, bh);
-      b.filter = "none";
-      vis.save();
-      vis.globalCompositeOperation = "lighter";
-      vis.globalAlpha = .46;
-      vis.drawImage(bloomBuf.el, 0, 0, W, H);
-      vis.restore();
-    }
+    if (blinkNext <= 0) blinkNext = 2.2 + Math.random() * 4.5;
+    blink = blinkNext < .14 ? Math.max(.05, blinkNext / .14) : 1;
+    for (let i = flares.length - 1; i >= 0; i--){ flares[i].s *= Math.exp(-dt * 2.6); if (flares[i].s < .02) flares.splice(i, 1); }
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.clearRect(0, 0, W, H);
+    draw();
   }
   requestAnimationFrame(frame);
 
   return {
-    set mood(m){ mood=m; },
+    set mood(m){ mood = m; },
     get mood(){ return mood; },
-    pulse(v){ boost=Math.max(boost, v); },
+    pulse(v){ boost = Math.max(boost, v); },
+    // something crossed the horizon at this angle (radians, from the centre)
+    flare(ang){ flares.push({ ang, s: 1 }); if (flares.length > 6) flares.shift(); boost = Math.max(boost, .5); },
+    get flares(){ return flares.length; },
   };
 })();
 
@@ -3978,6 +3819,10 @@ const Orbit = (() => {
   // the next meeting, as a moon: drifts in from the ring as it gets closer, docks while it runs
   let moon = null, moonEv = null, moonCheckedAt = -1, moonA = -Math.PI / 4, moonR = 1, moonState = "";
   let layer = null, track = null, more = null, card = null, cardFor = null, t = 0, last = 0, running = false;
+  // things falling into the horizon: finished tasks' planets and ended meetings' moons
+  const FALL = 2.4;                              // seconds from release to crossing
+  let fx = null, fxDirty = false, moonKey = null, moonPrev = null, moonIn = -9;
+  const fallers = [];                            // ended meetings' moons: {el, a, r0, t0, hist}
 
   function ensureLayer(){
     if (layer) return layer;
@@ -3986,6 +3831,7 @@ const Orbit = (() => {
     layer.setAttribute("aria-label", "Today's open tasks");
     stage.appendChild(layer);
     track = document.createElement("div"); track.className = "orbit-track"; layer.appendChild(track);
+    fx = document.createElement("canvas"); fx.className = "orbit-fx"; fx.setAttribute("aria-hidden", "true"); layer.appendChild(fx);
     moon = document.createElement("button"); moon.type = "button"; moon.className = "moon"; moon.hidden = true;
     moon.addEventListener("click", () => openMoonCard());
     moon.addEventListener("pointerenter", () => { hover++; });
@@ -4009,7 +3855,7 @@ const Orbit = (() => {
       const absorbed = done.has(id) || (!moved.has(id) && !list.some(x => String(x.id) === id));
       s.state = absorbed && !moved.has(id) ? "absorbing" : "leaving"; s.t0 = t;
       s.el.disabled = true; s.el.setAttribute("aria-hidden", "true");
-      if (s.state === "absorbing") setTimeout(() => Entity.pulse(.8), REDUCED ? 0 : 900);
+      if (s.state === "absorbing"){ s.col = rgbOf(getComputedStyle(s.el).getPropertyValue("--c")); s.hist = []; if (REDUCED) Entity.pulse(.8); }
       if (cardFor === id) closeCard();
     }
     shown.forEach((task, i) => {
@@ -4043,7 +3889,16 @@ const Orbit = (() => {
   function frame(now){
     const dt = Math.min(.1, (now - last) / 1000); last = now;
     const holding = hover > 0 || [...sats.values()].some(x => x.drag) || cardFor;
-    if (t - moonCheckedAt > 1 || moonCheckedAt < 0){ moonCheckedAt = t; moonEv = nextMeeting(); }
+    if (t - moonCheckedAt > 1 || moonCheckedAt < 0){
+      moonCheckedAt = t; moonEv = nextMeeting();
+      const key = moonEv ? (moonEv.id || moonEv.title + +moonEv.start) : null;
+      if (key !== moonKey){
+        // the meeting the moon stood for has ended: that moon falls in, the next drifts in from deep space
+        if (moonPrev && moonPrev.end <= Date.now() && moon && !moon.hidden) dropMoon();
+        if (moonKey !== null || moonPrev){ moonR = 1.9; moonIn = t; }
+        moonKey = key; moonPrev = moonEv;
+      }
+    }
     if (!document.hidden && !holding) t += dt;
     const stage = $("#stage");
     if (!stage || !layer){ running = false; return; }
@@ -4051,7 +3906,8 @@ const Orbit = (() => {
     const small = Math.min(W, H) < 170;
     layer.hidden = small;
     const cx = W / 2, cy = H / 2, R = Math.min(W, H) * .20;
-    let rx = Math.min(W * .44, Math.max(R * 2.1, Math.min(W, H) * .46)), ry = Math.max(R * 1.05, rx * .38);
+    // wide enough that the planets clear the horizon's glow
+    let rx = Math.min(W * .45, Math.max(R * 2.5, Math.min(W, H) * .5)), ry = Math.max(R * 1.6, rx * .4);
     // tilted, the ring is taller - keep it inside the stage
     const tall = Math.hypot(rx * ST, ry * CT), room = H * .46;
     if (tall > room){ rx *= room / tall; ry *= room / tall; }
@@ -4065,16 +3921,19 @@ const Orbit = (() => {
       // ease toward its slot so the ring re-spaces smoothly when tasks come and go
       let d = ((target - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
       const still = holding && (s.state === "orbit" || s.state === "entering");   // pointer over a planet: hold them all
-      if (!still) s.a += d * Math.min(1, dt * 1.6);
+      if (!still && s.state !== "absorbing") s.a += d * Math.min(1, dt * 1.6);
       let r = 1, op = 1, sc = 1, k = 0;
       if (s.state === "entering"){
         k = REDUCED ? 1 : Math.min(1, (t - s.t0) / 1.2);
         r = 1.7 - .7 * easeOut(k); op = k;
         if (k >= 1) s.state = "orbit";
       } else if (s.state === "absorbing"){
-        k = REDUCED ? 1 : Math.min(1, (t - s.t0) / .9);
-        r = 1 - .92 * easeIn(k); s.a += dt * 6 * k; sc = 1 - .7 * k; op = 1 - k * k;
-        if (k >= 1){ s.el.remove(); sats.delete(id); continue; }
+        if (REDUCED){ k = Math.min(1, (t - s.t0) / .6); op = 1 - k; if (k >= 1){ s.el.remove(); sats.delete(id); continue; } }
+        else {
+          // spirals in, faster and faster, until it crosses the horizon
+          k = Math.min(1, (t - s.t0) / FALL);
+          r = 1 - .85 * easeIn(k); s.a += dt * .35 * (1 + 9.6 * k * k);
+        }
       } else if (s.state === "leaving"){
         k = REDUCED ? 1 : Math.min(1, (t - s.t0) / .9);
         r = 1 + .8 * k; op = 1 - k;
@@ -4086,6 +3945,10 @@ const Orbit = (() => {
       const behind = depth < 0 && Math.hypot(x - cx, y - cy) < R * 1.1 && r > .3;
       sc *= .82 + .22 * (depth + 1) / 2;
       op *= behind ? .22 : .62 + .38 * (depth + 1) / 2;
+      if (s.state === "absorbing" && !REDUCED){
+        if (fallStep(s, x, y, cx, cy, R, k, sc, op)){ s.el.remove(); sats.delete(id); continue; }
+        continue;
+      }
       s.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
       s.el.style.opacity = op.toFixed(3);
       s.el.style.zIndex = depth > 0 ? 3 : 1;
@@ -4097,12 +3960,68 @@ const Orbit = (() => {
       if (cardFor === id) placeCard(x, y);
     }
     placeMoon(dt, cx, cy, R, rx, ry, holding);
+    for (let i = fallers.length - 1; i >= 0; i--){
+      const f = fallers[i], k = Math.min(1, (t - f.t0) / (FALL * 1.2));
+      f.a -= dt * .3 * (1 + 9.6 * k * k);
+      const r = f.r0 - (f.r0 - .15) * easeIn(k);
+      const px = Math.cos(f.a) * rx * r, py = Math.sin(f.a) * ry * r;
+      const x = cx + px * CT - py * ST, y = cy + px * ST + py * CT;
+      if (REDUCED || fallStep(f, x, y, cx, cy, R, k, .95, 1)){ f.el.remove(); fallers.splice(i, 1); }
+    }
+    drawTrails(W, H);
     if (!more.hidden){                                              // sits at the front-right of the ring
       more.style.transform = `translate(${(cx + rx * 1.05 * CT).toFixed(1)}px,${(cy + rx * 1.05 * ST + ry * 1.1).toFixed(1)}px) translate(-50%,-50%)`;
     }
-    if (sats.size || !more.hidden || moonEv) requestAnimationFrame(frame); else running = false;
+    if (sats.size || !more.hidden || moonEv || fallers.length) requestAnimationFrame(frame); else running = false;
   }
   const easeOut = k => 1 - Math.pow(1 - k, 3), easeIn = k => k * k * k;
+  const rgbOf = c => { const m = String(c).trim().match(/^#?([0-9a-f]{6})$/i); const n = m ? parseInt(m[1], 16) : 0xc8ccd4; return [n >> 16, n >> 8 & 255, n & 255]; };
+
+  // One step of a fall: stretched towards the hole, light shifting red, a trail
+  // behind it; true once it has crossed (the ring flares where it went in).
+  function fallStep(o, x, y, cx, cy, R, k, sc, op){
+    const d = Math.hypot(x - cx, y - cy);
+    if ((k > .25 && d < R * 1.02) || k >= 1){
+      Entity.flare(Math.atan2(y - cy, x - cx)); Entity.pulse(.8);
+      return true;
+    }
+    const near = Math.max(0, Math.min(1, (R * 1.9 - d) / (R * .9)));
+    const red = Math.max(near, k * .6), toC = Math.atan2(cy - y, cx - x);
+    o.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%) rotate(${toC.toFixed(3)}rad) scale(${(sc * (1 + 2.6 * k * k)).toFixed(3)},${(sc * (1 - .45 * k)).toFixed(3)})`;
+    o.el.style.filter = `sepia(${(.7 * red).toFixed(2)}) saturate(${(1 + 1.6 * red).toFixed(2)}) hue-rotate(${(-28 * red).toFixed(0)}deg) brightness(${(1 - .4 * red).toFixed(2)})`;
+    o.el.style.opacity = (op * (1 - near * .6)).toFixed(3);
+    o.el.style.zIndex = 3;
+    (o.hist = o.hist || []).unshift({ x, y }); if (o.hist.length > 18) o.hist.pop();
+    o.k = k; o.red = red;
+    return false;
+  }
+  function drawTrails(W, H){
+    if (!fx) return;
+    const falling = [...[...sats.values()].filter(s => s.state === "absorbing" && s.hist?.length), ...fallers.filter(f => f.hist?.length)];
+    if (!falling.length){ if (fxDirty){ fx.getContext("2d").clearRect(0, 0, fx.width, fx.height); fxDirty = false; } return; }
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    if (fx.width !== Math.round(W * dpr) || fx.height !== Math.round(H * dpr)){ fx.width = Math.round(W * dpr); fx.height = Math.round(H * dpr); }
+    const g = fx.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    g.globalCompositeOperation = "lighter"; g.lineCap = "round";
+    for (const o of falling){
+      const [cr, cg, cb] = o.col || [200, 204, 212], red = o.red || 0, n = o.hist.length;
+      const rr = Math.round(cr + (255 - cr) * red * .6), gg = Math.round(cg * (1 - red * .7)), bb = Math.round(cb * (1 - red * .85));
+      for (let i = 1; i < n; i++){
+        g.strokeStyle = `rgba(${rr},${gg},${bb},${((1 - i / n) * .55 * Math.min(1, (o.k || 0) * 4)).toFixed(3)})`;
+        g.lineWidth = 9 * (1 - i / n);
+        g.beginPath(); g.moveTo(o.hist[i - 1].x, o.hist[i - 1].y); g.lineTo(o.hist[i].x, o.hist[i].y); g.stroke();
+      }
+    }
+    fxDirty = true;
+  }
+  // the ended meeting's moon leaves its post and falls in
+  function dropMoon(){
+    if (cardFor === "moon") closeCard();
+    if (REDUCED) return;
+    const el = moon.cloneNode(true); el.className = "moon falling"; el.disabled = true; el.setAttribute("aria-hidden", "true"); el.removeAttribute("aria-label");
+    layer.appendChild(el);
+    fallers.push({ el, a: moonA, r0: moonR, t0: t, col: [205, 208, 215], hist: [] });
+  }
 
   // today's meeting that's on now, or the next one to start
   function nextMeeting(){
@@ -4119,7 +4038,7 @@ const Orbit = (() => {
     const mins = (ev.start - Date.now()) / 60000, on = mins <= 0;
     // docked beside the character while it runs; otherwise further out the longer it is
     // until it starts - on the ring two hours or more out, at the character's edge at the start
-    const target = on ? .42 : .48 + .52 * Math.min(1, mins / 120);
+    const target = on ? .66 : .7 + .3 * Math.min(1, mins / 120);
     moonR += (target - moonR) * Math.min(1, dt * 1.2);
     if (!holding && !on) moonA -= dt * Math.PI * 2 / 150;           // its own slow lap, the other way round
     if (on) moonA += ((-Math.PI * .3) - moonA) * Math.min(1, dt * 1.5);  // settles at the upper right
@@ -4127,7 +4046,7 @@ const Orbit = (() => {
     const x = cx + px * CT - py * ST, y = cy + px * ST + py * CT, depth = Math.sin(moonA);
     const behind = !on && depth < 0 && Math.hypot(x - cx, y - cy) < R * 1.1;
     moon.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%) scale(${(.85 + .2 * (depth + 1) / 2).toFixed(3)})`;
-    moon.style.opacity = behind ? ".3" : "1";
+    moon.style.opacity = ((behind ? .3 : 1) * Math.min(1, Math.max(0, (t - moonIn) / 1.6))).toFixed(3);
     moon.style.zIndex = depth > 0 || on ? 4 : 1;
     const state = on ? "docked" : mins <= 10 ? "soon" : "";
     if (state !== moonState){ moon.className = "moon" + (state ? " " + state : ""); moonState = state; }
