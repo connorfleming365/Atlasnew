@@ -2,12 +2,14 @@
    reached when the client has picked a cloud voice from the picker;
    the default (Auto, and every plain browser voice) never calls this. */
 import { denyCrossSite } from "../lib/guard.js";
+import { denyUnlessOwner } from "../lib/owner.js";
 import { ttsConfigured, synthesize, pinnedVoice } from "../lib/tts.js";
 
 export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error:{ code:"bad_request" } });
   if (denyCrossSite(req, res)) return;
+  if (denyUnlessOwner(req, res)) return;
   if (!ttsConfigured())
     return res.status(400).json({ error:{ code:"tts_not_configured", message:"ELEVENLABS_API_KEY is not set" } });
 

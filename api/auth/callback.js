@@ -1,6 +1,7 @@
 import { PROVIDERS, cookieName, exchangeCode } from "../../lib/providers.js";
 import { parseCookies, seal, setCookie, clearCookie, sameToken } from "../../lib/session.js";
 import { setStoredToken } from "../../lib/tokenStore.js";
+import { isOwner } from "../../lib/owner.js";
 
 const esc = s => String(s).replace(/[&<>"']/g, c =>
   ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -25,6 +26,10 @@ export default async function handler(req, res){
   const provider = Object.keys(PROVIDERS)
     .find(p => cookies[`atlas_state_${p}`] && sameToken(cookies[`atlas_state_${p}`], state));
 
+  if (!isOwner(req))
+    return res.status(401).send(page("Locked",
+      `<h2>Atlas is locked</h2><p>Open Atlas, enter your access code, then connect again.</p>
+       <p><a href="/">Back to Atlas</a></p>`));
   if (error)
     return res.status(400).send(page("Declined",
       `<h2>Connection declined</h2><p><code>${esc(String(error).slice(0,120))}</code></p>

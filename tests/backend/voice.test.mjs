@@ -3,11 +3,14 @@
 import { execFileSync } from "node:child_process";
 const TTS_URL = new URL("../../lib/tts.js", import.meta.url).href;
 const TTS_API_URL = new URL("../../api/tts.js", import.meta.url).href;
+const OWNER_URL = new URL("../../lib/owner.js", import.meta.url).href;
 const fails = [];
 const check = (name, ok, got) => { console.log((ok ? "PASS " : "FAIL ") + name + (ok ? "" : "  got: " + JSON.stringify(got))); if (!ok) fails.push(name); };
 
 const CHILD = `
 process.env.ELEVENLABS_API_KEY = "k";
+process.env.SESSION_SECRET = "test-secret-for-unit-tests-only";
+process.env.ATLAS_ACCESS_CODE = "test code";
 const voices = [{ voice_id: "pNInz6obpgDQGcFmaJgB", name: "Adam" },
                 { voice_id: "nPczCjzI2devNBz1zQrb", name: "Brian - Deep, Resonant" },
                 { voice_id: "XB0fDUnXU5powFXDhCwa", name: "Charlotte" }];
@@ -27,7 +30,12 @@ const pin = await tts.pinnedVoice();
 await tts.pinnedVoice();                               // second call should hit the cache
 const res = { headers: {}, code: 0, setHeader(k, v){ this.headers[k] = v; }, status(c){ this.code = c; return this; },
               end(){ return this; }, json(){ return this; } };
-await handler({ method: "POST", headers: { "sec-fetch-site": "same-origin" },
+// unlock first: /api/tts answers only to the owner
+const { grantOwner } = await import("${OWNER_URL}");
+const jar = { h: {}, getHeader(k){ return this.h[k]; }, setHeader(k, v){ this.h[k] = v; } };
+grantOwner(jar);
+const cookie = [].concat(jar.h["Set-Cookie"]).map(c => c.split(";")[0]).join("; ");
+await handler({ method: "POST", headers: { "sec-fetch-site": "same-origin", cookie },
                 body: { text: "hello", voiceId: "SomeOtherVoiceId000000" } }, res);
 console.log(JSON.stringify({ pin, listCalls, ttsVoice }));
 `;

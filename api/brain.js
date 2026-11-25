@@ -4,6 +4,7 @@
    actions, and returns what it decided to say. */
 import { converse } from "../lib/brain.js";
 import { denyCrossSite } from "../lib/guard.js";
+import { denyUnlessOwner } from "../lib/owner.js";
 
 export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
@@ -11,6 +12,7 @@ export default async function handler(req, res){
   // This can delete email and calendar events on the user's behalf —
   // same origin policy as /api/mcp, for the same reason.
   if (denyCrossSite(req, res)) return;
+  if (denyUnlessOwner(req, res)) return;
 
   let body = req.body;
   if (typeof body === "string"){ try{ body = JSON.parse(body); }catch(_){ body = null; } }

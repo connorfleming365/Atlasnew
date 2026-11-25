@@ -50,7 +50,17 @@ readable back in the dashboard. Click **Save**.
 No trailing slash. `https://atlasnew-ten.vercel.app` ✅ ·
 `https://atlasnew-ten.vercel.app/` ❌
 
-**✅ Check:** the list shows both keys. Nothing works yet — that's expected.
+**2.5** Add the third — the passphrase that unlocks Atlas on each device:
+
+| Field | Value |
+|---|---|
+| Key | `ATLAS_ACCESS_CODE` |
+| Value | a passphrase only you know — four or five unrelated words is plenty |
+| Environments | all three, **Sensitive** on |
+
+Without it the dashboard stays locked for everyone, you included.
+
+**✅ Check:** the list shows all three keys. Nothing works yet — that's expected.
 
 ---
 
