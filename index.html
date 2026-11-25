@@ -366,6 +366,27 @@
   .ac-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   #ac-note{margin:4px 18px 18px;font-size:12px;color:var(--ink3);line-height:1.5}
   #pills{cursor:pointer}
+  /* task orbit: satellites around the character */
+  #orbit{position:absolute;inset:0;pointer-events:none;z-index:2}
+  #orbit[hidden]{display:none}
+  .sat{position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;pointer-events:auto;
+       display:grid;place-items:center;will-change:transform,opacity;--c:var(--ink3)}
+  .sat::before{content:"";width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff 0 18%,var(--c) 55%);
+               box-shadow:0 0 10px var(--c),0 0 2px var(--c)}
+  .sat.p1{--c:#ff6b6b} .sat.p2{--c:#ffa24d} .sat.p3{--c:var(--teal)} .sat.p4{--c:#9fb4c8}
+  .sat.od::before{animation:satpulse 1.6s ease-in-out infinite}
+  @keyframes satpulse{50%{box-shadow:0 0 18px var(--c),0 0 4px var(--c);transform:scale(1.25)}}
+  .sat:hover::before,.sat:focus-visible::before{transform:scale(1.35)}
+  .sat:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  .sat.more{width:auto;height:auto;padding:3px 8px;border-radius:999px;font-family:var(--mono);font-size:10px;color:var(--ink2);
+            background:rgba(7,13,23,.7);border:1px solid var(--line2)}
+  .sat.more::before{display:none}
+  .sat-card{position:absolute;left:0;top:0;z-index:5;pointer-events:auto;width:min(240px,80vw);padding:10px 12px;border-radius:12px;
+            background:rgba(7,13,23,.94);border:1px solid var(--line2);box-shadow:0 12px 30px rgba(0,0,0,.5);display:grid;gap:6px}
+  .sat-card b{font-size:13.5px;font-weight:500;overflow-wrap:anywhere}
+  .sat-card .sc-top{display:flex;gap:6px;align-items:center} .sat-card .sc-od{font-size:11px;color:var(--serious)}
+  .sat-card .sc-acts{display:flex;gap:6px;flex-wrap:wrap}
+  @media (prefers-reduced-motion:reduce){ .sat.od::before{animation:none} }
   #weekbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
            border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
   #weekbtn:hover{color:var(--ink);border-color:rgba(69,224,190,.4)}
@@ -2349,6 +2370,7 @@ function taskBuckets(){
 function renderTodo(){
   const body = $("#p-todo .body");
   const {overdue, today, all} = taskBuckets();
+  try{ Orbit.sync([...overdue, ...today]); }catch(err){ console.warn("[Atlas] orbit:", err); }
   if (!all.length){ body.innerHTML=`<div class="empty">All clear — no open tasks due.</div>`; return; }
   const row = (t, od) => `
     <div class="task" data-id="${esc(t.id)}">
@@ -2402,6 +2424,7 @@ function renderStreak(){
 async function completeTask(el){
   const mcp=MCP(); if (!mcp) return;
   const id = el.dataset.id;
+  Orbit.markDone(id);
   el.classList.add("done");
   try{
     await mcp.callTool("Todoist","complete-tasks",{ids:[id]});
@@ -2466,6 +2489,7 @@ async function rescheduleTask(id, date, label, interrupt=true){
   const mcp=MCP(); if (!mcp || !date) return;
   const t = (S.data.todo?.tasks||[]).find(x=>x.id===id);
   try{
+    if (date !== todayKey()) Orbit.markMoved(id);      // it leaves the orbit, it isn't absorbed
     await mcp.callTool("Todoist","reschedule-tasks",{tasks:[{id, date}]});
     await mcp.invalidate("Todoist","find-tasks-by-date").catch(()=>{});
     Entity.pulse(.6);
@@ -3770,6 +3794,166 @@ function handleUtteranceClassic(text){
     speak(reply);
   }, 350);
 }
+
+/* ================================================================
+   TASK ORBIT
+   Today's open tasks (overdue + due today) circle the character as small
+   satellites, coloured by priority; overdue ones pulse. Tap one for its
+   name and DONE. When a task is completed - here, on the phone, in
+   Todoist or by voice - its satellite spirals into the character, which
+   pulses; one moved to another day drifts away instead. New tasks drift
+   in from outside the orbit. Reduced motion: a still ring, simple fades.
+   ================================================================ */
+const Orbit = (() => {
+  const MAX = 12, PERIOD = 110;                 // seconds per lap
+  const sats = new Map();                       // id → {el, slot, a, r, state, t0, task}
+  const moved = new Set();                      // ids rescheduled away (drift out, not absorbed)
+  const done = new Set();                       // ids completed from this page
+  let layer = null, more = null, card = null, cardFor = null, t = 0, last = 0, running = false;
+
+  function ensureLayer(){
+    if (layer) return layer;
+    const stage = $("#stage"); if (!stage) return null;
+    layer = document.createElement("div"); layer.id = "orbit"; layer.setAttribute("role", "group");
+    layer.setAttribute("aria-label", "Today's open tasks");
+    stage.appendChild(layer);
+    more = document.createElement("button"); more.type = "button"; more.className = "sat more"; more.hidden = true;
+    more.addEventListener("click", () => openView("todo", { from: $(`.gauge[data-view="todo"]`) }));
+    layer.appendChild(more);
+    addEventListener("pointerdown", e => { if (card && !card.contains(e.target) && !e.target.closest?.(".sat")) closeCard(); }, true);
+    addEventListener("keydown", e => { if (e.key === "Escape" && card) closeCard(); });
+    return layer;
+  }
+
+  function sync(tasks){
+    if (!ensureLayer()) return;
+    const list = byPriority(tasks);
+    const shown = list.slice(0, MAX), ids = new Set(shown.map(x => String(x.id)));
+    // gone: absorbed if completed, drifts out if it was moved to another day or just dropped off the list
+    for (const [id, s] of sats){
+      if (ids.has(id) || s.state === "leaving" || s.state === "absorbing") continue;
+      const absorbed = done.has(id) || (!moved.has(id) && !list.some(x => String(x.id) === id));
+      s.state = absorbed && !moved.has(id) ? "absorbing" : "leaving"; s.t0 = t;
+      s.el.disabled = true; s.el.setAttribute("aria-hidden", "true");
+      if (s.state === "absorbing") setTimeout(() => Entity.pulse(.8), REDUCED ? 0 : 900);
+      if (cardFor === id) closeCard();
+    }
+    shown.forEach((task, i) => {
+      const id = String(task.id);
+      let s = sats.get(id);
+      if (!s){
+        const el = document.createElement("button"); el.type = "button"; el.className = "sat";
+        el.addEventListener("click", () => openCard(id));
+        layer.appendChild(el);
+        s = { el, a: null, r: 1.7, state: "entering", t0: t };
+        sats.set(id, s);
+      }
+      s.task = task; s.slot = i / shown.length * Math.PI * 2;
+      const od = isOverdue(task), p = task.priority || "p4";
+      s.el.className = `sat ${p}${od ? " od" : ""}`;
+      s.el.setAttribute("aria-label", `Task: ${task.content}, ${p.toUpperCase()}${od ? ", overdue" : ""}. Show actions`);
+      s.el.title = task.content;
+    });
+    const extra = list.length - shown.length;
+    more.hidden = extra <= 0; more.textContent = extra > 0 ? `+${extra}` : "";
+    more.setAttribute("aria-label", `${extra} more tasks — open the task list`);
+    if (!running){ running = true; last = performance.now(); requestAnimationFrame(frame); }
+  }
+  const isOverdue = task => { const d = String(task.dueDate || task.deadlineDate || "").slice(0, 10); return d && d < todayKey(); };
+
+  function frame(now){
+    const dt = Math.min(.1, (now - last) / 1000); last = now;
+    if (!document.hidden) t += dt;
+    const stage = $("#stage");
+    if (!stage || !layer){ running = false; return; }
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const small = Math.min(W, H) < 170;
+    layer.hidden = small;
+    const cx = W / 2, cy = H / 2, R = Math.min(W, H) * .20;
+    const rx = Math.min(W * .44, Math.max(R * 2.1, Math.min(W, H) * .46)), ry = Math.max(R * 1.05, rx * .36);
+    const spin = REDUCED ? 0 : t / PERIOD * Math.PI * 2;
+    for (const [id, s] of sats){
+      const target = s.slot + spin;
+      if (s.a == null) s.a = target;
+      // ease toward its slot so the ring re-spaces smoothly when tasks come and go
+      let d = ((target - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      s.a += REDUCED ? d : d * Math.min(1, dt * 1.6);
+      let r = 1, op = 1, sc = 1, k = 0;
+      if (s.state === "entering"){
+        k = REDUCED ? 1 : Math.min(1, (t - s.t0) / 1.2);
+        r = 1.7 - .7 * easeOut(k); op = k;
+        if (k >= 1) s.state = "orbit";
+      } else if (s.state === "absorbing"){
+        k = REDUCED ? 1 : Math.min(1, (t - s.t0) / .9);
+        r = 1 - .92 * easeIn(k); s.a += dt * 6 * k; sc = 1 - .7 * k; op = 1 - k * k;
+        if (k >= 1){ s.el.remove(); sats.delete(id); continue; }
+      } else if (s.state === "leaving"){
+        k = REDUCED ? 1 : Math.min(1, (t - s.t0) / .9);
+        r = 1 + .8 * k; op = 1 - k;
+        if (k >= 1){ s.el.remove(); sats.delete(id); continue; }
+      }
+      const x = cx + Math.cos(s.a) * rx * r, y = cy + Math.sin(s.a) * ry * r;
+      const depth = Math.sin(s.a);                                  // + in front of the character, - behind
+      const behind = depth < 0 && Math.abs(x - cx) < R * 1.05 && r > .3;
+      sc *= .82 + .22 * (depth + 1) / 2;
+      op *= behind ? .22 : .62 + .38 * (depth + 1) / 2;
+      s.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
+      s.el.style.opacity = op.toFixed(3);
+      s.el.style.zIndex = depth > 0 ? 3 : 1;
+      if (cardFor === id) placeCard(x, y);
+    }
+    if (!more.hidden){                                              // sits at the front-right of the ring
+      more.style.transform = `translate(${(cx + rx * 1.12).toFixed(1)}px,${(cy + ry * .9).toFixed(1)}px) translate(-50%,-50%)`;
+    }
+    if (sats.size || !more.hidden) requestAnimationFrame(frame); else running = false;
+  }
+  const easeOut = k => 1 - Math.pow(1 - k, 3), easeIn = k => k * k * k;
+
+  function openCard(id){
+    const s = sats.get(id); if (!s) return;
+    closeCard();
+    const task = s.task, od = isOverdue(task);
+    card = document.createElement("div"); card.className = "sat-card"; card.setAttribute("role", "dialog");
+    card.setAttribute("aria-label", task.content);
+    card.innerHTML = `<div class="sc-top"><span class="pri ${esc(task.priority || "p4")}">${esc((task.priority || "p4").toUpperCase())}</span>${
+      od ? `<span class="sc-od">overdue</span>` : ""}</div><b>${esc(task.content)}</b>
+      <div class="sc-acts"><button type="button" class="actchip" data-sc="done">DONE</button>
+      <button type="button" class="actchip" data-sc="list">ALL TASKS</button></div>`;
+    layer.appendChild(card); cardFor = id;
+    card.querySelector('[data-sc="done"]').addEventListener("click", () => complete(id));
+    card.querySelector('[data-sc="list"]').addEventListener("click", () => { closeCard(); openView("todo", { from: $(`.gauge[data-view="todo"]`) }); });
+    card.querySelector('[data-sc="done"]').focus({ preventScroll: true });
+  }
+  function placeCard(x, y){
+    if (!card) return;
+    const W = layer.clientWidth, cw = card.offsetWidth, ch = card.offsetHeight;
+    const left = Math.max(6, Math.min(W - cw - 6, x - cw / 2)), top = Math.max(6, y - ch - 18);
+    card.style.transform = `translate(${left.toFixed(0)}px,${top.toFixed(0)}px)`;
+  }
+  function closeCard(){ card?.remove(); card = null; const id = cardFor; cardFor = null; if (id) sats.get(id)?.el.focus?.({ preventScroll: true }); }
+
+  async function complete(id){
+    const mcp = MCP(), s = sats.get(id); if (!mcp || !s) return;
+    const name = s.task.content;
+    closeCard();
+    done.add(id);
+    // absorb straight away; the list refresh then confirms it
+    sync((S.data.todo?.tasks || []).filter(x => !x.checked && String(x.id) !== id && isOpenToday(x)));
+    try{
+      await mcp.callTool("Todoist", "complete-tasks", { ids: [id] });
+      await mcp.invalidate("Todoist", "find-tasks-by-date").catch(() => {});
+      speakWidget(`Done: ${name}.`);
+    }catch(err){
+      done.delete(id);
+      addMsg("atlas", "Couldn't tick that off — " + errCopy(err?.code, "Todoist"));
+      refresh();
+    }
+  }
+  const isOpenToday = x => { const d = String(x.dueDate || x.deadlineDate || "").slice(0, 10); return d && d <= todayKey(); };
+  function refresh(){ if (S.data.todo){ const { overdue, today } = taskBuckets(); sync([...overdue, ...today]); } }
+
+  return { sync, refresh, markMoved: id => moved.add(String(id)), markDone: id => done.add(String(id)) };
+})();
 
 /* ================================================================
    PLAN MY DAY
