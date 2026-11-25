@@ -68,6 +68,8 @@ check("links: which accounts the phone can reach", s.links.google && s.links.who
 s = await buildSummary({ tokens: {}, ...args, run: fake() });
 check("nothing connected → empty, never throws", s.todayEvents.length === 0 && s.inbox === null && s.training === null, s);
 check("nothing connected → links all false (tile says reconnect)", Object.values(s.links).every(v => v === false), s.links);
+s = await buildSummary({ tokens: { google: "g", whoop: null }, ...args, run: fake(), configuredIds: ["google", "whoop"] });
+check("links only list accounts set up on the deployment", Object.keys(s.links).sort().join() === "google,whoop" && s.links.whoop === false, s.links);
 
 // handler: auth and day bounds
 const res = () => { const r = { headers: {}, code: 200, body: null };

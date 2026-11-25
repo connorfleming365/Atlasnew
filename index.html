@@ -402,6 +402,14 @@
   .sat-card .sc-top{display:flex;gap:6px;align-items:center} .sat-card .sc-od{font-size:11px;color:var(--serious)}
   .sat-card .sc-acts{display:flex;gap:6px;flex-wrap:wrap}
   @media (prefers-reduced-motion:reduce){ .sat.od::before{animation:none} }
+  .sat{touch-action:none;cursor:grab} .sat:active{cursor:grabbing}
+  .drop-core{position:absolute;left:50%;top:50%;width:min(48%,48vh);aspect-ratio:1;border-radius:50%;pointer-events:none;
+             transform:translate(-50%,-50%);border:2px dashed rgba(69,224,190,.45);transition:border-color .15s,box-shadow .15s}
+  .drop-core.hot{border-color:var(--teal);box-shadow:0 0 30px rgba(69,224,190,.45),inset 0 0 30px rgba(69,224,190,.25)}
+  #dayline.drop-ok{box-shadow:0 0 0 1px rgba(69,224,190,.55),0 0 24px rgba(69,224,190,.2)}
+  .dl-ghost{position:absolute;top:18px;height:20px;border-radius:7px;background:rgba(69,224,190,.35);border:1px solid var(--teal);
+            font:600 10px var(--mono);color:#e9fffa;display:grid;place-items:center;white-space:nowrap;overflow:visible;z-index:3;min-width:28px}
+  .dl-ghost[hidden]{display:none}
   #weekbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
            border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
   #weekbtn:hover{color:var(--ink);border-color:rgba(69,224,190,.4)}
@@ -2178,6 +2186,31 @@ $("#voicebtn").classList.toggle("on", S.voiceOn);
 $("#flowbtn").classList.toggle("on", S.flowOn);
 updateHint();
 
+/* Memory notes: saved by you in MEMORY, or by Atlas when you tell it something
+   lasting ("remember I don't take meetings before 9"). Synced when Upstash is on. */
+function setMemory(list, push = true){
+  store.set("memory", list.slice(0, 20));
+  if ($("#memorypanel").classList.contains("show")) $("#memorytext").value = list.join("\n");
+  if (push) pushSyncedSettings();
+}
+function rememberLocally(note){
+  const list = store.get("memory", []);
+  note = note.replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!note) return "There's nothing to remember there.";
+  if (/\b(password|passcode|pin|card number|cvv|security code)\b/i.test(note)) return "I won't save that — it looks like a secret.";
+  if (!list.some(n => n.toLowerCase() === note.toLowerCase())) list.push(note);
+  while (list.length > 20) list.shift();
+  setMemory(list);
+  return `Noted: ${note}. It's in MEMORY if you want to change it.`;
+}
+function forgetLocally(words){
+  const list = store.get("memory", []), w = words.toLowerCase().split(/\W+/).filter(x => x.length > 2);
+  let best = -1, score = 0;
+  list.forEach((n, i) => { const sc = w.filter(x => n.toLowerCase().includes(x)).length; if (sc > score){ score = sc; best = i; } });
+  if (best < 0) return "I don't have a note like that.";
+  const [gone] = list.splice(best, 1); setMemory(list);
+  return `Forgotten: ${gone}.`;
+}
 $("#memorybtn").addEventListener("click", e=>{
   const panel = $("#memorypanel"), open = panel.classList.toggle("show");
   e.currentTarget.classList.toggle("on", open);
@@ -3182,7 +3215,7 @@ function renderGauges(){
 }
 
 /* ---- Day Line ---- */
-let dlItems = [], dlHtml = "";
+let dlItems = [], dlHtml = "", dlScale = null;
 function renderDayLine(){
   const track = $("#dl-track"); if (!track) return;
   const now = new Date(), tk = todayKey();
@@ -3210,6 +3243,7 @@ function renderDayLine(){
   h1 = Math.min(24, h1);
   const base = new Date(now); base.setHours(h0, 0, 0, 0);
   const span = (h1 - h0) * 3600e3;
+  dlScale = { base, span };                 // for dropping a task planet onto the line
   const X = d => Math.max(0, Math.min(100, (d - base) / span * 100));
   const f = n => n.toFixed(2);
 
@@ -3720,6 +3754,7 @@ async function askBrain(promptText){
       return;
     }
     if (Array.isArray(j.history)) brainHistory = j.history;
+    if (Array.isArray(j.memory)) setMemory(j.memory, false);   // the brain saved or forgot a note
     speak(j.reply || "…");
   }catch(err){
     console.warn("[Atlas] brain request failed:", err);
@@ -3747,6 +3782,10 @@ function handleUtteranceClassic(text){
     return;
   }
   if (/^undo\b/.test(q)){ undoLast(); return; }
+  const rem = text.trim().match(/^(?:please )?remember(?: that)?\s+(.+?)[.!]?$/i);
+  if (rem){ speak(rememberLocally(rem[1].replace(/^i /i, "I "))); return; }
+  const fgt = q.match(/^forget(?: that| the note about| about)?\s+(.+)$/);
+  if (fgt){ speak(forgetLocally(fgt[1])); return; }
   if (/\b(block|book|reserve)\b.*\b(time|hour|slot|focus)\b|^focus block/.test(q)){
     focusBlock(/tomorrow/.test(q) ? 1 : 0); return;
   }
@@ -3826,6 +3865,7 @@ const Orbit = (() => {
   const sats = new Map();                       // id → {el, slot, a, r, state, t0, task}
   const moved = new Set();                      // ids rescheduled away (drift out, not absorbed)
   const done = new Set();                       // ids completed from this page
+  let hover = 0;                                // pointer over a planet: the ring holds still so it's easy to grab
   let layer = null, track = null, more = null, card = null, cardFor = null, t = 0, last = 0, running = false;
 
   function ensureLayer(){
@@ -3863,7 +3903,10 @@ const Orbit = (() => {
         const el = document.createElement("button"); el.type = "button"; el.className = "sat";
         let hsh = 0; for (const ch of id) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
         el.style.setProperty("--band", `${-40 + Math.abs(hsh) % 50}deg`);
-        el.addEventListener("click", () => openCard(id));
+        el.addEventListener("click", e => { if (el.dataset.dragged){ delete el.dataset.dragged; e.preventDefault(); return; } openCard(id); });
+        el.addEventListener("pointerdown", e => startDrag(e, id));
+        el.addEventListener("pointerenter", () => { hover++; });
+        el.addEventListener("pointerleave", () => { hover = Math.max(0, hover - 1); });
         layer.appendChild(el);
         s = { el, a: null, r: 1.7, state: "entering", t0: t };
         sats.set(id, s);
@@ -3883,7 +3926,8 @@ const Orbit = (() => {
 
   function frame(now){
     const dt = Math.min(.1, (now - last) / 1000); last = now;
-    if (!document.hidden) t += dt;
+    const holding = hover > 0 || [...sats.values()].some(x => x.drag) || cardFor;
+    if (!document.hidden && !holding) t += dt;
     const stage = $("#stage");
     if (!stage || !layer){ running = false; return; }
     const W = stage.clientWidth, H = stage.clientHeight;
@@ -3904,7 +3948,7 @@ const Orbit = (() => {
       if (s.a == null) s.a = target;
       // ease toward its slot so the ring re-spaces smoothly when tasks come and go
       let d = ((target - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-      s.a += d * Math.min(1, dt * 1.6);
+      if (!holding || s.state !== "orbit") s.a += d * Math.min(1, dt * 1.6);
       let r = 1, op = 1, sc = 1, k = 0;
       if (s.state === "entering"){
         k = REDUCED ? 1 : Math.min(1, (t - s.t0) / 1.2);
@@ -3928,6 +3972,11 @@ const Orbit = (() => {
       s.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
       s.el.style.opacity = op.toFixed(3);
       s.el.style.zIndex = depth > 0 ? 3 : 1;
+      if (s.drag){                                            // held by the pointer
+        s.el.style.transform = `translate(${s.drag.x.toFixed(1)}px,${s.drag.y.toFixed(1)}px) translate(-50%,-50%) scale(1.35)`;
+        s.el.style.opacity = "1"; s.el.style.zIndex = 6;
+        continue;
+      }
       if (cardFor === id) placeCard(x, y);
     }
     if (!more.hidden){                                              // sits at the front-right of the ring
@@ -3959,6 +4008,76 @@ const Orbit = (() => {
     card.style.transform = `translate(${left.toFixed(0)}px,${top.toFixed(0)}px)`;
   }
   function closeCard(){ card?.remove(); card = null; const id = cardFor; cardFor = null; if (id) sats.get(id)?.el.focus?.({ preventScroll: true }); }
+
+  /* ---- drag a planet: onto the character = done; onto the Day Line = block that time ---- */
+  let drop = null;   // {core, ghost}
+  function startDrag(e, id){
+    const s = sats.get(id); if (!s || s.state !== "orbit" || e.button > 0) return;
+    const L = layer.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+    let moved = false;
+    s.el.setPointerCapture?.(e.pointerId);
+    const move = ev => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+      if (!moved){ moved = true; closeCard(); showTargets(); }
+      s.drag = { x: ev.clientX - L.left, y: ev.clientY - L.top };
+      updateTargets(ev.clientX, ev.clientY, s.task);
+    };
+    const up = ev => {
+      s.el.removeEventListener("pointermove", move); s.el.removeEventListener("pointerup", up); s.el.removeEventListener("pointercancel", up);
+      if (!moved) return;
+      s.el.dataset.dragged = "1";
+      const target = targetAt(ev.clientX, ev.clientY);
+      hideTargets(); s.drag = null;
+      if (target?.kind === "core") complete(id);
+      else if (target?.kind === "line") blockFor(s.task, target.at);
+    };
+    s.el.addEventListener("pointermove", move); s.el.addEventListener("pointerup", up); s.el.addEventListener("pointercancel", up);
+  }
+  function coreHit(cx, cy){
+    const st = $("#stage").getBoundingClientRect(), R = Math.min(st.width, st.height) * .2;
+    return Math.hypot(cx - (st.left + st.width / 2), cy - (st.top + st.height / 2)) < R * 1.5;
+  }
+  function lineTime(cx, cy){
+    const tr = $("#dl-track")?.getBoundingClientRect();
+    if (!tr || !dlScale || cy < tr.top - 12 || cy > tr.bottom + 12 || cx < tr.left || cx > tr.right) return null;
+    const t = new Date(+dlScale.base + (cx - tr.left) / tr.width * dlScale.span);
+    t.setMinutes(Math.round(t.getMinutes() / 15) * 15, 0, 0);
+    const soonest = new Date(Math.ceil(Date.now() / 900000) * 900000);
+    return t < soonest ? soonest : t;
+  }
+  const targetAt = (cx, cy) => coreHit(cx, cy) ? { kind: "core" } : (t => t ? { kind: "line", at: t } : null)(lineTime(cx, cy));
+  function showTargets(){
+    drop = { core: document.createElement("div"), ghost: document.createElement("div") };
+    drop.core.className = "drop-core"; layer.appendChild(drop.core);
+    drop.ghost.className = "dl-ghost"; drop.ghost.hidden = true; $("#dl-track")?.appendChild(drop.ghost);
+    $("#dayline")?.classList.add("drop-ok");
+  }
+  function updateTargets(cx, cy, task){
+    if (!drop) return;
+    drop.core.classList.toggle("hot", coreHit(cx, cy));
+    const t = coreHit(cx, cy) ? null : lineTime(cx, cy), tr = $("#dl-track")?.getBoundingClientRect();
+    drop.ghost.hidden = !t;
+    if (t && tr){
+      const mins = taskMinutes(task);
+      drop.ghost.style.left = ((t - dlScale.base) / dlScale.span * 100).toFixed(2) + "%";
+      drop.ghost.style.width = (mins * 60000 / dlScale.span * 100).toFixed(2) + "%";
+      drop.ghost.textContent = fmtT(t);
+    }
+  }
+  function hideTargets(){ drop?.core.remove(); drop?.ghost.remove(); drop = null; $("#dayline")?.classList.remove("drop-ok"); }
+  const taskMinutes = t => DEEP_RX.test(t.content) ? 60 : QUICK_RX.test(t.content) ? 20 : 30;
+  async function blockFor(task, at){
+    const mcp = MCP(); if (!mcp) return;
+    const end = new Date(+at + taskMinutes(task) * 60000);
+    try{
+      const r = await mcp.callTool("Google Calendar", "create_event", { summary: `Focus: ${task.content}`,
+        description: "Blocked by Atlas — you dropped this task on the Day Line.",
+        startTime: at.toISOString(), endTime: end.toISOString(), notificationLevel: "NONE" });
+      setLastAction({ type: "focus", eventId: r.payload?.id });
+      await mcp.invalidate("Google Calendar", "list_events").catch(() => {});
+      speakWidget(`Blocked ${fmtT(at)} to ${fmtT(end)} for ${task.content}. Say undo to remove it.`);
+    }catch(err){ speakWidget("Couldn't block that time. " + errCopy(err?.code, "Google Calendar")); }
+  }
 
   async function complete(id){
     const mcp = MCP(), s = sats.get(id); if (!mcp || !s) return;
@@ -4484,14 +4603,39 @@ function collectNudges(){
       text: "Your weekly review is ready — tasks, training, recovery, inbox and next week.",
       act: { label: "OPEN REVIEW", run: () => openReview() } });
   }
+  // connection health: an account that was working and stopped, or one the phone can't reach
+  if (ATLAS.hosted && ATLAS.status?.providers){
+    const seen = new Set(store.get("seenConnected", []));
+    for (const [id, p] of Object.entries(ATLAS.status.providers)){
+      if (!p.configured) continue;
+      if (p.connected) seen.add(id);
+      const fix = { label: "RECONNECT", run: () => { location.href = `/api/auth/start?provider=${encodeURIComponent(id)}`; } };
+      if (!p.connected && seen.has(id))
+        out.push({ id: `conn:${id}:${tk}`, kind: "CONNECTION", warn: true, act: fix,
+          text: `${p.label} has disconnected — its login expired or was revoked. Reconnect to bring it back.`,
+          say: `${p.label} has disconnected. Tap reconnect to bring it back.` });
+      else if (p.connected && p.phone === false)
+        out.push({ id: `phone:${id}:${tk}`, kind: "CONNECTION", act: fix,
+          text: `${p.label} isn't reaching your phone. Reconnect it once to fix that.`,
+          say: `${p.label} isn't reaching your phone — reconnect it once to fix that.` });
+    }
+    store.set("seenConnected", [...seen]);
+  }
   const plan = whoopModel()?.today ? trainingPlan() : null;
   if (plan?.action?.kind === "move") out.push({ id: `plan:${tk}`, kind: "RECOVERY", warn: true,
     text: plan.say, short: plan.short, act: { label: plan.action.label, run: () => runPlan(plan.action, false) },
     pend: plan.action });
   return out;
 }
+let statusCheckedAt = Date.now();
 function checkNudges(){
   if (!S.awake || !S.nudgesOn || !MCP()) return;
+  // re-check connections every 10 minutes (a login can expire mid-session)
+  if (ATLAS.hosted && Date.now() - statusCheckedAt > 10 * 60000){
+    statusCheckedAt = Date.now();
+    fetch("/api/status", { credentials: "same-origin" }).then(r => r.ok ? r.json() : null)
+      .then(st => { if (st && !st.locked) ATLAS.status = st; }).catch(() => {});
+  }
   for (const n of collectNudges()) if (nudgeOnce(n.id)) showNudge(n);
 }
 function showNudge(n){
