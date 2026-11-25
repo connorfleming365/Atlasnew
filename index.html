@@ -1485,8 +1485,30 @@ function addMsg(who, text){
 let voice=null;
 let cloudVoices=[];   // [{id,name}] — from ElevenLabs via /api/voices, only when hosted+configured
 function selectedCloudVoiceId(){
+  // a site-wide voice (ATLAS_VOICE on the deployment) beats any per-browser choice
+  const pinned = ATLAS.status?.tts?.pinned?.id;
+  if (pinned) return pinned;
   const v = store.get("voiceName", null);
   return (typeof v==="string" && v.startsWith("cloud:")) ? v.slice(6) : null;
+}
+function voiceNote(html){
+  const el = $("#micnote");
+  el.innerHTML = html; el.classList.add("show");
+}
+/* With a pinned voice there's nothing to choose, so the picker goes away and
+   the VOICE button says which voice is speaking. A pin that names no voice
+   in the ElevenLabs account is said out loud, not silently ignored. */
+function applyPinnedVoice(){
+  const pin = ATLAS.status?.tts?.pinned;
+  if (!pin) return;
+  if (pin.id){
+    $("#voicesel").hidden = true;
+    $("#voicebtn").title = `Spoken replies — ${pin.name || "the site's voice"} (set for every device by ATLAS_VOICE)`;
+  } else if (pin.error){
+    console.warn("[Atlas] " + pin.error);
+    voiceNote(`<b>Site voice not found</b> — ${esc(pin.error)}. Check the name in your ElevenLabs voice library;
+      until then each device uses its own pick.`);
+  }
 }
 function populateVoiceSelect(vs){
   const sel = $("#voicesel");
@@ -1562,7 +1584,7 @@ function previewVoice(){
 }
 if ("speechSynthesis" in window){
   pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
-  hostedReady.then(hosted => { if (hosted) loadCloudVoices(); });
+  hostedReady.then(hosted => { if (hosted){ applyPinnedVoice(); loadCloudVoices(); } });
   $("#voicesel").addEventListener("change", e=>{
     store.set("voiceName", e.target.value || null);
     pickVoice();
@@ -1644,10 +1666,7 @@ async function runCloudQueue(){
     else armFlowMic();
   }; })();
   try{
-    const r = await fetch("/api/tts", { method:"POST", credentials:"same-origin",
-      headers:{"content-type":"application/json"}, body: JSON.stringify({ text: job.text, voiceId: job.voiceId }) });
-    if (!r.ok) throw new Error("http "+r.status);
-    const url = URL.createObjectURL(await r.blob());
+    const url = URL.createObjectURL(await fetchCloudSpeech(job.text, job.voiceId));
     const audio = new Audio(url);
     cloudActive = audio;
     audio.onplay = ()=>{ ENV.ttsProbe = "working"; Entity.mood="speaking"; };
@@ -1655,11 +1674,34 @@ async function runCloudQueue(){
     audio.onerror = ()=>{ URL.revokeObjectURL(url); finish(); };
     await audio.play();
   }catch(err){
-    // Cloud voice unreachable/misconfigured — fall back rather than go silent.
+    // Cloud voice unreachable/misconfigured — fall back rather than go silent,
+    // and say so once, so a different-sounding reply is never a mystery.
     console.warn("cloud voice failed, falling back to local voice:", err.message);
+    if (!cloudFallbackNoted){
+      cloudFallbackNoted = true;
+      voiceNote(`<b>Cloud voice didn't answer</b> — that reply used this device's own voice instead.
+        Atlas goes back to the cloud voice automatically on the next reply.`);
+    }
     cloudActive = null;
     speakLocal(job.text, job.then, true, true);
     if (cloudQueue.length) runCloudQueue();
+  }
+}
+let cloudFallbackNoted = false;
+/* One retry for a passing blip (network, or ElevenLabs answering 5xx)
+   before giving up on the cloud voice for this reply. A 4xx means a
+   setup problem a retry won't fix, so that falls back straight away. */
+async function fetchCloudSpeech(text, voiceId){
+  for (let attempt = 1; ; attempt++){
+    let status = 0;
+    try{
+      const r = await fetch("/api/tts", { method:"POST", credentials:"same-origin",
+        headers:{"content-type":"application/json"}, body: JSON.stringify({ text, voiceId }) });
+      if (r.ok) return await r.blob();
+      status = r.status;
+    }catch(_){ /* network error: worth one retry */ }
+    if (attempt >= 2 || (status >= 400 && status < 500)) throw new Error(status ? "http " + status : "network error");
+    await new Promise(res => setTimeout(res, 500));
   }
 }
 function speakLocal(text, then, alreadyLogged, interrupt=true){

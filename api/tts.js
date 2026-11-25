@@ -2,7 +2,7 @@
    reached when the client has picked a cloud voice from the picker;
    the default (Auto, and every plain browser voice) never calls this. */
 import { denyCrossSite } from "../lib/guard.js";
-import { ttsConfigured, synthesize } from "../lib/tts.js";
+import { ttsConfigured, synthesize, pinnedVoice } from "../lib/tts.js";
 
 export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
@@ -14,7 +14,10 @@ export default async function handler(req, res){
   let body = req.body;
   if (typeof body === "string"){ try{ body = JSON.parse(body); }catch(_){ body = null; } }
   const text = String(body?.text || "").slice(0, 600);
-  const voiceId = String(body?.voiceId || "");
+  // A site-wide voice (ATLAS_VOICE) wins over whatever a browser asks for,
+  // so an old tab or a stale saved choice can't speak in another voice.
+  const pin = await pinnedVoice();
+  const voiceId = pin?.id || String(body?.voiceId || "");
   if (!text || !voiceId)
     return res.status(400).json({ error:{ code:"bad_request", message:"text and voiceId are required" } });
 
