@@ -150,6 +150,13 @@ That endpoint needs two things set:
   returns 401. Put the same value in the Android app's own config before you
   build it.
 
+The launcher can also make four changes through `POST /api/launcher/action`,
+with the same key: tick a task done, archive an email (recoverable), book
+today's training hour, or move a calendar event (the red-day "move to
+tomorrow"). Nothing else — no deleting, no sending — and events are limited to
+3 hours within the next two days, so a leaked key can't do much damage.
+Change `LAUNCHER_API_KEY` (and the phone's Settings) to revoke it.
+
 Leave `LAUNCHER_API_KEY` unset and the endpoint always answers 401 — the rest
 of this deployment is unaffected either way.
 
@@ -293,9 +300,9 @@ only full verification removes that, and for `gmail.modify`'s restricted
 scope category that's a genuinely heavy process not worth it for a
 single-user dashboard. The one thing Testing mode's test-user list was also
 doing is gating *who* can even reach Google's consent screen; publishing
-removes that gate. If **Vercel Deployment Protection** (see Security model
-above) is on, that's moot — nothing behind it is reachable by anyone but you
-regardless.
+removes that gate — but Atlas's own access code (see **Security model**)
+already stops anyone else starting a connection through your deployment, and
+the consent screen only ever grants access to the account that signs in.
 
 ## 4. Todoist
 
