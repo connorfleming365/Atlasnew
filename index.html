@@ -390,6 +390,9 @@
   .rd-say{font-size:13px;color:var(--ink2);padding:8px 12px;border-radius:10px;background:var(--bg1);
           border-left:3px solid var(--band)}
   .rd-say b{color:var(--band);font-weight:600}
+  .rd-plan{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+           font-size:13px;color:var(--ink);padding:8px 12px;border-radius:10px;border:1px solid var(--line)}
+  .rd-plan span{min-width:0;overflow-wrap:anywhere}
   .rtrend{display:flex;align-items:flex-end;gap:3px;height:34px}
   .rtrend i{flex:1;border-radius:3px 3px 1px 1px;background:var(--band);opacity:.8;min-height:3px}
   .stat .vs{font-size:10.5px;color:var(--ink3);padding-top:2px}
@@ -2075,7 +2078,7 @@ function calEvents(){
     const allday = !e.start?.dateTime;
     const start = new Date(e.start?.dateTime || (e.start?.date+"T00:00:00"));
     const end   = new Date(e.end?.dateTime   || (e.end?.date  +"T23:59:59"));
-    return {title:e.summary||"(untitled)", loc:e.location, allday, start, end,
+    return {id:e.id, title:e.summary||"(untitled)", loc:e.location, allday, start, end,
             attendees:e.attendees||null};
   }).sort((a,b)=>a.start-b.start);
 }
@@ -2327,6 +2330,11 @@ async function undoLast(){
       await mcp.callTool("Gmail","label_thread",{threadId:a.threadId, labelIds:["INBOX"]});
       await mcp.invalidate("Gmail","search_threads").catch(()=>{});
       speak("Recovered from Trash and back in your inbox.");
+    } else if (a.type==="move"){
+      await mcp.callTool("Google Calendar","update_event",
+        {eventId:a.eventId, startTime:a.from.start, endTime:a.from.end, notificationLevel:"NONE"});
+      await mcp.invalidate("Google Calendar","list_events").catch(()=>{});
+      speak("Moved it back.");
     }
   }catch(err){ speak("Undo didn't take. " + errCopy(err?.code, "the connector")); }
 }
@@ -2676,10 +2684,119 @@ function whoopModel(){
 const hrvDelta = (r, wm) => wm.hrvBase != null && r.hrv_ms != null ? Math.round(r.hrv_ms - wm.hrvBase) : null;
 const rhrDelta = (r, wm) => wm.rhrBase != null && r.resting_hr != null ? Math.round(r.resting_hr - wm.rhrBase) : null;
 
+/* ---- readiness-aware planning ----
+   Today's recovery band, read against today's calendar and what's already
+   been done, becomes one concrete offer:
+     green  → book the best free hour for a hard session (after 4 pm if possible)
+     yellow → the same, for a moderate session
+     red    → move a hard session already on today's calendar to tomorrow,
+              or, with none booked, suggest an easy day
+     trained already, or training already booked → nothing extra to do
+   Returns {say, short, action} — action is null when there's nothing to do —
+   or null when there's no readiness signal at all. */
+const HARD_RX = /\b(intervals?|tempo|threshold|vo2|hiit|race|track|hard|long run|fartlek|hills?|speed|brick)\b/i;
+const TRAIN_RX = /\b(run|ride|swim|gym|training|train|workout|lift|spin|yoga|pilates|strength)\b/i;
+function trainingPlan(){
+  const tk = todayKey(), now = new Date();
+  const wm = whoopModel(), r = wm?.today;
+  let band = r ? W_BAND(r.recovery_score).k : null, basis = r ? `Recovery ${r.recovery_score}%` : "";
+  if (!band){
+    const rd = readiness();   // Strava week-on-week load as the fallback signal
+    if (!rd) return null;
+    band = rd.ratio > 1.35 ? "red" : rd.ratio < 0.75 ? "green" : "yellow";
+    basis = "Training load";
+  }
+
+  const doneW = (wm ? (S.data.whoop?.workouts || []) : []).find(w => w.date === tk && (w.duration_min || 0) >= 20);
+  const doneS = (S.data.strava?.activities || []).find(a => String(a.start_local || "").startsWith(tk)
+                                                         && (a.summary?.moving_time || 0) >= 1200);
+  if (doneW || doneS){
+    const what = doneW ? doneW.sport : (doneS.name || doneS.sport_type || "a session");
+    return { say: `You've already trained today — ${what}. No extra session needed; recover well.`,
+             short: "Trained today — nothing more needed.", action: null };
+  }
+
+  const ahead = calEvents().filter(e => !e.allday && dayKey(e.start) === tk && e.end > now);
+  const hard = ahead.find(e => HARD_RX.test(e.title));
+  const booked = ahead.find(e => TRAIN_RX.test(e.title));
+
+  if (band === "red"){
+    if (hard){
+      const to = d => { const x = new Date(d); x.setDate(x.getDate() + 1); return x; };
+      return { say: `${basis}, red, and you've got ${hard.title} at ${fmtT(hard.start)}. Want me to move it to the same time tomorrow?`,
+               short: `Red day — ${hard.title} at ${fmtT(hard.start)} is a hard one.`,
+               action: { kind: "move", label: "MOVE TO TOMORROW", eventId: hard.id, title: hard.title,
+                         from: { start: hard.start.toISOString(), end: hard.end.toISOString() },
+                         to: { start: to(hard.start).toISOString(), end: to(hard.end).toISOString() } } };
+    }
+    return { say: `${basis}, red. Make today easy — a walk, mobility or full rest. Nothing hard on the calendar to move.`,
+             short: "Red day — keep it easy or rest.", action: null };
+  }
+
+  const kind = band === "green" ? "hard" : "moderate";
+  if (booked) return { say: `${basis}, ${band}. ${booked.title} at ${fmtT(booked.start)} is already on the calendar${
+                         band === "yellow" && hard ? " — keep the intensity in check" : ""}.`,
+                       short: `${booked.title} at ${fmtT(booked.start)} — ${band === "green" ? "go for it" : "keep it moderate"}.`,
+                       action: null };
+
+  // best free hour: the first that fits from 4 pm on, else the earliest
+  const hour = 60 * 60000, four = new Date(now); four.setHours(16, 0, 0, 0);
+  let start = null;
+  for (const [a, b] of freeGaps()){
+    const s = a < four ? four : a;
+    if (b - s >= hour){ start = s; break; }
+  }
+  if (!start && freeGaps()[0]) start = freeGaps()[0][0];
+  if (!start) return { say: `${basis}, ${band} — but there's no free hour left today. Tomorrow, then.`,
+                       short: `${band === "green" ? "Green" : "Yellow"} — no free hour left today.`, action: null };
+  const end = new Date(start.getTime() + hour);
+  const title = band === "green" ? "Training — hard session" : "Training — moderate session";
+  return { say: `${basis}, ${band} — good for a ${kind} session. You're free ${fmtT(start)} to ${fmtT(end)}. Want me to book it?`,
+           short: `Free ${fmtT(start)}–${fmtT(end)} for a ${kind} session.`,
+           action: { kind: "book", label: `BOOK ${fmtT(start)}`, title,
+                     start: start.toISOString(), end: end.toISOString() } };
+}
+
+let pendingPlan = null;   // a plan action awaiting a spoken "yes"
+let whoopHtml = "", shownPlan = null;   // renderWhoop's last markup and the plan its button runs
+function offerPlan(queued){
+  const p = trainingPlan();
+  if (!p) return false;
+  pendingPlan = p.action; if (p.action) pendingDelete = null;
+  (queued ? speakWidget : speak)(p.say);
+  return true;
+}
+async function runPlan(a, spoken){
+  pendingPlan = null;
+  const mcp = MCP();
+  if (!mcp){ speak("Booking needs the connector bridge — open me from your claude.ai artifacts."); return; }
+  Entity.mood = "thinking";
+  try{
+    if (a.kind === "book"){
+      if (new Date(a.start) < Date.now() - 5 * 60000){ speak("That slot's already gone — ask me again for a fresh one."); return; }
+      const r = await mcp.callTool("Google Calendar", "create_event", {
+        summary: a.title, description: "Booked by Atlas from today's recovery.",
+        startTime: a.start, endTime: a.end, notificationLevel: "NONE" });
+      setLastAction({ type: "focus", eventId: r.payload?.id });
+      await mcp.invalidate("Google Calendar", "list_events").catch(() => {});
+      speak(`Booked ${fmtT(new Date(a.start))} to ${fmtT(new Date(a.end))}: ${a.title.replace("Training — ", "")}. Say undo to remove it.`);
+    } else if (a.kind === "move"){
+      await mcp.callTool("Google Calendar", "update_event", {
+        eventId: a.eventId, startTime: a.to.start, endTime: a.to.end, notificationLevel: "NONE" });
+      setLastAction({ type: "move", eventId: a.eventId, from: a.from });
+      await mcp.invalidate("Google Calendar", "list_events").catch(() => {});
+      speak(`Moved ${a.title} to tomorrow at ${fmtT(new Date(a.to.start))}. Say undo to put it back.`);
+    }
+  }catch(err){
+    speak((a.kind === "book" ? "Couldn't book it. " : "Couldn't move it. ") + errCopy(err?.code, "Google Calendar"));
+  }
+}
+
 function renderWhoop(){
   const body = $("#p-whoop .body"); if (!body) return;
   const wm = whoopModel();
   if (!wm || (!wm.latest && !wm.week.n && !wm.last.n)){
+    whoopHtml = ""; shownPlan = null;
     body.innerHTML = `<div class="empty">No WHOOP data in the last five weeks. Wear the strap and sync the WHOOP app.</div>`;
     return;
   }
@@ -2705,6 +2822,12 @@ function renderWhoop(){
     html += `<div class="degraded"><span class="ic">◌</span><span>No recovery scored yet this morning — sync the WHOOP app${
       wm.latest ? `. Last scored: <b>${wm.latest.recovery_score}%</b> on ${esc(shortDay(wm.latest.wake_date))}` : ""}.</span></div>`;
   }
+
+  // today's plan: the free hour to train in, or the hard session to move
+  const plan = trainingPlan();
+  shownPlan = plan?.action || null;
+  if (plan) html += `<div class="rd-plan"><span>${esc(plan.short)}</span>${plan.action
+    ? `<button type="button" class="actchip" id="plan-act">${esc(plan.action.label)}</button>` : ""}</div>`;
 
   if (wm.trend.length > 1){
     html += `<div class="daylabel">RECOVERY · LAST ${wm.trend.length} MORNINGS</div>
@@ -2739,7 +2862,12 @@ function renderWhoop(){
       <span class="ws">${esc(x.sport.replace(/[-_]/g, " "))}</span>
       <span class="wm">${fmtMin(x.duration_min)}${x.strain != null ? ` · strain ${x.strain}` : ""}${x.avg_hr ? ` · ${x.avg_hr} bpm avg` : ""}</span></div>`).join("");
   else html += `<div class="empty">No WHOOP workouts logged yet this week.</div>`;
+  // It also redraws on every clock tick (the plan depends on the calendar and
+  // the time), so only touch the DOM when something changed: focus survives.
+  if (html === whoopHtml) return;
+  whoopHtml = html;
   body.innerHTML = html;
+  $("#plan-act")?.addEventListener("click", () => { if (shownPlan) runPlan(shownPlan, false); });
 }
 
 /* ---- gauges + rail badges ---- */
@@ -2978,7 +3106,7 @@ function renderHud(){
 function renderDeck(){
   // decoration over the data, never in its way: a failure here must not
   // interrupt setMeta or the clock
-  try{ renderGauges(); renderDayLine(); renderHud(); }
+  try{ renderGauges(); renderDayLine(); renderHud(); if (S.data.whoop) renderWhoop(); }
   catch(err){ console.warn("[Atlas] deck render failed:", err); }
 }
 
@@ -3058,6 +3186,16 @@ function setMode(mode){
 /* ---- voice and typed layout commands ---- */
 function uiIntent(text){
   const q = text.toLowerCase().replace(/[?!.,]/g, "").replace(/\s+/g, " ").trim();
+  // a plan offer waiting on an answer: yes runs it, anything else drops it
+  if (pendingPlan){
+    const a = pendingPlan; pendingPlan = null;
+    if (/^(yes|yeah|yep|yup|sure|ok|okay|please|book it|move it|do it|go ahead|go for it)\b/.test(q)){ runPlan(a, true); return true; }
+    if (/^(no|nope|not now|skip|cancel|leave it|don'?t)\b/.test(q)){ speak("Okay, leaving it."); return true; }
+  }
+  if (/^(?:plan|book|schedule) (?:my |a |in )?(?:training|session|workout)(?: today)?$|^when should i (?:train|work out|run)|^should i (?:train|work out|run|go hard)|^(?:what|how) should i train/.test(q)){
+    if (!offerPlan(false)) speak("I need a WHOOP recovery score or some Strava history to plan training around.");
+    return true;
+  }
   if (/^(?:(?:switch|change|go) to |show |turn on |enable )?(?:the )?(?:heads[- ]?up|hud)(?: mode| view| display)?$/.test(q)){
     setMode("hud"); speak("Heads-up display on."); return true;
   }
@@ -3351,7 +3489,7 @@ function handleUtteranceClassic(text){
     // Voice deletion always names its target and waits for confirmation
     const t = mailItems()[0];
     if (!t){ speak("Nothing in the inbox to delete."); return; }
-    pendingDelete = t.threadId;
+    pendingDelete = t.threadId; pendingPlan = null;
     speak(`Delete “${t.subj}” from ${t.from}? Say yes to move it to Trash.`);
     return;
   }
@@ -3394,7 +3532,7 @@ function handleUtteranceClassic(text){
     else if (/\b(who are you|what are you|your name)\b/.test(q))
       reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training. I can capture and move tasks, block focus time, archive email, and read messages out loud.";
     else if (/\b(help|what can you do|commands)\b/.test(q))
-      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Debrief. Or undo. To move around: show my inbox, show my tasks, close, heads-up mode, or back to the deck.";
+      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Plan my training. Debrief. Or undo. To move around: show my inbox, show my tasks, close, heads-up mode, or back to the deck.";
     else
       reply = "Not sure I caught that. Say help for everything I can do — or try 'brief me'.";
     speak(reply);
@@ -3490,7 +3628,12 @@ $("#wake").addEventListener("click", async ()=>{
   if (MCP() && h>=5 && h<12 && store.get("autobrief")!==todayKey()){
     // morning: deliver the briefing unprompted, once per day, after data lands
     store.set("autobrief", todayKey());
-    setTimeout(()=> BRAIN_ON() ? askBrain("Give me my morning briefing.") : speak(fullBrief()), 3200);
+    // ...then today's training offer, queued behind it
+    setTimeout(async ()=>{
+      if (BRAIN_ON()) await askBrain("Give me my morning briefing.");
+      else speak(fullBrief());
+      offerPlan(true);
+    }, 3200);
   } else if (MCP() && h>=17 && store.get("debriefOffer")!==todayKey()){
     store.set("debriefOffer", todayKey());
     setTimeout(()=>speak(`Good ${partOfDay()}. Systems linked. Say debrief when you're ready to close out the day.`), 900);
