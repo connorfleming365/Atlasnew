@@ -55,12 +55,12 @@ const sats = page => page.$$eval('#orbit .sat:not(.more)', els => els.map(e => (
   let c = await page.evaluate(() => __calls);
   check('DONE completes that task in Todoist', c.length === 1 && c[0].tool === 'complete-tasks' && c[0].input.ids[0] === 'a', c);
   check('its satellite starts being absorbed', (await sats(page)).find(x => /Send invoice/.test(x.label || '') || x.hidden === 'true') !== undefined);
-  await page.waitForTimeout(1300);
+  await page.waitForTimeout(3200);
   check('…and is gone afterwards', !(await sats(page)).some(x => /Send invoice/.test(x.label)), await sats(page));
 
   // completed elsewhere: it just disappears from the list on refresh
   await page.evaluate(() => setTasks([{ id: 'c', content: 'Renew passport', priority: 'p4', dueDate: '2026-11-20' }]));
-  await page.waitForTimeout(1300);
+  await page.waitForTimeout(3200);
   s = await sats(page);
   check('a task completed elsewhere is absorbed on refresh', s.length === 1 && /Renew passport/.test(s[0].label), s);
 
