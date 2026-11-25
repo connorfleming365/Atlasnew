@@ -312,6 +312,43 @@
   #lock button{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:#03100c;background:var(--teal);
                border-radius:999px;padding:11px 16px}
   #lock .lk-note{font-size:11.5px;color:var(--ink3)}
+  /* non-modal: the dock below stays usable, so you can type or talk while they're open */
+  #plan,#triage{position:fixed;z-index:60;top:72px;left:50%;transform:translateX(-50%);margin:0;
+          width:min(620px,calc(100vw - 32px));max-height:calc(100dvh - 210px);overflow:auto;padding:0;
+          color:var(--ink);background:rgba(7,13,23,.95);border:1px solid var(--line2);border-radius:18px;
+          box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  #plan::backdrop,#triage::backdrop{background:rgba(1,4,9,.6)}
+  #plan > header,#triage > header{display:flex;align-items:baseline;gap:12px;padding:16px 18px 6px}
+  #plan h2,#triage h2{margin:0;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--teal);font-weight:500}
+  #plan h2:focus,#triage h2:focus{outline:none}
+  #pl-src,#tr-count{font-size:12px;color:var(--ink3);flex:1}
+  .dlg-x{color:var(--ink3);font-size:22px;line-height:1;padding:2px 6px}
+  .dlg-x:hover{color:var(--ink)}
+  #plan footer,#triage footer{display:flex;flex-wrap:wrap;gap:8px;padding:6px 18px 18px}
+  #pl-body{padding:6px 18px 10px;display:grid;gap:6px}
+  .pl-row{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;align-items:baseline;padding:8px 10px;
+          border-radius:10px;background:var(--bg1);border:1px solid var(--line);cursor:pointer}
+  .pl-row.off{opacity:.45} .pl-row.off b{text-decoration:line-through}
+  .pl-row input{accent-color:var(--teal)}
+  .pl-t{font-family:var(--mono);font-size:12px;color:var(--teal);white-space:nowrap}
+  @media (min-width:1081px){ #plan,#triage{top:196px;max-height:calc(100dvh - 330px)} }   /* below the Day Line */
+  .pl-x{min-width:0;display:flex;flex-direction:column}
+  .pl-x b{font-weight:500;font-size:13.5px;overflow-wrap:anywhere} .pl-x em{font-style:normal;font-size:11.5px;color:var(--ink3)}
+  .pl-un{margin-top:6px;font-size:12.5px;color:var(--ink2)} .pl-un span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--ink3);margin-bottom:4px}
+  .pl-un em{font-style:normal;color:var(--ink3)}
+  #dl-plan{align-self:flex-start;margin-top:4px}
+  .dl-prop{position:absolute;top:18px;height:20px;border-radius:7px;border:1px dashed var(--peri);
+           background:repeating-linear-gradient(135deg,rgba(139,147,255,.28) 0 6px,rgba(139,147,255,.12) 6px 12px);
+           cursor:pointer;z-index:2;font-size:10px;color:#dfe2ff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 4px;line-height:18px}
+  .dl-prop.trn{border-color:var(--teal);background:repeating-linear-gradient(135deg,rgba(69,224,190,.3) 0 6px,rgba(69,224,190,.12) 6px 12px)}
+  #tr-card{padding:8px 18px 10px;display:grid;gap:6px}
+  #tr-from{font-size:12px;color:var(--ink2)} #tr-subj{font-size:16px;font-weight:600;overflow-wrap:anywhere}
+  #tr-sum{margin:4px 0 0;font-size:14px;line-height:1.5;padding:10px 12px;border-radius:10px;background:var(--bg1);border-left:3px solid var(--teal)}
+  #tr-sug{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--ink3)}
+  #triage [data-act].sug{background:rgba(69,224,190,.16);border-color:var(--teal)}
+  #tr-reply{display:flex;gap:8px} #tr-reply[hidden]{display:none}
+  #tr-say{flex:1;min-width:0;font:14px var(--sans);color:var(--ink);background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:9px 12px}
+  #tr-note{font-size:12px;color:var(--ink3)}
   #weekbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
            border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
   #weekbtn:hover{color:var(--ink);border-color:rgba(69,224,190,.4)}
@@ -626,6 +663,31 @@
 </div>
 
 <div id="nudges" role="region" aria-label="Nudges" aria-live="polite"></div>
+<dialog id="plan" aria-labelledby="pl-h">
+  <header><h2 id="pl-h" tabindex="-1" autofocus>PLAN MY DAY</h2><span id="pl-src"></span>
+    <button type="button" id="pl-close" class="dlg-x" aria-label="Close the draft (it stays on the Day Line)">×</button></header>
+  <div id="pl-body"></div>
+  <footer><button type="button" class="actchip" id="pl-ok">ADD TO CALENDAR</button>
+    <button type="button" class="actchip warn" id="pl-discard">DISCARD</button></footer>
+</dialog>
+<dialog id="triage" aria-labelledby="tr-h">
+  <header><h2 id="tr-h" tabindex="-1" autofocus>TRIAGE</h2><span id="tr-count"></span>
+    <button type="button" id="tr-close" class="dlg-x" aria-label="Stop triage">×</button></header>
+  <div id="tr-card">
+    <div id="tr-from"></div><div id="tr-subj"></div>
+    <p id="tr-sum" aria-live="polite"></p><div id="tr-sug" hidden></div>
+    <form id="tr-reply" hidden><input id="tr-say" placeholder="What should the reply say?" aria-label="What should the reply say?" autocomplete="off">
+      <button type="submit" class="actchip">SAVE DRAFT</button></form>
+    <div id="tr-note" role="status"></div>
+  </div>
+  <footer>
+    <button type="button" class="actchip" data-act="archive">ARCHIVE</button>
+    <button type="button" class="actchip" data-act="reply">REPLY…</button>
+    <button type="button" class="actchip" data-act="keep">KEEP</button>
+    <button type="button" class="actchip crit" data-act="delete">DELETE</button>
+    <button type="button" class="actchip" data-act="next">NEXT</button>
+  </footer>
+</dialog>
 <dialog id="review" aria-labelledby="wr-h">
   <header><h2 id="wr-h" tabindex="-1" autofocus>WEEKLY REVIEW</h2><span id="wr-range"></span>
     <button type="button" id="wr-close" aria-label="Close weekly review">×</button></header>
@@ -668,6 +730,7 @@
       <div class="dl-lab" id="dl-date">TODAY</div>
       <div class="dl-head" id="dl-head">Day Line</div>
       <div class="dl-sub" id="dl-sub">Waiting for calendar…</div>
+      <button type="button" class="actchip" id="dl-plan" title="Draft today's tasks into your free time - nothing is added until you approve">PLAN MY DAY</button>
     </div>
     <div class="dl-scroll"><div class="dl-track" id="dl-track"></div></div>
   </section>
@@ -687,6 +750,7 @@
     </section>
     <section class="panel" id="p-gmail" aria-labelledby="h-gmail" hidden>
       <header><h2 id="h-gmail" tabindex="-1">INBOX</h2><span class="src">Gmail</span><span class="upd"></span>
+        <button type="button" class="actchip" id="tr-start" title="Go through unread mail one at a time">TRIAGE</button>
         <button type="button" class="vclose" aria-label="Close Inbox and return to the deck" title="Back to the deck (Esc)">×</button></header>
       <div class="body"><div class="empty">Waiting for inbox…</div></div>
     </section>
@@ -2447,6 +2511,11 @@ async function undoLast(){
       await mcp.callTool("Gmail","label_thread",{threadId:a.threadId, labelIds:["INBOX"]});
       await mcp.invalidate("Gmail","search_threads").catch(()=>{});
       speak("Recovered from Trash and back in your inbox.");
+    } else if (a.type==="plan"){
+      for (const id of a.eventIds || [])
+        await mcp.callTool("Google Calendar","delete_event",{eventId:id, notificationLevel:"NONE"}).catch(()=>{});
+      await mcp.invalidate("Google Calendar","list_events").catch(()=>{});
+      speak(`Removed the ${(a.eventIds || []).length} planned block${(a.eventIds || []).length === 1 ? "" : "s"}.`);
     } else if (a.type==="move"){
       await mcp.callTool("Google Calendar","update_event",
         {eventId:a.eventId, startTime:a.from.start, endTime:a.from.end, notificationLevel:"NONE"});
@@ -3102,9 +3171,14 @@ function renderDayLine(){
     const label = `free ${durLabel(g[1] - g[0])}`, st = `left:${f(X(g[0]))}%;width:${f(X(g[1]) - X(g[0]))}%`;
     html += i === 0
       ? `<button type="button" class="dl-free" id="dl-block" style="${st}" title="Block an hour from ${fmtT(g[0])} for your top task"
-           aria-label="${label}, ${fmtT(g[0])} to ${fmtT(g[1])}. Block an hour for your top task">${label}</button>`
-      : `<span class="dl-free" style="${st}" title="${label}, ${fmtT(g[0])}–${fmtT(g[1])}">${label}</span>`;
+           aria-label="${label}, ${fmtT(g[0])} to ${fmtT(g[1])}. Block an hour for your top task">${S.proposal ? "" : label}</button>`
+      : `<span class="dl-free" style="${st}" title="${label}, ${fmtT(g[0])}–${fmtT(g[1])}">${S.proposal ? "" : label}</span>`;
   });
+  for (const b of (S.proposal?.blocks || []).filter(b => b.keep)){
+    const x = X(b.start), w = Math.max(.6, X(b.end) - x);
+    html += `<button type="button" class="dl-prop${b.kind === "training" ? " trn" : ""}" style="left:${f(x)}%;width:${f(w)}%"
+      title="Draft: ${esc(b.title)} · ${fmtT(b.start)}–${fmtT(b.end)}" aria-label="Draft block ${esc(b.title)}, ${fmtT(b.start)} to ${fmtT(b.end)}. Review the draft">${w > 6 ? esc(b.title) : ""}</button>`;
+  }
   html += `<div class="dl-axis"></div>`;
   for (let h = h0; h <= h1; h += 2){
     const d = new Date(base); d.setHours(h, 0, 0, 0);
@@ -3132,6 +3206,7 @@ function renderDayLine(){
       it.kind === "ev" ? speakEvent(it.e) : speakActivity(it.a);
     }));
     $("#dl-block")?.addEventListener("click", () => focusBlock(0));
+    track.querySelectorAll(".dl-prop").forEach(b => b.addEventListener("click", () => openPlanPanel()));
   }
   const needle = $("#dl-now");
   if (needle){ needle.hidden = !(now >= base && now - base <= span); needle.style.left = f(X(now)) + "%"; }
@@ -3140,6 +3215,7 @@ function renderDayLine(){
   $("#dl-head").textContent = !S.data.cal && !S.data.todo ? "Day Line"
     : left || due ? [left && `${left} event${left > 1 ? "s" : ""}`, due && `${due} task${due > 1 ? "s" : ""}`].filter(Boolean).join(" · ") + " left"
     : "Day's clear";
+  $("#dl-plan").textContent = S.proposal ? "REVIEW DRAFT" : "PLAN MY DAY";
   $("#dl-sub").textContent = (!S.data.cal ? waitingCopy("cal")
     : gaps.length ? `Free ${fmtT(gaps[0][0])}–${fmtT(gaps[0][1])}` : "No free hour left today")
     + (allday.length ? ` · All day: ${allday[0].title}` : "");
@@ -3322,6 +3398,9 @@ function uiIntent(text){
     else speak(`Nudges are already ${S.nudgesOn ? "on" : "off"}.`);
     return true;
   }
+  // undo is always local: the brain can't see what this page just did
+  if (/^undo\b/.test(q) && lastAction){ undoLast(); return true; }
+  if (planTriageIntent(q)) return true;
   if (/^(?:plan|book|schedule) (?:my |a |in )?(?:training|session|workout)(?: today)?$|^when should i (?:train|work out|run)|^should i (?:train|work out|run|go hard)|^(?:what|how) should i train/.test(q)){
     if (!offerPlan(false)) speak("I need a WHOOP recovery score or some Strava history to plan training around.");
     return true;
@@ -3662,11 +3741,273 @@ function handleUtteranceClassic(text){
     else if (/\b(who are you|what are you|your name)\b/.test(q))
       reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training. I can capture and move tasks, block focus time, archive email, and read messages out loud.";
     else if (/\b(help|what can you do|commands)\b/.test(q))
-      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Plan my training. Weekly review. Debrief. Or undo. To move around: show my inbox, show my tasks, close, heads-up mode, or back to the deck.";
+      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Plan my training. Plan my day. Triage my inbox. Weekly review. Debrief. Or undo. To move around: show my inbox, show my tasks, close, heads-up mode, or back to the deck.";
     else
       reply = "Not sure I caught that. Say help for everything I can do — or try 'brief me'.";
     speak(reply);
   }, 350);
+}
+
+/* ================================================================
+   PLAN MY DAY
+   Today's open tasks laid into today's free time as a DRAFT. Claude does
+   the placing on the self-hosted site (/api/plan); simple rules do it
+   elsewhere. The draft shows on the Day Line and in a list where any
+   block can be dropped. Nothing touches the calendar until you approve;
+   "undo" then removes everything that was added.
+   ================================================================ */
+S.proposal = null;
+const QUICK_RX = /\b(reply|respond|email|call|ring|text|pay|book|send|order|renew|confirm|check|sign|file|chase|remind)\b/i;
+const DEEP_RX = /\b(write|draft|build|design|prepare|prep|plan|review|analy[sz]e|research|study|create|fix|report|deck|proposal|strategy)\b/i;
+const hm = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const atHM = s => { const [h, m] = String(s).split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d; };
+
+function planInputs(){
+  const { overdue, today } = taskBuckets();
+  const tasks = byPriority([...overdue, ...today]).map(t => ({
+    id: String(t.id), content: t.content, priority: t.priority || "p4", overdue: overdue.includes(t),
+    due: String(t.dueDate || "").length > 10 ? hm(new Date(t.dueDate)) : null,
+  }));
+  // the training hour, when today's plan offers one, is held back from task time
+  const tp = trainingPlan();
+  const training = tp?.action?.kind === "book" ? { start: new Date(tp.action.start), end: new Date(tp.action.end), title: tp.action.title } : null;
+  let gaps = freeGaps();
+  if (training) gaps = gaps.flatMap(([a, b]) => training.end <= a || training.start >= b ? [[a, b]]
+    : [[a, training.start], [training.end, b]].filter(([x, y]) => y - x >= 15 * 60000));
+  return { tasks, gaps, training };
+}
+
+/* No AI available: priority order, a duration guessed from the wording,
+   packed into the free gaps with ten minutes between blocks. */
+function rulesPlan(tasks, gaps){
+  const free = gaps.map(([a, b]) => [new Date(a), new Date(b)]);
+  const blocks = [], unscheduled = [];
+  for (const t of tasks){
+    const mins = DEEP_RX.test(t.content) ? 60 : QUICK_RX.test(t.content) ? 20 : 30;
+    const g = free.find(([a, b]) => b - a >= mins * 60000 && (!t.due || +a + mins * 60000 <= +atHM(t.due)));
+    if (!g){ unscheduled.push({ task_id: t.id, why: "no room today" }); continue; }
+    const s = new Date(g[0]), e = new Date(+s + mins * 60000);
+    blocks.push({ task_id: t.id, start: hm(s), end: hm(e), why: t.overdue ? "overdue" : t.priority === "p1" ? "top priority" : "" });
+    g[0] = new Date(+e + 10 * 60000);
+  }
+  return { blocks, unscheduled, summary: "", source: "rules" };
+}
+
+async function planDay(){
+  if (!MCP()){ speak("Planning needs your calendar and tasks — open me from claude.ai or your Atlas site."); return; }
+  if (!S.data.todo || !S.data.cal){ speak("Give me a moment — your calendar and tasks are still loading."); return; }
+  const { tasks, gaps, training } = planInputs();
+  if (!tasks.length){ speak("Nothing due today to plan — you're clear."); return; }
+  if (!gaps.length){ speak("There's no free time left today to put tasks into."); return; }
+  Entity.mood = "thinking";
+  let out = null;
+  if (ATLAS.hosted && BRAIN_ON()){
+    try{
+      const r = await fetch("/api/plan", { method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ now: hm(new Date()), weekday: new Date().toLocaleDateString([], { weekday: "long" }),
+          tasks, gaps: gaps.map(([a, b]) => ({ start: hm(a), end: hm(b) })),
+          events: calEvents().filter(e => !e.allday && dayKey(e.start) === todayKey()).map(e => ({ title: e.title, start: hm(e.start), end: hm(e.end) })),
+          training: training ? { start: hm(training.start), end: hm(training.end) } : null,
+          recovery: whoopModel()?.today ? `${W_BAND(whoopModel().today.recovery_score).k} (${whoopModel().today.recovery_score}%)` : null }) });
+      const j = await r.json();
+      if (!j.error) out = j;
+    }catch(_){ /* fall back to the rules below */ }
+  }
+  if (!out) out = rulesPlan(tasks, gaps);
+  const byId = Object.fromEntries(tasks.map(t => [t.id, t]));
+  const blocks = (out.blocks || []).filter(b => byId[b.task_id]).map(b => ({
+    kind: "task", taskId: b.task_id, title: byId[b.task_id].content, start: atHM(b.start), end: atHM(b.end), why: b.why || "", keep: true }));
+  if (training) blocks.push({ kind: "training", title: training.title, start: training.start, end: training.end, why: "today's recovery", keep: true });
+  blocks.sort((a, b) => a.start - b.start);
+  S.proposal = { blocks, unscheduled: (out.unscheduled || []).map(u => ({ title: byId[u.task_id]?.content || "", why: u.why })).filter(u => u.title),
+                 summary: out.summary || "", source: out.source || "rules" };
+  dlHtml = ""; renderDayLine(); openPlanPanel();
+  const nT = blocks.filter(b => b.kind === "task").length;
+  if (!blocks.length){ speak("I couldn't fit anything into today's free time."); return; }
+  const first = blocks[0];
+  speak(`${S.proposal.summary || `Here's a draft: ${nT} task${nT === 1 ? "" : "s"}${training ? " plus training" : ""}, starting with ${first.title} at ${fmtT(first.start)}.`} ` +
+        `Nothing's on your calendar yet — say approve to add it, or remove any you don't want.`);
+}
+
+function openPlanPanel(show = true){
+  const dlg = $("#plan"), P = S.proposal; if (!dlg || !P) return;
+  const kept = P.blocks.filter(b => b.keep).length;
+  $("#pl-body").innerHTML = (P.blocks.length ? P.blocks.map((b, i) => `<label class="pl-row${b.keep ? "" : " off"}">
+      <input type="checkbox" data-i="${i}" ${b.keep ? "checked" : ""}>
+      <span class="pl-t">${fmtT(b.start)}–${fmtT(b.end)}</span>
+      <span class="pl-x"><b>${esc(b.title)}</b>${b.why ? `<em>${esc(b.why)}</em>` : ""}</span></label>`).join("")
+      : `<div class="empty">Nothing fitted into today's free time.</div>`)
+    + (P.unscheduled.length ? `<div class="pl-un"><span>NOT TODAY</span>${P.unscheduled.map(u =>
+        `<div>${esc(u.title)}<em> — ${esc(u.why)}</em></div>`).join("")}</div>` : "");
+  $("#pl-src").textContent = P.source === "ai" ? "Drafted by Claude · nothing added yet" : "Drafted by simple rules · nothing added yet";
+  $("#pl-ok").textContent = kept ? `ADD ${kept} TO CALENDAR` : "NOTHING SELECTED";
+  $("#pl-ok").disabled = !kept;
+  $("#pl-body").querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", () => {
+    S.proposal.blocks[+cb.dataset.i].keep = cb.checked; dlHtml = ""; renderDayLine(); openPlanPanel(false);
+  }));
+  if (!dlg.open && show) dlg.show();
+}
+
+async function approvePlan(){
+  const P = S.proposal, mcp = MCP(); if (!P || !mcp) return;
+  const keep = P.blocks.filter(b => b.keep);
+  if (!keep.length){ speak("Nothing's selected to add."); return; }
+  $("#plan")?.open && $("#plan").close();
+  S.proposal = null; dlHtml = ""; renderDayLine();
+  Entity.mood = "thinking";
+  const ids = [];
+  try{
+    for (const b of keep){
+      const r = await mcp.callTool("Google Calendar", "create_event", {
+        summary: b.kind === "training" ? b.title : `Focus: ${b.title}`,
+        description: "Planned by Atlas — you approved this block.",
+        startTime: b.start.toISOString(), endTime: b.end.toISOString(), notificationLevel: "NONE" });
+      if (r.payload?.id) ids.push(r.payload.id);
+    }
+    setLastAction({ type: "plan", eventIds: ids });
+    await mcp.invalidate("Google Calendar", "list_events").catch(() => {});
+    speak(`Added ${ids.length} block${ids.length === 1 ? "" : "s"} to your calendar. Say undo to remove them all.`);
+  }catch(err){
+    if (ids.length) setLastAction({ type: "plan", eventIds: ids });
+    speak(`Added ${ids.length} of ${keep.length}, then the calendar refused. ` + errCopy(err?.code, "Google Calendar"));
+  }
+}
+function discardPlan(say = true){
+  S.proposal = null; dlHtml = ""; renderDayLine();
+  if ($("#plan")?.open) $("#plan").close();
+  if (say) speak("Draft discarded — nothing was added.");
+}
+/* "remove the invoice one" → untick the closest-matching block */
+function dropFromPlan(words){
+  const P = S.proposal; if (!P) return false;
+  const w = words.toLowerCase().split(/\s+/).filter(x => x.length > 2 && !/^(the|one|block|task|from|plan)$/.test(x));
+  let best = null, score = 0;
+  P.blocks.forEach(b => { const s = w.filter(x => b.title.toLowerCase().includes(x)).length; if (s > score){ score = s; best = b; } });
+  if (!best) return false;
+  best.keep = false; dlHtml = ""; renderDayLine(); openPlanPanel(false);
+  speak(`Removed ${best.title}. ${P.blocks.filter(b => b.keep).length} left — say approve when it looks right.`);
+  return true;
+}
+$("#pl-ok").addEventListener("click", () => approvePlan());
+$("#pl-discard").addEventListener("click", () => discardPlan());
+$("#pl-close").addEventListener("click", () => $("#plan").close());
+$("#dl-plan").addEventListener("click", () => S.proposal ? openPlanPanel() : planDay());
+
+/* ================================================================
+   INBOX TRIAGE
+   Unread mail, one thread at a time, most important first: a one-line
+   summary (Claude on the self-hosted site, the snippet elsewhere) and a
+   suggestion, then archive, delete, reply-as-draft or next. Replies are
+   only ever saved as Gmail drafts.
+   ================================================================ */
+S.triage = null;
+function triageQueue(){
+  const rank = m => (m.important ? 0 : 2) + (m.low ? 4 : 0);
+  return mailItems().filter(m => m.unread).sort((a, b) => rank(a) - rank(b));
+}
+async function startTriage(){
+  if (!MCP()){ speak("Triage needs your inbox — open me from claude.ai or your Atlas site."); return; }
+  if (!S.data.gmail){ speak("Your inbox is still loading — try again in a moment."); return; }
+  const queue = triageQueue();
+  if (!queue.length){ speak("No unread mail — your inbox is clear."); return; }
+  S.triage = { queue, i: 0, done: 0 };
+  $("#triage").show();
+  speak(`${queue.length} unread. Say archive, delete, reply saying something, or next.`);
+  showTriageItem();
+}
+async function showTriageItem(){
+  const T = S.triage; if (!T) return;
+  if (T.i >= T.queue.length){ endTriage(); return; }
+  const m = T.queue[T.i];
+  $("#tr-count").textContent = `${T.i + 1} of ${T.queue.length}`;
+  $("#tr-from").textContent = m.from;
+  $("#tr-subj").textContent = m.subj;
+  $("#tr-sum").textContent = "Summarising…";
+  $("#tr-sug").hidden = true; $("#tr-reply").hidden = true; $("#tr-note").textContent = "";
+  let sum = m.snip.slice(0, 140), action = null, reason = "";
+  if (ATLAS.hosted && BRAIN_ON()){
+    try{
+      const r = await fetch("/api/triage", { method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId: m.threadId }) });
+      const j = await r.json();
+      if (!j.error){ sum = j.summary || sum; action = j.action; reason = j.reason || ""; }
+    }catch(_){ /* the snippet stands in */ }
+  }
+  if (S.triage !== T || T.queue[T.i] !== m) return;      // moved on meanwhile
+  T.current = { action };
+  $("#tr-sum").textContent = sum;
+  if (action){
+    $("#tr-sug").hidden = false;
+    $("#tr-sug").textContent = `SUGGEST: ${action.toUpperCase()}${reason ? ` — ${reason}` : ""}`;
+    document.querySelectorAll("#triage [data-act]").forEach(b => b.classList.toggle("sug", b.dataset.act === action));
+  }
+  speakWidget(`${m.from}: ${sum.replace(/[.!?]\s*$/, "")}${action ? `. I'd ${action === "keep" ? "keep it for later" : action}.` : ""}`);
+}
+function nextTriage(){ if (!S.triage) return; S.triage.i++; showTriageItem(); }
+function endTriage(){
+  const T = S.triage; S.triage = null;
+  if ($("#triage").open) $("#triage").close();
+  if (T) speak(T.i >= T.queue.length ? `That's the lot — ${T.done} handled.` : `Stopped — ${T.done} handled.`);
+}
+async function triageAct(act, instruction){
+  const T = S.triage, mcp = MCP(); if (!T || !mcp) return;
+  const m = T.queue[T.i]; if (!m) return;
+  try{
+    if (act === "archive"){
+      await mcp.callTool("Gmail", "unlabel_thread", { threadId: m.threadId, labelIds: ["INBOX"] });
+      setLastAction({ type: "archive", threadId: m.threadId });
+    } else if (act === "delete"){
+      await mcp.callTool("Gmail", "apply_sensitive_thread_label", { threadId: m.threadId, labelOption: "TRASH" });
+      setLastAction({ type: "trash", threadId: m.threadId });
+    } else if (act === "reply"){
+      if (!instruction){ $("#tr-reply").hidden = false; $("#tr-say").focus(); return; }
+      $("#tr-note").textContent = "Writing the draft…";
+      if (ATLAS.hosted && BRAIN_ON()){
+        const r = await fetch("/api/triage", { method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ threadId: m.threadId, instruction, name: firstName() }) });
+        const j = await r.json(); if (j.error) throw j.error;
+      } else {
+        await mcp.callTool("Gmail", "create_draft", { threadId: m.threadId, to: m.from, subject: m.subj, body: instruction });
+      }
+      speakWidget("Draft saved in Gmail — not sent.");
+    }
+    if (act !== "keep") T.done++;
+    mcp.invalidate("Gmail", "search_threads").catch(() => {});
+    nextTriage();
+  }catch(err){
+    $("#tr-note").textContent = "That didn't work: " + errCopy(err?.code, "Gmail");
+  }
+}
+document.querySelectorAll("#triage [data-act]").forEach(b => b.addEventListener("click", () =>
+  b.dataset.act === "next" ? nextTriage() : triageAct(b.dataset.act)));
+$("#tr-reply").addEventListener("submit", e => { e.preventDefault(); const v = $("#tr-say").value.trim(); if (v){ $("#tr-say").value = ""; triageAct("reply", v); } });
+$("#tr-close").addEventListener("click", () => endTriage());
+$("#triage").addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); endTriage(); } });
+$("#plan").addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); $("#plan").close(); } });
+$("#tr-start").addEventListener("click", () => startTriage());
+
+/* Voice and typed commands for both, checked before anything else */
+function planTriageIntent(q){
+  if (S.triage){
+    if (/^(archive|archive it|done with it)$/.test(q)){ triageAct("archive"); return true; }
+    if (/^(delete|delete it|bin it|trash it|junk)$/.test(q)){ triageAct("delete"); return true; }
+    if (/^(next|skip|keep|keep it|later|leave it)$/.test(q)){ if (/^(keep|keep it|later|leave it)$/.test(q)) S.triage.done++; nextTriage(); return true; }
+    const rep = q.match(/^reply(?: saying| with| that)?\s+(.+)$/);
+    if (rep){ triageAct("reply", rep[1]); return true; }
+    if (/^(stop|done|finish|exit|that's enough|end triage)$/.test(q)){ endTriage(); return true; }
+  }
+  if (/^(?:triage|sort|go through|clear)(?: my| the)? (?:inbox|email|emails|mail)$|^inbox triage$/.test(q)){ startTriage(); return true; }
+  if (/^(?:plan|organi[sz]e|schedule|map out|lay out)(?: out)? (?:my |the )?(?:day|today)$|^plan today$/.test(q)){ planDay(); return true; }
+  if (S.proposal){
+    if (/^(approve|approved|add them|add it|looks good|go ahead|do it|yes|yes please|book them|confirm)$/.test(q)){ approvePlan(); return true; }
+    if (/^(discard|scrap it|cancel|cancel the plan|no thanks|forget it|bin the plan)$/.test(q)){ discardPlan(); return true; }
+    const drop = q.match(/^(?:remove|drop|skip|take out|untick)\s+(.+)$/);
+    if (drop && dropFromPlan(drop[1])) return true;
+    if (/^(show (?:the |my )?(?:plan|draft)|open (?:the )?(?:plan|draft))$/.test(q)){ openPlanPanel(); return true; }
+  }
+  return false;
 }
 
 /* ================================================================
