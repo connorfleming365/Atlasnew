@@ -130,8 +130,9 @@ exactly as before.
 
 ## Android launcher
 
-The Atlas Launcher Android app (a separate repo) shows a small dashboard card
-— next calendar event, top task, overdue count — on your phone's home screen.
+The Atlas Launcher Android app (a separate repo) puts the flight deck on your
+phone's home screen — the Day Line, nudges, and the Next / Tasks / Inbox /
+Readiness gauges with their full views.
 It has no browser, so it can't carry the cookie the web dashboard uses; it
 polls one small endpoint instead: `GET /api/launcher/summary`.
 
@@ -139,7 +140,9 @@ That endpoint needs two things set:
 
 - **`UPSTASH_REDIS_REST_URL`** and **`UPSTASH_REDIS_REST_TOKEN`** (see
   **Cross-device sync** above) — this is what lets the server hold a copy of
-  your Google/Todoist tokens to read from without a cookie. Sealed the same
+  your Google, Todoist, WHOOP and Strava tokens to read from without a cookie
+  (copied each time you connect one; if a gauge says "not connected" on the
+  phone but works on the web, disconnect and reconnect that provider once). Sealed the same
   way as everything else here.
 - **`LAUNCHER_API_KEY`** — any long random string you make up yourself (a
   password manager's generator is fine). The launcher sends it back as an
