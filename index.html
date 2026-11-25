@@ -371,11 +371,16 @@
   #orbit[hidden]{display:none}
   .sat{position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;pointer-events:auto;
        display:grid;place-items:center;will-change:transform,opacity;--c:var(--ink3)}
-  .sat::before{content:"";width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff 0 18%,var(--c) 55%);
-               box-shadow:0 0 10px var(--c),0 0 2px var(--c)}
-  .sat.p1{--c:#ff6b6b} .sat.p2{--c:#ffa24d} .sat.p3{--c:var(--teal)} .sat.p4{--c:#9fb4c8}
-  .sat.od::before{animation:satpulse 1.6s ease-in-out infinite}
-  @keyframes satpulse{50%{box-shadow:0 0 18px var(--c),0 0 4px var(--c);transform:scale(1.25)}}
+  /* bright enough to stand out from the starfield: white-hot core, saturated body, coloured ring and halo */
+  .sat::before{content:"";width:15px;height:15px;border-radius:50%;
+               background:radial-gradient(circle at 38% 35%,#fff 0 22%,var(--c) 58%,color-mix(in srgb,var(--c) 70%,#000) 100%);
+               box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 45%,transparent),0 0 12px 2px var(--c),0 0 28px 6px color-mix(in srgb,var(--c) 45%,transparent)}
+  .sat.p1{--c:#ff3b5c} .sat.p2{--c:#ffa41c} .sat.p3{--c:#2dffc9} .sat.p4{--c:#8ab4ff}
+  .sat.od::before{animation:satpulse 1.4s ease-in-out infinite}
+  @keyframes satpulse{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 60%,transparent),0 0 18px 4px var(--c),0 0 40px 10px color-mix(in srgb,var(--c) 55%,transparent);transform:scale(1.2)}}
+  .orbit-track{position:absolute;border-radius:50%;border:1px dashed rgba(69,224,190,.22);pointer-events:none;
+               box-shadow:0 0 18px rgba(69,224,190,.06) inset}
+  .orbit-track[hidden]{display:none}
   .sat:hover::before,.sat:focus-visible::before{transform:scale(1.35)}
   .sat:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
   .sat.more{width:auto;height:auto;padding:3px 8px;border-radius:999px;font-family:var(--mono);font-size:10px;color:var(--ink2);
@@ -3805,11 +3810,13 @@ function handleUtteranceClassic(text){
    in from outside the orbit. Reduced motion: a still ring, simple fades.
    ================================================================ */
 const Orbit = (() => {
-  const MAX = 12, PERIOD = 110;                 // seconds per lap
+  const MAX = 12, PERIOD = 45;                  // seconds per lap
+  const TILT = -22 * Math.PI / 180;             // the ring rises to the right, like a planet's rings
+  const CT = Math.cos(TILT), ST = Math.sin(TILT);
   const sats = new Map();                       // id → {el, slot, a, r, state, t0, task}
   const moved = new Set();                      // ids rescheduled away (drift out, not absorbed)
   const done = new Set();                       // ids completed from this page
-  let layer = null, more = null, card = null, cardFor = null, t = 0, last = 0, running = false;
+  let layer = null, track = null, more = null, card = null, cardFor = null, t = 0, last = 0, running = false;
 
   function ensureLayer(){
     if (layer) return layer;
@@ -3817,6 +3824,7 @@ const Orbit = (() => {
     layer = document.createElement("div"); layer.id = "orbit"; layer.setAttribute("role", "group");
     layer.setAttribute("aria-label", "Today's open tasks");
     stage.appendChild(layer);
+    track = document.createElement("div"); track.className = "orbit-track"; layer.appendChild(track);
     more = document.createElement("button"); more.type = "button"; more.className = "sat more"; more.hidden = true;
     more.addEventListener("click", () => openView("todo", { from: $(`.gauge[data-view="todo"]`) }));
     layer.appendChild(more);
@@ -3870,14 +3878,21 @@ const Orbit = (() => {
     const small = Math.min(W, H) < 170;
     layer.hidden = small;
     const cx = W / 2, cy = H / 2, R = Math.min(W, H) * .20;
-    const rx = Math.min(W * .44, Math.max(R * 2.1, Math.min(W, H) * .46)), ry = Math.max(R * 1.05, rx * .36);
-    const spin = REDUCED ? 0 : t / PERIOD * Math.PI * 2;
+    let rx = Math.min(W * .44, Math.max(R * 2.1, Math.min(W, H) * .46)), ry = Math.max(R * 1.05, rx * .38);
+    // tilted, the ring is taller - keep it inside the stage
+    const tall = Math.hypot(rx * ST, ry * CT), room = H * .46;
+    if (tall > room){ rx *= room / tall; ry *= room / tall; }
+    // the ring always turns (slowly - this is the point of it); reduced motion only
+    // drops the spiral-in and drift-in effects below
+    const spin = t / PERIOD * Math.PI * 2;
+    track.hidden = !sats.size;
+    track.style.cssText = `left:${(cx - rx).toFixed(1)}px;top:${(cy - ry).toFixed(1)}px;width:${(rx * 2).toFixed(1)}px;height:${(ry * 2).toFixed(1)}px;transform:rotate(${TILT}rad)`;
     for (const [id, s] of sats){
       const target = s.slot + spin;
       if (s.a == null) s.a = target;
       // ease toward its slot so the ring re-spaces smoothly when tasks come and go
       let d = ((target - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-      s.a += REDUCED ? d : d * Math.min(1, dt * 1.6);
+      s.a += d * Math.min(1, dt * 1.6);
       let r = 1, op = 1, sc = 1, k = 0;
       if (s.state === "entering"){
         k = REDUCED ? 1 : Math.min(1, (t - s.t0) / 1.2);
@@ -3892,9 +3907,10 @@ const Orbit = (() => {
         r = 1 + .8 * k; op = 1 - k;
         if (k >= 1){ s.el.remove(); sats.delete(id); continue; }
       }
-      const x = cx + Math.cos(s.a) * rx * r, y = cy + Math.sin(s.a) * ry * r;
+      const px = Math.cos(s.a) * rx * r, py = Math.sin(s.a) * ry * r;   // on the flat ring…
+      const x = cx + px * CT - py * ST, y = cy + px * ST + py * CT;    // …tilted diagonally
       const depth = Math.sin(s.a);                                  // + in front of the character, - behind
-      const behind = depth < 0 && Math.abs(x - cx) < R * 1.05 && r > .3;
+      const behind = depth < 0 && Math.hypot(x - cx, y - cy) < R * 1.1 && r > .3;
       sc *= .82 + .22 * (depth + 1) / 2;
       op *= behind ? .22 : .62 + .38 * (depth + 1) / 2;
       s.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
@@ -3903,7 +3919,7 @@ const Orbit = (() => {
       if (cardFor === id) placeCard(x, y);
     }
     if (!more.hidden){                                              // sits at the front-right of the ring
-      more.style.transform = `translate(${(cx + rx * 1.12).toFixed(1)}px,${(cy + ry * .9).toFixed(1)}px) translate(-50%,-50%)`;
+      more.style.transform = `translate(${(cx + rx * 1.05 * CT).toFixed(1)}px,${(cy + rx * 1.05 * ST + ry * 1.1).toFixed(1)}px) translate(-50%,-50%)`;
     }
     if (sats.size || !more.hidden) requestAnimationFrame(frame); else running = false;
   }
