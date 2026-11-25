@@ -292,6 +292,30 @@
   #modes button{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);
                 padding:4px 12px;border-radius:999px;transition:background .2s,color .2s}
   #modes button:hover{color:var(--ink)}
+  #weekbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
+           border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
+  #weekbtn:hover{color:var(--ink);border-color:rgba(69,224,190,.4)}
+  #review{width:min(860px,calc(100vw - 32px));max-height:calc(100dvh - 48px);overflow:auto;padding:0;
+          color:var(--ink);background:rgba(7,13,23,.95);border:1px solid var(--line2);border-radius:18px;
+          box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  #review::backdrop{background:rgba(1,4,9,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  #review > header{display:flex;align-items:baseline;gap:12px;padding:16px 18px 6px}
+  #review h2{margin:0;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--teal);font-weight:500}
+  #wr-h:focus{outline:none}
+  #wr-range{font-size:12px;color:var(--ink3);flex:1}
+  #wr-close{color:var(--ink3);font-size:22px;line-height:1;padding:2px 6px}
+  #wr-close:hover{color:var(--ink)}
+  #wr-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:10px 18px 18px}
+  .wr-tile{background:var(--bg1);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+  .wr-tile h3{margin:0 0 6px;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--ink3);font-weight:500}
+  .wr-big{font-size:28px;font-weight:600;line-height:1.1}
+  .wr-big small{font-size:12px;font-weight:400;color:var(--ink2);margin-left:4px}
+  .wr-sub{font-size:12.5px;color:var(--ink2);margin-top:4px;overflow-wrap:anywhere}
+  .wr-sub em{font-style:normal;color:var(--ink3)} .wr-sub em.up{color:var(--teal)} .wr-sub em.down{color:var(--warn)}
+  .wr-tile ul{margin:8px 0 0;padding-left:16px;font-size:12.5px;color:var(--ink2)}
+  .wr-tile li{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wr-note{font-size:11.5px;color:var(--ink3);margin-top:8px;overflow-wrap:anywhere}
+  .wr-trend{margin-top:10px}
   #modes button[aria-pressed="true"]{color:#03100c;background:var(--teal);box-shadow:0 0 12px rgba(69,224,190,.45)}
 
   /* ---------- rail ---------- */
@@ -582,6 +606,11 @@
 </div>
 
 <div id="nudges" role="region" aria-label="Nudges" aria-live="polite"></div>
+<dialog id="review" aria-labelledby="wr-h">
+  <header><h2 id="wr-h" tabindex="-1" autofocus>WEEKLY REVIEW</h2><span id="wr-range"></span>
+    <button type="button" id="wr-close" aria-label="Close weekly review">×</button></header>
+  <div id="wr-body"></div>
+</dialog>
 <div id="app" data-mode="deck" data-view="deck">
   <header id="topbar">
     <div id="wordmark">ATL<b>A</b>S</div>
@@ -590,6 +619,7 @@
       <button type="button" data-mode="deck" aria-pressed="true" title="Flight deck: gauges, Day Line and full views">DECK</button>
       <button type="button" data-mode="hud" aria-pressed="false" title="Heads-up display: readouts on the window, no panels">HUD</button>
     </div>
+    <button type="button" id="weekbtn" title="Weekly review: tasks, training, recovery, inbox and the week ahead">WEEK</button>
     <div id="pills" aria-live="polite" aria-atomic="false">
       <span class="pill" id="pill-cal"><i></i>CALENDAR</span>
       <span class="pill" id="pill-gmail"><i></i>GMAIL</span>
@@ -3210,6 +3240,9 @@ function uiIntent(text){
     if (/^(yes|yeah|yep|yup|sure|ok|okay|please|book it|move it|do it|go ahead|go for it)\b/.test(q)){ runPlan(a, true); return true; }
     if (/^(no|nope|not now|skip|cancel|leave it|don'?t)\b/.test(q)){ speak("Okay, leaving it."); return true; }
   }
+  if (/^(?:(?:do|show|give me|run|open)(?: me)? )?(?:my |the |a )?(?:weekly review|week in review|review(?: of)? (?:my|the) week)$|^how (?:was|did) (?:my|the) week(?: go)?$/.test(q)){
+    openReview(); return true;
+  }
   const nz = q.match(/^(?:turn |switch )?(on|off) (?:the )?nudges$|^(?:turn |switch )?(?:the )?nudges (on|off)$/);
   if (nz){
     if ((nz[1] || nz[2]) === "on" ? !S.nudgesOn : S.nudgesOn) $("#nudgebtn").click();
@@ -3556,12 +3589,154 @@ function handleUtteranceClassic(text){
     else if (/\b(who are you|what are you|your name)\b/.test(q))
       reply = "I'm Atlas — your operations agent. I watch your calendar, inbox, tasks and training. I can capture and move tasks, block focus time, archive email, and read messages out loud.";
     else if (/\b(help|what can you do|commands)\b/.test(q))
-      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Plan my training. Debrief. Or undo. To move around: show my inbox, show my tasks, close, heads-up mode, or back to the deck.";
+      reply = "Try: brief me. What's next. Block time. How's my inbox. Read the latest email. Delete that email. What's due today. Push a task to tomorrow. How's training. Am I ready to train. Plan my training. Weekly review. Debrief. Or undo. To move around: show my inbox, show my tasks, close, heads-up mode, or back to the deck.";
     else
       reply = "Not sure I caught that. Say help for everything I can do — or try 'brief me'.";
     speak(reply);
   }, 350);
 }
+
+/* ================================================================
+   WEEKLY REVIEW
+   Monday → now, against last week up to the same point:
+     tasks closed · training · recovery trend · inbox load · the week ahead.
+   Fetched fresh when asked for (a week of mail and next week's calendar sit
+   outside the live watches), shown in a dialog and spoken as one paragraph.
+   Offered by nudge from Friday 4 pm; "weekly review" or WEEK any time.
+   ================================================================ */
+function weekBounds(){
+  const now = new Date(), dow = (now.getDay() + 6) % 7;
+  const mon = new Date(now); mon.setHours(0, 0, 0, 0); mon.setDate(now.getDate() - dow);
+  const lastMon = new Date(mon); lastMon.setDate(mon.getDate() - 7);
+  const lastSame = new Date(now); lastSame.setDate(now.getDate() - 7);
+  // "ahead": next Mon–Sun from Friday on, otherwise the rest of this week
+  const late = dow >= 4;
+  const aheadFrom = late ? new Date(mon.getTime() + 7 * 86400000) : new Date(now);
+  const aheadTo = new Date(mon.getTime() + (late ? 14 : 7) * 86400000);
+  return { now, mon, lastMon, lastSame, aheadFrom, aheadTo, late };
+}
+async function gatherReview(){
+  const mcp = MCP(); if (!mcp) return null;
+  const b = weekBounds();
+  const get = (server, tool, input) => mcp.callTool(server, tool, input, {cache:{staleTime:120000}})
+                                         .then(r => r.payload).catch(() => null);
+  const [done, mail, ahead] = await Promise.all([
+    get("Todoist", "find-completed-tasks", {since: dayKey(b.lastMon), until: todayKey()}),
+    get("Gmail", "search_threads", {query: "in:inbox newer_than:7d", pageSize: 50}),
+    get("Google Calendar", "list_events", {startTime: b.aheadFrom.toISOString(), endTime: b.aheadTo.toISOString(),
+                                           orderBy: "startTime", pageSize: 100}),
+  ]);
+  const R = { b };
+
+  if (done){
+    const at = t => new Date(t.completedAt || 0);
+    const tw = (done.tasks || []).filter(t => at(t) >= b.mon);
+    const lw = (done.tasks || []).filter(t => at(t) >= b.lastMon && at(t) <= b.lastSame);
+    const { overdue } = taskBuckets();
+    R.tasks = { n: tw.length, last: lw.length, top: tw.slice(0, 3).map(t => t.content), overdue: overdue.length };
+  }
+
+  const wm = whoopModel();
+  if (wm && (wm.week.n || wm.last.n)){
+    R.train = { src: "WHOOP", n: wm.week.n, min: wm.week.min, lastN: wm.last.n, lastMin: wm.last.min,
+                strain: wm.week.strain, lastStrain: wm.last.strain };
+  } else if (S.data.strava?.activities?.length){
+    const span = (a, z) => (S.data.strava.activities || []).filter(x => { const d = new Date(x.start_local); return d >= a && d <= z; });
+    const tw = span(b.mon, b.now), lw = span(b.lastMon, b.lastSame);
+    const mins = xs => Math.round(xs.reduce((t, x) => t + (x.summary?.moving_time || 0), 0) / 60);
+    R.train = { src: "Strava", n: tw.length, min: mins(tw), lastN: lw.length, lastMin: mins(lw) };
+  }
+
+  const recs = (S.data.whoop?.recoveries || []).filter(r => r.score_state === "SCORED" && r.recovery_score != null && r.wake_date);
+  if (recs.length){
+    const avg = xs => xs.length ? Math.round(xs.reduce((t, r) => t + r.recovery_score, 0) / xs.length) : null;
+    const tw = recs.filter(r => r.wake_date >= dayKey(b.mon));
+    const lw = recs.filter(r => r.wake_date >= dayKey(b.lastMon) && r.wake_date < dayKey(b.mon));
+    R.recovery = { avg: avg(tw), last: avg(lw), days: tw.slice().reverse(),
+                   green: tw.filter(r => r.recovery_score >= 67).length, red: tw.filter(r => r.recovery_score < 34).length };
+  }
+
+  if (mail){
+    const items = (mail.threads || []).map(t => { const m = t.messages?.[t.messages.length - 1] || {};
+      return { unread: (m.labelIds || []).includes("UNREAD"), important: (m.labelIds || []).includes("IMPORTANT") }; });
+    R.inbox = { n: items.length, unread: items.filter(i => i.unread).length,
+                important: items.filter(i => i.unread && i.important).length, capped: items.length >= 50 };
+  }
+
+  if (ahead){
+    const evs = (ahead.events || []).filter(e => e.start?.dateTime);
+    const hrs = evs.reduce((t, e) => t + (new Date(e.end.dateTime) - new Date(e.start.dateTime)) / 3600000, 0);
+    const byDay = {};
+    evs.forEach(e => { const k = dayKey(new Date(e.start.dateTime)); byDay[k] = (byDay[k] || 0) + 1; });
+    const busiest = Object.entries(byDay).sort((x, y) => y[1] - x[1])[0];
+    R.ahead = { n: evs.length, hrs: Math.round(hrs * 10) / 10, late: b.late,
+                busiest: busiest ? { day: shortDay(busiest[0]), n: busiest[1] } : null,
+                first: evs[0] ? { title: evs[0].summary || "(untitled)", when: new Date(evs[0].start.dateTime) } : null };
+  }
+  return R;
+}
+const vsLast = (a, b, unit = "") => b == null ? "" : a === b ? "same as last week" : `${a > b ? "up" : "down"} from ${b}${unit} last week`;
+function reviewSpeech(R){
+  const s = [];
+  if (R.tasks) s.push(`You closed ${R.tasks.n} task${R.tasks.n === 1 ? "" : "s"} this week, ${vsLast(R.tasks.n, R.tasks.last)}${
+    R.tasks.overdue ? `, with ${R.tasks.overdue} still overdue` : ""}.`);
+  if (R.train) s.push(`Training: ${R.train.n} session${R.train.n === 1 ? "" : "s"}, ${(R.train.min / 60).toFixed(1)} hours — ${
+    R.train.n === R.train.lastN && R.train.min === R.train.lastMin ? "level with" : R.train.min >= R.train.lastMin ? "more than" : "less than"
+  } this point last week.`);
+  if (R.recovery?.avg != null) s.push(`Recovery averaged ${R.recovery.avg} percent${R.recovery.last != null
+    ? `, ${vsLast(R.recovery.avg, R.recovery.last, " percent")}` : ""}.`);
+  if (R.inbox) s.push(`Inbox: ${R.inbox.n}${R.inbox.capped ? " plus" : ""} threads in seven days, ${R.inbox.unread} unread${
+    R.inbox.important ? `, ${R.inbox.important} of them important` : ""}.`);
+  if (R.ahead) s.push(`${R.ahead.late ? "Next week" : "The rest of this week"}: ${R.ahead.n} event${R.ahead.n === 1 ? "" : "s"}, ${
+    R.ahead.hrs} hours${R.ahead.busiest && R.ahead.n > 2 ? `, busiest on ${R.ahead.busiest.day}` : ""}.`);
+  return s.length ? `Here's your week. ${s.join(" ")}` : "I couldn't pull enough to review the week — check the connectors.";
+}
+function reviewHtml(R){
+  const tile = (k, big, sub, extra = "") => `<section class="wr-tile"><h3>${k}</h3><div class="wr-big">${big}</div>
+    <div class="wr-sub">${sub}</div>${extra}</section>`;
+  const delta = (a, b) => b == null ? "" : `<em class="${a > b ? "up" : a < b ? "down" : ""}">${a === b ? "±0" : signed(a - b)} vs last wk</em>`;
+  let h = "";
+  h += R.tasks ? tile("TASKS CLOSED", R.tasks.n, `${delta(R.tasks.n, R.tasks.last)}${R.tasks.overdue ? ` · ${R.tasks.overdue} overdue` : ""}`,
+        R.tasks.top.length ? `<ul>${R.tasks.top.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : "")
+               : tile("TASKS CLOSED", "—", "Todoist unavailable");
+  h += R.train ? tile("TRAINING", `${R.train.n} <small>sessions</small>`,
+        `${fmtMin(R.train.min)} ${delta(R.train.min, R.train.lastMin).replace("vs", "min vs")}${R.train.strain != null ? ` · avg strain ${R.train.strain.toFixed(1)}` : ""}`,
+        `<div class="wr-note">${R.train.src} · last week by now: ${R.train.lastN} · ${fmtMin(R.train.lastMin)}</div>`)
+               : tile("TRAINING", "—", "No training data");
+  h += R.recovery?.avg != null ? tile("RECOVERY", `${R.recovery.avg}<small>% avg</small>`,
+        `${delta(R.recovery.avg, R.recovery.last)} · ${R.recovery.green} green · ${R.recovery.red} red`,
+        `<div class="rtrend wr-trend">${R.recovery.days.map(r => `<i class="band-${W_BAND(r.recovery_score).k}" style="height:${Math.max(r.recovery_score, 4)}%" title="${esc(shortDay(r.wake_date))}: ${r.recovery_score}%"></i>`).join("")}</div>`)
+               : tile("RECOVERY", "—", "Connect WHOOP for recovery");
+  h += R.inbox ? tile("INBOX · 7 DAYS", `${R.inbox.n}${R.inbox.capped ? "+" : ""} <small>threads</small>`,
+        `${R.inbox.unread} unread${R.inbox.important ? ` · ${R.inbox.important} important` : ""}`)
+               : tile("INBOX · 7 DAYS", "—", "Gmail unavailable");
+  h += R.ahead ? tile(R.ahead.late ? "NEXT WEEK" : "REST OF THE WEEK", `${R.ahead.n} <small>events</small>`,
+        `${R.ahead.hrs} h booked${R.ahead.busiest ? ` · busiest ${esc(R.ahead.busiest.day)} (${R.ahead.busiest.n})` : ""}`,
+        R.ahead.first ? `<div class="wr-note">First: ${esc(R.ahead.first.title)} · ${esc(R.ahead.first.when.toLocaleDateString([], {weekday:"short"}))} ${fmtT(R.ahead.first.when)}</div>` : "")
+               : tile("THE WEEK AHEAD", "—", "Calendar unavailable");
+  return h;
+}
+let reviewOpener = null;
+async function openReview(opts = {}){
+  const dlg = $("#review");
+  if (!MCP()){ speak("The weekly review needs your connectors — open me from claude.ai or the hosted site."); return; }
+  reviewOpener = document.activeElement;
+  const nid = `review:${dayKey(weekBounds().mon)}`;   // seen now: no nudge for it
+  nudgeOnce(nid); document.querySelector(`#nudges .nudge[data-id="${nid}"]`)?.remove();
+  $("#wr-range").textContent = (() => { const b = weekBounds();
+    return `${b.mon.toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"})} → today`; })();
+  $("#wr-body").innerHTML = `<div class="empty">Pulling the week together…</div>`;
+  if (!dlg.open) dlg.showModal();
+  Entity.mood = "thinking";
+  const R = await gatherReview();
+  if (!dlg.open) return;
+  $("#wr-body").innerHTML = reviewHtml(R);
+  if (opts.speak !== false) speak(reviewSpeech(R));
+}
+$("#weekbtn").addEventListener("click", () => openReview());
+$("#wr-close").addEventListener("click", () => $("#review").close());
+$("#review").addEventListener("close", () => reviewOpener?.focus?.({preventScroll:true}));
+$("#review").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
 /* ================================================================
    NUDGES
@@ -3617,6 +3792,11 @@ function collectNudges(){
       text: p1.length === 1 ? `Top priority still open: “${p1[0].content}”.`
                             : `${p1.length} top-priority tasks still open, starting with “${p1[0].content}”.`,
       act: { label: "OPEN TASKS", run: () => openView("todo") } });
+  }
+  if ((now.getDay() === 5 && now.getHours() >= 16) || now.getDay() === 6 || now.getDay() === 0){
+    out.push({ id: `review:${dayKey(weekBounds().mon)}`, kind: "WEEKLY REVIEW",
+      text: "Your weekly review is ready — tasks, training, recovery, inbox and next week.",
+      act: { label: "OPEN REVIEW", run: () => openReview() } });
   }
   const plan = whoopModel()?.today ? trainingPlan() : null;
   if (plan?.action?.kind === "move") out.push({ id: `plan:${tk}`, kind: "RECOVERY", warn: true,
