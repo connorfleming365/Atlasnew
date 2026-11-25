@@ -1,0 +1,29 @@
+name: tests
+
+# Every pull request, and every push to the production branch Vercel deploys.
+on:
+  pull_request:
+  push:
+    branches: [claude/ai-agent-dashboard-1eigpm]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # pinned: Playwright 1.56 has no Chromium build for newer Ubuntu images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Playwright is installed for the test run only, never added to
+      # package.json, so the Vercel deployment doesn't carry it.
+      - name: Install Playwright + Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run tests
+        run: npm test
