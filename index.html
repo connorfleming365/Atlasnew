@@ -3998,7 +3998,8 @@ const Orbit = (() => {
       if (s.a == null) s.a = target;
       // ease toward its slot so the ring re-spaces smoothly when tasks come and go
       let d = ((target - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-      if (!holding || s.state !== "orbit") s.a += d * Math.min(1, dt * 1.6);
+      const still = holding && (s.state === "orbit" || s.state === "entering");   // pointer over a planet: hold them all
+      if (!still) s.a += d * Math.min(1, dt * 1.6);
       let r = 1, op = 1, sc = 1, k = 0;
       if (s.state === "entering"){
         k = REDUCED ? 1 : Math.min(1, (t - s.t0) / 1.2);
@@ -4111,7 +4112,9 @@ const Orbit = (() => {
   /* ---- drag a planet: onto the character = done; onto the Day Line = block that time ---- */
   let drop = null;   // {core, ghost}
   function startDrag(e, id){
-    const s = sats.get(id); if (!s || s.state !== "orbit" || e.button > 0) return;
+    const s = sats.get(id); if (!s || e.button > 0) return;
+    if (s.state === "entering") s.state = "orbit";          // still drifting in: grabbing it lands it
+    if (s.state !== "orbit") return;
     const L = layer.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
     let moved = false;
     s.el.setPointerCapture?.(e.pointerId);
