@@ -371,13 +371,23 @@
   #orbit[hidden]{display:none}
   .sat{position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;pointer-events:auto;
        display:grid;place-items:center;will-change:transform,opacity;--c:var(--ink3)}
-  /* bright enough to stand out from the starfield: white-hot core, saturated body, coloured ring and halo */
-  .sat::before{content:"";width:15px;height:15px;border-radius:50%;
-               background:radial-gradient(circle at 38% 35%,#fff 0 22%,var(--c) 58%,color-mix(in srgb,var(--c) 70%,#000) 100%);
-               box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 45%,transparent),0 0 12px 2px var(--c),0 0 28px 6px color-mix(in srgb,var(--c) 45%,transparent)}
+  /* tiny planets: lit from the upper left, banded like gas giants, a thin atmosphere in the
+     priority colour so they still stand out from the stars; P1s carry a ring */
+  .sat::before{content:"";width:18px;height:18px;border-radius:50%;
+               background:
+                 radial-gradient(circle at 30% 28%,rgba(255,255,255,.9) 0 7%,rgba(255,255,255,0) 26%),
+                 radial-gradient(circle at 72% 76%,rgba(0,0,0,.62) 0 18%,rgba(0,0,0,0) 62%),
+                 repeating-linear-gradient(var(--band,-20deg),rgba(255,255,255,.16) 0 2px,rgba(0,0,0,.14) 2px 4.5px,rgba(255,255,255,0) 4.5px 6px),
+                 radial-gradient(circle at 38% 36%,color-mix(in srgb,var(--c) 55%,#fff) 0,var(--c) 48%,color-mix(in srgb,var(--c) 45%,#000) 100%);
+               box-shadow:inset -2px -3px 5px rgba(0,0,0,.45),0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent),
+                          0 0 10px 1px color-mix(in srgb,var(--c) 75%,transparent),0 0 24px 4px color-mix(in srgb,var(--c) 30%,transparent)}
+  .sat.p1::after{content:"";position:absolute;left:50%;top:50%;width:34px;height:9px;border-radius:50%;pointer-events:none;
+                 border:1.5px solid color-mix(in srgb,var(--c) 55%,#fff);opacity:.8;
+                 transform:translate(-50%,-50%) rotate(-22deg);box-shadow:0 0 6px color-mix(in srgb,var(--c) 50%,transparent)}
   .sat.p1{--c:#ff3b5c} .sat.p2{--c:#ffa41c} .sat.p3{--c:#2dffc9} .sat.p4{--c:#8ab4ff}
   .sat.od::before{animation:satpulse 1.4s ease-in-out infinite}
-  @keyframes satpulse{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 60%,transparent),0 0 18px 4px var(--c),0 0 40px 10px color-mix(in srgb,var(--c) 55%,transparent);transform:scale(1.2)}}
+  @keyframes satpulse{50%{box-shadow:inset -2px -3px 5px rgba(0,0,0,.45),0 0 0 2px color-mix(in srgb,var(--c) 70%,transparent),
+                                     0 0 16px 4px var(--c),0 0 36px 9px color-mix(in srgb,var(--c) 50%,transparent);transform:scale(1.15)}}
   .orbit-track{position:absolute;border-radius:50%;border:1px dashed rgba(69,224,190,.22);pointer-events:none;
                box-shadow:0 0 18px rgba(69,224,190,.06) inset}
   .orbit-track[hidden]{display:none}
@@ -3810,7 +3820,7 @@ function handleUtteranceClassic(text){
    in from outside the orbit. Reduced motion: a still ring, simple fades.
    ================================================================ */
 const Orbit = (() => {
-  const MAX = 12, PERIOD = 45;                  // seconds per lap
+  const MAX = 12, PERIOD = 90;                  // seconds per lap
   const TILT = -22 * Math.PI / 180;             // the ring rises to the right, like a planet's rings
   const CT = Math.cos(TILT), ST = Math.sin(TILT);
   const sats = new Map();                       // id → {el, slot, a, r, state, t0, task}
@@ -3851,6 +3861,8 @@ const Orbit = (() => {
       let s = sats.get(id);
       if (!s){
         const el = document.createElement("button"); el.type = "button"; el.className = "sat";
+        let hsh = 0; for (const ch of id) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
+        el.style.setProperty("--band", `${-40 + Math.abs(hsh) % 50}deg`);
         el.addEventListener("click", () => openCard(id));
         layer.appendChild(el);
         s = { el, a: null, r: 1.7, state: "entering", t0: t };
