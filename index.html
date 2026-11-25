@@ -3803,7 +3803,7 @@ async function planDay(){
   let out = null;
   if (ATLAS.hosted && BRAIN_ON()){
     try{
-      const r = await fetch("/api/plan", { method: "POST", credentials: "same-origin",
+      const r = await fetch("/api/ai/plan", { method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ now: hm(new Date()), weekday: new Date().toLocaleDateString([], { weekday: "long" }),
           tasks, gaps: gaps.map(([a, b]) => ({ start: hm(a), end: hm(b) })),
@@ -3928,7 +3928,7 @@ async function showTriageItem(){
   let sum = m.snip.slice(0, 140), action = null, reason = "";
   if (ATLAS.hosted && BRAIN_ON()){
     try{
-      const r = await fetch("/api/triage", { method: "POST", credentials: "same-origin",
+      const r = await fetch("/api/ai/triage", { method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId: m.threadId }) });
       const j = await r.json();
       if (!j.error){ sum = j.summary || sum; action = j.action; reason = j.reason || ""; }
@@ -3964,7 +3964,7 @@ async function triageAct(act, instruction){
       if (!instruction){ $("#tr-reply").hidden = false; $("#tr-say").focus(); return; }
       $("#tr-note").textContent = "Writing the draft…";
       if (ATLAS.hosted && BRAIN_ON()){
-        const r = await fetch("/api/triage", { method: "POST", credentials: "same-origin",
+        const r = await fetch("/api/ai/triage", { method: "POST", credentials: "same-origin",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ threadId: m.threadId, instruction, name: firstName() }) });
         const j = await r.json(); if (j.error) throw j.error;

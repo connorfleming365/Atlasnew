@@ -7,7 +7,7 @@ process.env.UPSTASH_REDIS_REST_TOKEN = "u";
 process.env.GOOGLE_CLIENT_ID = "g"; process.env.GOOGLE_CLIENT_SECRET = "g";
 process.env.TODOIST_CLIENT_ID = "t"; process.env.TODOIST_CLIENT_SECRET = "t";
 const { seal } = await import(new URL("../../lib/session.js", import.meta.url).href);
-const handler = (await import(new URL("../../api/launcher/action.js", import.meta.url).href)).default;
+const handler = (await import(new URL("../../lib/routes/launcher-action.js", import.meta.url).href)).default;
 
 const fails = [];
 const check = (name, ok, got) => { console.log((ok ? "PASS " : "FAIL ") + name + (ok ? "" : "  got: " + JSON.stringify(got))); if (!ok) fails.push(name); };

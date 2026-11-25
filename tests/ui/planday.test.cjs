@@ -19,14 +19,14 @@ async function setup(page, { ai }){
       ATLAS.hosted = true; ATLAS.status = { brain: { configured: true } };
       const real = window.fetch;
       window.fetch = async (url, opts) => {
-        if (String(url) === '/api/plan'){
+        if (String(url) === '/api/ai/plan'){
           const b = JSON.parse(opts.body); __api.push({ url, body: b });
           return new Response(JSON.stringify({ source: 'ai', summary: 'Two focus blocks this morning, admin after lunch.',
             blocks: [{ task_id: 'b', start: '10:00', end: '11:00', why: 'deep work early' },
                      { task_id: 'a', start: '14:00', end: '14:20', why: 'quick admin' }],
             unscheduled: [{ task_id: 'c', why: 'no room today' }] }));
         }
-        if (String(url) === '/api/triage'){
+        if (String(url) === '/api/ai/triage'){
           const b = JSON.parse(opts.body); __api.push({ url, body: b });
           return new Response(JSON.stringify(b.instruction ? { drafted: true, body: 'Thanks - Thursday works.' }
             : { summary: 'Asks you to confirm Thursday kickoff time.', action: 'reply', reason: 'needs your answer' }));
@@ -77,7 +77,7 @@ async function setup(page, { ai }){
   // ---- AI draft ----
   await setup(page, { ai: true });
   await page.click('#dl-plan'); await page.waitForTimeout(500);
-  const api = await page.evaluate(() => __api.find(a => a.url === '/api/plan'));
+  const api = await page.evaluate(() => __api.find(a => a.url === '/api/ai/plan'));
   check('AI: sends tasks, free gaps (HH:MM), busy events', api && api.body.tasks.length === 3 && api.body.gaps[0].start === '09:30'
         && api.body.events[0].title === 'Team sync', api?.body);
   const rows = await page.$$eval('#pl-body .pl-row', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
@@ -104,7 +104,7 @@ async function setup(page, { ai }){
         && /1 of 3/.test(await page.innerText('#tr-count')));
   check('concise AI summary + suggestion', /confirm Thursday kickoff/.test(await page.innerText('#tr-sum')) && /SUGGEST: REPLY/.test(await page.innerText('#tr-sug')));
   await say(page, 'reply saying Thursday at 10 works'); await page.waitForTimeout(300);
-  const dr = await page.evaluate(() => __api.filter(a => a.url === '/api/triage' && a.body.instruction));
+  const dr = await page.evaluate(() => __api.filter(a => a.url === '/api/ai/triage' && a.body.instruction));
   check('reply by voice → draft via Claude, never sent', dr.length === 1 && dr[0].body.instruction === 'thursday at 10 works' && dr[0].body.threadId === 't2aaaaaa', dr);
   check('moves to the next one', /2 of 3/.test(await page.innerText('#tr-count')), await page.innerText('#tr-count'));
   await page.click('#triage [data-act="archive"]'); await page.waitForTimeout(300);

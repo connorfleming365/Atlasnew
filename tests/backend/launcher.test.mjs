@@ -3,7 +3,7 @@
 // section empty.
 process.env.SESSION_SECRET = "test-secret-for-unit-tests-only";
 process.env.LAUNCHER_API_KEY = "launch-key";
-const mod = await import(new URL("../../api/launcher/summary.js", import.meta.url).href);
+const mod = await import(new URL("../../lib/routes/launcher-summary.js", import.meta.url).href);
 const { buildSummary } = mod;
 
 const fails = [];
@@ -62,8 +62,11 @@ check("no score today: score null, last score kept", s.readiness.score === null 
 // one provider failing leaves the rest
 s = await buildSummary({ tokens, ...args, run: fake({ "Gmail/search_threads": () => { throw new Error("boom"); } }) });
 check("Gmail failing → inbox null, everything else present", s.inbox === null && s.todayEvents.length === 2 && s.readiness.score === 28, s);
+check("a failing section is named in failed[]", s.failed.includes("gmail") && s.failed.length === 1, s.failed);
+check("links: which accounts the phone can reach", s.links.google && s.links.whoop && s.links.strava && s.links.todoist, s.links);
 s = await buildSummary({ tokens: {}, ...args, run: fake() });
 check("nothing connected → empty, never throws", s.todayEvents.length === 0 && s.inbox === null && s.training === null, s);
+check("nothing connected → links all false (tile says reconnect)", Object.values(s.links).every(v => v === false), s.links);
 
 // handler: auth and day bounds
 const res = () => { const r = { headers: {}, code: 200, body: null };
