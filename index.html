@@ -71,7 +71,7 @@
   #wordmark b{color:var(--teal);font-weight:600}
   #clock{font-family:var(--mono);font-size:12.5px;color:var(--ink2);letter-spacing:.08em}
   #pills{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-  .pill{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;
+  .pill{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;
         letter-spacing:.1em;color:var(--ink2);border:1px solid var(--line);
         border-radius:999px;padding:4px 10px;background:var(--bg1)}
   .pill i{width:7px;height:7px;border-radius:50%;background:var(--ink3);flex:none}
@@ -84,7 +84,7 @@
           border-radius:10px;padding:10px 14px;display:flex;gap:12px;align-items:center;
           font-size:13.5px;color:var(--ink2)}
   .banner button{color:var(--teal);font-family:var(--mono);font-size:12px;letter-spacing:.08em}
-  .banner a.connect{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--teal);
+  .banner a.connect{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--teal);
     border:1px solid rgba(69,224,190,.35);border-radius:999px;padding:5px 11px;text-decoration:none;
     white-space:nowrap}
   .banner a.connect:hover{background:rgba(69,224,190,.1)}
@@ -96,8 +96,8 @@
                 border-bottom:1px solid var(--line)}
   .panel h2{margin:0;font-family:var(--mono);font-size:11px;font-weight:600;
             letter-spacing:.22em;color:var(--ink)}
-  .panel .src{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--ink3)}
-  .panel .upd{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+  .panel .src{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--ink3)}
+  .panel .upd{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink3)}
   .panel .body{padding:10px 14px 12px;overflow-y:auto;min-height:0;flex:1}
   .empty{color:var(--ink3);font-size:13px;padding:14px 2px}
   .degraded{display:flex;gap:10px;align-items:flex-start;padding:12px 2px;color:var(--ink2);font-size:13px}
@@ -113,11 +113,11 @@
   .ev.next .name{color:var(--teal)}
   .ev.next .t{color:var(--teal)}
   .ev.past{opacity:.42}
-  .chip{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  .chip{display:inline-block;font-family:var(--mono);font-size:12px;letter-spacing:.08em;
         border:1px solid var(--line2);border-radius:999px;padding:1px 8px;color:var(--ink2);
         margin-left:6px;vertical-align:1px}
   .chip.now{color:var(--teal);border-color:rgba(69,224,190,.4)}
-  .daylabel{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink3);
+  .daylabel{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--ink3);
             padding:10px 0 4px}
 
   /* tasks */
@@ -129,9 +129,9 @@
   .task.done{opacity:.35}
   .task.done .tick{background:var(--teal);border-color:var(--teal)}
   .task .c{font-size:13.5px;min-width:0}
-  .task .meta{font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+  .task .meta{font-family:var(--mono);font-size:12px;color:var(--ink3)}
   .task .meta .od{color:var(--serious)}
-  .pri{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;border-radius:4px;
+  .pri{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;border-radius:4px;
        padding:0 5px;margin-right:6px;vertical-align:1px}
   .pri.p1{color:var(--crit);border:1px solid rgba(208,59,59,.5)}
   .pri.p2{color:var(--serious);border:1px solid rgba(236,131,90,.5)}
@@ -147,13 +147,13 @@
   /* inbox */
   .mailstat{display:flex;gap:16px;padding:4px 0 10px}
   .mailstat .n{font-size:22px;font-weight:600}
-  .mailstat .l{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink3)}
+  .mailstat .l{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--ink3)}
   .mail{padding:7px 0;border-bottom:1px solid var(--line);min-width:0}
   .mail:last-child{border-bottom:none}
   .mail .row1{display:flex;gap:8px;align-items:baseline}
   .mail .from{font-family:var(--mono);font-size:11px;color:var(--ink2);
               overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mail .when{margin-left:auto;flex:none;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+  .mail .when{margin-left:auto;flex:none;font-family:var(--mono);font-size:12px;color:var(--ink3)}
   .mail .subj{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mail .snip{font-size:12px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mail.unread .subj{color:var(--ink)}
@@ -168,7 +168,7 @@
   .stat:hover{transform:translateY(-2px);border-color:var(--line2)}
   .stat .n{font-size:19px;font-weight:600}
   .stat .n small{font-size:11px;color:var(--ink2);font-weight:400}
-  .stat .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--ink3)}
+  .stat .l{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--ink3)}
   .chart{display:flex;align-items:flex-end;gap:3px;height:74px;padding:2px 0 0}
   .bar{flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;
        align-items:center;gap:3px;height:100%}
@@ -179,9 +179,9 @@
   .bar.hot i{background:linear-gradient(180deg,#7df5db,#1f9e86);
              box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 14px rgba(69,224,190,.45)}
   .bar.zero i{background:var(--line2);height:2px;box-shadow:none}
-  .bar .v{font-family:var(--mono);font-size:9px;color:var(--ink2)}
+  .bar .v{font-family:var(--mono);font-size:11px;color:var(--ink2)}
   .xlab{display:flex;gap:3px;padding-top:4px;border-top:1px solid var(--line);margin-top:4px}
-  .xlab span{flex:1;text-align:center;font-family:var(--mono);font-size:9px;color:var(--ink3)}
+  .xlab span{flex:1;text-align:center;font-family:var(--mono);font-size:11px;color:var(--ink3)}
   .lastact{padding-top:10px;font-size:12.5px;color:var(--ink2)}
   .lastact b{color:var(--ink);font-weight:600}
 
@@ -197,7 +197,7 @@
              border-bottom-left-radius:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
   .msg.user{align-self:flex-end;background:rgba(14,46,44,.72);
             border:1px solid rgba(69,224,190,.3);border-bottom-right-radius:4px}
-  .msg .who{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--ink3);
+  .msg .who{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--ink3);
             display:block;padding-bottom:2px}
   .msg.atlas .who{color:var(--teal-dim)}
   #interim{align-self:flex-end;color:var(--ink3);font-size:13px;font-style:italic;padding:0 6px}
@@ -218,7 +218,7 @@
        color:var(--ink);font:14px var(--sans);padding:13px 18px}
   #say::placeholder{color:var(--ink3)}
   #say:focus{border-color:rgba(69,224,190,.4)}
-  .dockbtn{flex:none;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  .dockbtn{flex:none;font-family:var(--mono);font-size:12px;letter-spacing:.12em;
            color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:8px 12px}
   .dockbtn.on{color:var(--teal);border-color:rgba(69,224,190,.4)}
   .dockbtn.off,#mic.off{opacity:.4}
@@ -230,7 +230,7 @@
          border:1px solid var(--line);border-left:3px solid var(--teal);color:var(--ink);font-size:13px;
          box-shadow:0 10px 30px rgba(0,0,0,.35);animation:nudgein .25s ease-out}
   .nudge.warn{border-left-color:var(--serious)}
-  .nudge .nk{grid-column:1/-1;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--ink3)}
+  .nudge .nk{grid-column:1/-1;font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;color:var(--ink3)}
   .nudge p{margin:0;min-width:0;overflow-wrap:anywhere}
   .nudge .nx{color:var(--ink3);font-size:16px;line-height:1;padding:2px 4px}
   .nudge .actchip{grid-column:1/-1;justify-self:start}
@@ -238,15 +238,15 @@
   @media (prefers-reduced-motion:reduce){.nudge{animation:none}}
   @media (max-width:660px){#nudges{top:10px;right:16px;left:16px;width:auto}}
   #voicesel{flex:none;appearance:none;-webkit-appearance:none;font-family:var(--mono);
-            font-size:10px;letter-spacing:.06em;color:var(--ink3);background:var(--bg1);
+            font-size:12px;letter-spacing:.06em;color:var(--ink3);background:var(--bg1);
             border:1px solid var(--line);border-radius:999px;padding:8px 22px 8px 12px;
-            max-width:118px;text-overflow:ellipsis}
+            max-width:150px;text-overflow:ellipsis}
   #voicesel:hover{border-color:rgba(69,224,190,.4)}
   #voicesel option{background:var(--solid);color:var(--ink)}
   #mic.off svg{fill:var(--ink3)}
   #mic.off::before{content:"";position:absolute;left:14px;right:14px;top:50%;height:1.5px;
     background:var(--ink3);transform:rotate(-35deg);border-radius:2px}
-  #hint{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  #hint{text-align:center;font-family:var(--mono);font-size:12px;letter-spacing:.1em;
         color:var(--ink2);padding:8px 0 0;text-shadow:0 1px 8px rgba(0,0,0,.9)}
   #micnote{display:none;margin:8px 6px 0;padding:8px 12px;border-radius:10px;font-size:12.5px;
            background:var(--bg2);border:1px solid var(--line2);color:var(--ink2)}
@@ -275,7 +275,7 @@
   .ev,.mail,.task .c,.lastact,.bar{cursor:pointer}
   .acts{display:none;gap:8px;padding:6px 0 2px;flex-wrap:wrap}
   .mail.open .acts,.task.open .acts{display:flex}
-  .actchip{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--teal);
+  .actchip{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--teal);
            border:1px solid rgba(69,224,190,.35);border-radius:999px;padding:3px 10px}
   .actchip:hover{background:rgba(69,224,190,.08)}
   .actchip.warn{color:var(--serious);border-color:rgba(236,131,90,.4)}
@@ -283,18 +283,18 @@
   .actchip.crit:hover{background:rgba(208,59,59,.1)}
   .actchip.crit[data-confirm]{background:rgba(208,59,59,.16);color:#ff8a89}
   details.fold{margin-top:6px}
-  details.fold summary{font-family:var(--mono);font-size:10px;letter-spacing:.18em;
+  details.fold summary{font-family:var(--mono);font-size:12px;letter-spacing:.18em;
     color:var(--ink3);cursor:pointer;padding:6px 0;list-style:none}
   details.fold summary::-webkit-details-marker{display:none}
   details.fold summary::before{content:"▸ "}
   details.fold[open] summary::before{content:"▾ "}
   .readiness{font-size:12.5px;color:var(--ink2);padding-top:8px;border-top:1px solid var(--line);margin-top:10px}
   .readiness b{color:var(--teal);font-weight:600}
-  .streak{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;margin-left:auto}
+  .streak{font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.1em;margin-left:auto}
 
   /* ---------- layout toggle (top bar) ---------- */
   #modes{display:flex;gap:2px;padding:2px;border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
-  #modes button{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);
+  #modes button{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--ink2);
                 padding:4px 12px;border-radius:999px;transition:background .2s,color .2s}
   #modes button:hover{color:var(--ink)}
   #lock{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:16px;
@@ -334,17 +334,17 @@
   @media (min-width:1081px){ #plan,#triage{top:196px;max-height:calc(100dvh - 330px)} }   /* below the Day Line */
   .pl-x{min-width:0;display:flex;flex-direction:column}
   .pl-x b{font-weight:500;font-size:13.5px;overflow-wrap:anywhere} .pl-x em{font-style:normal;font-size:11.5px;color:var(--ink3)}
-  .pl-un{margin-top:6px;font-size:12.5px;color:var(--ink2)} .pl-un span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--ink3);margin-bottom:4px}
+  .pl-un{margin-top:6px;font-size:12.5px;color:var(--ink2)} .pl-un span{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;color:var(--ink3);margin-bottom:4px}
   .pl-un em{font-style:normal;color:var(--ink3)}
   #dl-plan{align-self:flex-start;margin-top:4px}
   .dl-prop{position:absolute;top:18px;height:20px;border-radius:7px;border:1px dashed var(--peri);
            background:repeating-linear-gradient(135deg,rgba(139,147,255,.28) 0 6px,rgba(139,147,255,.12) 6px 12px);
-           cursor:pointer;z-index:2;font-size:10px;color:#dfe2ff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 4px;line-height:18px}
+           cursor:pointer;z-index:2;font-size:11px;color:#dfe2ff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 4px;line-height:18px}
   .dl-prop.trn{border-color:var(--teal);background:repeating-linear-gradient(135deg,rgba(69,224,190,.3) 0 6px,rgba(69,224,190,.12) 6px 12px)}
   #tr-card{padding:8px 18px 10px;display:grid;gap:6px}
   #tr-from{font-size:12px;color:var(--ink2)} #tr-subj{font-size:16px;font-weight:600;overflow-wrap:anywhere}
   #tr-sum{margin:4px 0 0;font-size:14px;line-height:1.5;padding:10px 12px;border-radius:10px;background:var(--bg1);border-left:3px solid var(--teal)}
-  #tr-sug{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--ink3)}
+  #tr-sug{font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--ink3)}
   #triage [data-act].sug{background:rgba(69,224,190,.16);border-color:var(--teal)}
   #tr-reply{display:flex;gap:8px} #tr-reply[hidden]{display:none}
   #tr-say{flex:1;min-width:0;font:14px var(--sans);color:var(--ink);background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:9px 12px}
@@ -360,7 +360,7 @@
   .ac-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:10px 12px;
           border-radius:12px;background:var(--bg1);border:1px solid var(--line)}
   .ac-name b{display:block;font-size:14px;font-weight:600} .ac-name span{font-size:12px;color:var(--ink3)}
-  .ac-state{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.08em}
+  .ac-state{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;font-family:var(--mono);font-size:12px;letter-spacing:.08em}
   .ac-state i{font-style:normal;padding:3px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--ink2)}
   .ac-state i.ok{color:var(--teal);border-color:rgba(69,224,190,.45)} .ac-state i.bad{color:var(--serious);border-color:rgba(236,131,90,.45)}
   .ac-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
@@ -393,7 +393,7 @@
   .orbit-track[hidden]{display:none}
   .sat:hover::before,.sat:focus-visible::before{transform:scale(1.35)}
   .sat:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
-  .sat.more{width:auto;height:auto;padding:3px 8px;border-radius:999px;font-family:var(--mono);font-size:10px;color:var(--ink2);
+  .sat.more{width:auto;height:auto;padding:3px 8px;border-radius:999px;font-family:var(--mono);font-size:11px;color:var(--ink2);
             background:rgba(7,13,23,.7);border:1px solid var(--line2)}
   .sat.more::before{display:none}
   .sat-card{position:absolute;left:0;top:0;z-index:5;pointer-events:auto;width:min(240px,80vw);padding:10px 12px;border-radius:12px;
@@ -408,7 +408,7 @@
   .drop-core.hot{border-color:var(--teal);box-shadow:0 0 30px rgba(69,224,190,.45),inset 0 0 30px rgba(69,224,190,.25)}
   #dayline.drop-ok{box-shadow:0 0 0 1px rgba(69,224,190,.55),0 0 24px rgba(69,224,190,.2)}
   .dl-ghost{position:absolute;top:18px;height:20px;border-radius:7px;background:rgba(69,224,190,.35);border:1px solid var(--teal);
-            font:600 10px var(--mono);color:#e9fffa;display:grid;place-items:center;white-space:nowrap;overflow:visible;z-index:3;min-width:28px}
+            font:600 11px var(--mono);color:#e9fffa;display:grid;place-items:center;white-space:nowrap;overflow:visible;z-index:3;min-width:28px}
   .dl-ghost[hidden]{display:none}
   /* the next meeting, as a moon */
   .moon{position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
@@ -428,7 +428,7 @@
   .moon:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
   .sat-card .sc-when{font-size:11.5px;color:var(--ink2)} .sat-card .sc-loc{font-size:12px;color:var(--ink3)}
   @media (prefers-reduced-motion:reduce){ .moon.soon::before{animation:none} }
-  #weekbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
+  #weekbtn{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
            border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
   #weekbtn:hover{color:var(--ink);border-color:rgba(69,224,190,.4)}
   #review{width:min(860px,calc(100vw - 32px));max-height:calc(100dvh - 48px);overflow:auto;padding:0;
@@ -443,7 +443,7 @@
   #wr-close:hover{color:var(--ink)}
   #wr-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:10px 18px 18px}
   .wr-tile{background:var(--bg1);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
-  .wr-tile h3{margin:0 0 6px;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--ink3);font-weight:500}
+  .wr-tile h3{margin:0 0 6px;font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;color:var(--ink3);font-weight:500}
   .wr-big{font-size:28px;font-weight:600;line-height:1.1}
   .wr-big small{font-size:12px;font-weight:400;color:var(--ink2);margin-left:4px}
   .wr-sub{font-size:12.5px;color:var(--ink2);margin-top:4px;overflow-wrap:anywhere}
@@ -464,14 +464,14 @@
   #rail svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .rail-sep{width:22px;height:1px;background:var(--line2);margin:2px 0}
   .badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;
-         background:var(--teal);color:#03100c;font:700 9.5px/16px var(--mono);text-align:center}
+         background:var(--teal);color:#03100c;font:700 10.5px/16px var(--mono);text-align:center}
   .badge.crit{background:var(--serious);color:#1d0904}
 
   /* ---------- Day Line: today on one strip ---------- */
   #dayline{display:grid;grid-template-columns:minmax(150px,190px) minmax(0,1fr);gap:12px;align-items:center;
            padding:10px 16px 6px;border-radius:16px}
   .dl-sum{display:flex;flex-direction:column;gap:2px;min-width:0}
-  .dl-lab{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--ink3)}
+  .dl-lab{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--ink3)}
   .dl-head{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dl-sub{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dl-scroll{overflow-x:auto;overflow-y:hidden;min-width:0;scrollbar-width:thin}
@@ -484,16 +484,16 @@
   .dl-ev.cur{border-color:var(--teal);box-shadow:0 0 10px rgba(69,224,190,.5)}
   .dl-ev.past,.dl-lbl.past,.dl-pin.past{opacity:.42}
   .dl-free{position:absolute;top:18px;height:20px;border:1px dashed rgba(69,224,190,.7);border-radius:7px;
-           background:rgba(69,224,190,.07);font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.08em;
+           background:rgba(69,224,190,.07);font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.08em;
            color:var(--teal);text-transform:uppercase;display:grid;place-items:center;overflow:hidden;white-space:nowrap}
   button.dl-free{cursor:pointer}
   button.dl-free:hover{background:rgba(69,224,190,.2)}
   .dl-axis{position:absolute;left:0;right:0;top:46px;height:1px;background:rgba(255,255,255,.2)}
-  .dl-hr{position:absolute;top:50px;font-family:var(--mono);font-size:10px;color:var(--ink3);transform:translateX(-50%)}
+  .dl-hr{position:absolute;top:50px;font-family:var(--mono);font-size:12px;color:var(--ink3);transform:translateX(-50%)}
   .dl-now{position:absolute;top:0;bottom:20px;width:2px;margin-left:-1px;background:var(--teal);
           box-shadow:0 0 8px var(--teal);pointer-events:none}
   /* the label rides on the axis, clear of the event names above it */
-  .dl-now b{position:absolute;top:45px;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:9px;
+  .dl-now b{position:absolute;top:45px;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:10.5px;
             line-height:12px;letter-spacing:.1em;color:#03100c;background:var(--teal);padding:0 5px;border-radius:99px;
             box-shadow:0 0 8px rgba(69,224,190,.6)}
   .dl-pin{position:absolute;top:66px;font-size:11px;color:var(--ink2);display:flex;gap:5px;align-items:center;
@@ -516,7 +516,7 @@
   .gauge:hover{border-color:rgba(69,224,190,.55)}
   .gauge::after{content:"↗";position:absolute;top:9px;right:12px;font-size:12px;color:var(--ink3)}
   .gauge:hover::after{color:var(--teal)}
-  .gl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.2em;color:var(--ink3);text-transform:uppercase}
+  .gl{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.2em;color:var(--ink3);text-transform:uppercase}
   .gv{font-size:28px;line-height:1.05;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
       text-overflow:ellipsis;max-width:100%}
   .gv small{font-size:12px;font-weight:400;color:var(--ink2);margin-left:5px}
@@ -554,9 +554,9 @@
                       conic-gradient(var(--band) calc(var(--p)*1%),rgba(255,255,255,.08) 0);
            box-shadow:0 0 22px color-mix(in srgb,var(--band) 30%,transparent)}
   .rd-ring b{font-size:26px;font-weight:600;line-height:1;color:var(--ink)}
-  .rd-ring span{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--band);text-transform:uppercase;margin-top:3px}
+  .rd-ring span{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;color:var(--band);text-transform:uppercase;margin-top:3px}
   .rd-facts{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
-  .rd-lab{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink3)}
+  .rd-lab{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--ink3)}
   .rd-row{display:grid;grid-template-columns:86px auto minmax(0,1fr);gap:10px;align-items:baseline;font-size:13px}
   .rd-row span{color:var(--ink2)}
   .rd-row b{font-weight:600;white-space:nowrap}
@@ -570,11 +570,11 @@
   .rd-plan span{min-width:0;overflow-wrap:anywhere}
   .rtrend{display:flex;align-items:flex-end;gap:3px;height:34px}
   .rtrend i{flex:1;border-radius:3px 3px 1px 1px;background:var(--band);opacity:.8;min-height:3px}
-  .stat .vs{font-size:10.5px;color:var(--ink3);padding-top:2px}
+  .stat .vs{font-size:12px;color:var(--ink3);padding-top:2px}
   .zbar{display:flex;height:10px;border-radius:99px;overflow:hidden;margin:4px 0 6px;background:var(--bg1)}
   .zbar i{display:block}
   .z1{background:#5b8ff9} .z2{background:#45e0be} .z3{background:#e8d44d} .z4{background:#f39a4a} .z5{background:#ec5a5a}
-  .zleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:10.5px;color:var(--ink2);padding-bottom:8px}
+  .zleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:12px;color:var(--ink2);padding-bottom:8px}
   .zleg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
   .wsports{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink2);padding-bottom:6px}
   .wsports b{color:var(--ink);font-weight:500;text-transform:capitalize}
@@ -605,7 +605,7 @@
               background:radial-gradient(closest-side,rgba(2,4,10,.6),rgba(2,4,10,0))}
   .ro-tl{left:max(44px,4.5vw);top:104px} .ro-tr{right:max(44px,4.5vw);top:104px;text-align:right}
   .ro-bl{left:max(44px,4.5vw);bottom:260px} .ro-br{right:max(44px,4.5vw);bottom:260px;text-align:right}
-  .ro .k{font-size:10.5px;letter-spacing:.2em;color:var(--teal)}
+  .ro .k{font-size:12px;letter-spacing:.2em;color:var(--teal)}
   .ro .v{font-size:19px;font-weight:600;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ro .t{font-size:26px;font-weight:600;color:var(--teal);letter-spacing:.04em}
   .ro .row{font-size:12px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -685,6 +685,16 @@
     #boot{background:var(--bg0);-webkit-backdrop-filter:none;backdrop-filter:none}
   }
 
+  /* ---------- assessment pass: one account light on phones, bigger targets, dock options ---------- */
+  #pill-sum{display:none}
+  .dock-opts{display:contents}
+  #modes button{min-height:32px}
+  .actchip{min-height:32px}
+  #micnote button{min-height:30px}
+  #micnote .mn-x{float:right;margin:-4px -6px 0 8px;width:30px;height:30px;font-size:18px;color:var(--ink3);background:none;border:0;cursor:pointer}
+  #micnote .mn-x:hover{color:var(--ink)}
+  .dl-empty .dl-fix{pointer-events:auto}
+
   /* ---------- breakpoints (last, so they override the component rules) ---------- */
   @media (max-width:1080px){
     body{overflow:auto}
@@ -714,19 +724,38 @@
     #app{grid-template-areas:"top" "rail" "line" "mid"}
     #app.viewing{grid-template-areas:"top" "rail" "line" "view" "mid"}
     #app[data-mode="hud"]{grid-template-areas:"top" "mid" "hud"}
-    #topbar{flex-wrap:wrap;gap:8px 14px}
-    #pills{margin-left:0}
-    #dock{flex-wrap:wrap}
-    #say{min-width:0;flex:1 1 calc(100% - 64px)}   /* mic + ask on one row, toggles below */
+    /* one row: wordmark, time, DECK/HUD and a single account light */
+    #topbar{flex-wrap:nowrap;gap:8px;padding:8px 10px}
+    #wordmark{letter-spacing:.24em;font-size:14px}
+    #clock{white-space:nowrap;font-size:12px;letter-spacing:.02em}
+    #clock .cd{display:none}
+    #modes button{padding:6px 10px;letter-spacing:.1em}
+    #pill-sum{padding:4px 8px;letter-spacing:.06em}
+    #pills{margin-left:auto;flex-wrap:nowrap}
+    #pills .pill{display:none}
+    #pills #pill-sum{display:flex;white-space:nowrap}
+    /* the talk bar stays on screen while the page scrolls */
+    #dock{flex-wrap:wrap;position:sticky;bottom:0;z-index:6;gap:8px;padding:10px 8px calc(10px + env(safe-area-inset-bottom));
+          background:linear-gradient(to bottom,rgba(3,5,11,0),rgba(3,5,11,.92) 26%)}
+    #say{min-width:0;flex:1 1 calc(100% - 64px)}   /* mic + ask on one row, options below */
+    #mic{width:46px;height:46px}
+    .dock-opts{display:flex;gap:8px;width:100%;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}
+    .dock-opts::-webkit-scrollbar{display:none}
     #rail{flex-direction:row;justify-content:space-around;width:auto;padding:6px 8px}
     .rail-sep{width:1px;height:22px;margin:0}
     #dayline{grid-template-columns:minmax(0,1fr)}
+    /* the whole day fits the phone's width - no sideways scrolling */
+    .dl-track{min-width:0;margin:0 12px}
     #deck{grid-template-columns:repeat(2,minmax(0,1fr))}
     .gauge:nth-child(n){rotate:none;translate:none}
     #app[data-mode="hud"] #hud{grid-template-columns:minmax(0,1fr)}
     /* ring above the figures so each baseline comparison gets the full width */
     .rd{flex-direction:column;align-items:flex-start}
     .rd-facts{width:100%}
+  }
+  @media (max-width:380px){
+    #pill-sum-t{display:none}                 /* the light alone; tap it for Accounts */
+    #pills #pill-sum{min-width:32px;min-height:32px;justify-content:center;padding:0}
   }
 </style>
 
@@ -786,8 +815,8 @@
       <button type="button" data-mode="deck" aria-pressed="true" title="Flight deck: gauges, Day Line and full views">DECK</button>
       <button type="button" data-mode="hud" aria-pressed="false" title="Heads-up display: readouts on the window, no panels">HUD</button>
     </div>
-    <button type="button" id="weekbtn" title="Weekly review: tasks, training, recovery, inbox and the week ahead">WEEK</button>
     <div id="pills" aria-live="polite" aria-atomic="false" title="Accounts: reconnect or disconnect">
+      <span class="pill" id="pill-sum"><i></i><span id="pill-sum-t">LINKING</span></span>
       <span class="pill" id="pill-cal"><i></i>CALENDAR</span>
       <span class="pill" id="pill-gmail"><i></i>GMAIL</span>
       <span class="pill" id="pill-todo"><i></i>TODOIST</span>
@@ -808,6 +837,9 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4.5 7 7.5 6 7.5-6"/></svg><b class="badge" id="rb-gmail" hidden></b></button>
     <button type="button" data-view="strava" aria-label="Training" title="Training" aria-controls="p-strava">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12.5h4l2.5-6 5 12 2.5-6H21"/></svg></button>
+    <span class="rail-sep" aria-hidden="true"></span>
+    <button type="button" id="weekbtn" aria-label="Weekly review" title="Weekly review: tasks, training, recovery, inbox and the week ahead">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M8 16.5v-2.5M12 16.5v-4M16 16.5v-1.5"/></svg></button>
   </nav>
 
   <section id="dayline" aria-labelledby="dl-head">
@@ -875,11 +907,13 @@
       </button>
       <input id="say" placeholder="Ask Atlas anything…" aria-label="Ask Atlas"
              autocomplete="off">
-      <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
-      <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
-      <select id="voicesel" title="Which voice Atlas speaks with"><option value="">Auto</option></select>
-      <button class="dockbtn on" id="nudgebtn" title="Nudges: heads-ups before meetings and deadlines, and for important mail">NUDGES</button>
+      <div class="dock-opts">
+      <button class="dockbtn on" id="voicebtn" title="Spoken replies: Atlas reads its answers aloud">READ ALOUD</button>
+      <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">HANDS-FREE</button>
+      <select id="voicesel" title="Which voice Atlas speaks with"><option value="">Voice: auto</option></select>
+      <button class="dockbtn on" id="nudgebtn" title="Alerts: heads-ups before meetings and deadlines, and for important mail">ALERTS</button>
       <button class="dockbtn" id="memorybtn" title="Notes Atlas always remembers">MEMORY</button>
+      </div>
     </div>
     <div id="memorypanel" role="dialog" aria-label="Standing notes for Atlas">
       <textarea id="memorytext" rows="3"
@@ -1420,12 +1454,13 @@ const ENV = {
   ttsProbe: "not tried",
 };
 
-function micNote(html){
+function micNote(html, forgetKey){
   const el = $("#micnote");
   if (!html){ el.classList.remove("show"); el.innerHTML=""; return; }
-  el.innerHTML = html + ` <button data-diag>WHY?</button>`;
+  el.innerHTML = html + ` <button data-diag>WHY?</button><button type="button" class="mn-x" aria-label="Dismiss" title="Dismiss">×</button>`;
   el.classList.add("show");
   el.querySelector("[data-diag]")?.addEventListener("click", showDiagnostics);
+  el.querySelector(".mn-x").addEventListener("click", () => { if (forgetKey) store.set(forgetKey, true); micNote(""); });
 }
 function showDiagnostics(){
   const rows = [
@@ -1786,7 +1821,7 @@ function populateVoiceSelect(vs){
   if (!sel) return;
   const chosen = store.get("voiceName", null);
   const en = vs.filter(v=>/^en/i.test(v.lang)), rest = vs.filter(v=>!/^en/i.test(v.lang));
-  let html = '<option value="">Auto</option>';
+  let html = '<option value="">Voice: auto</option>';
   if (cloudVoices.length)
     html += '<optgroup label="Cloud">' + cloudVoices
       .map(v=>`<option value="cloud:${esc(v.id)}">☁ ${esc(v.name)}</option>`).join("") + '</optgroup>';
@@ -1872,13 +1907,13 @@ hostedReady.then(hosted => { if (hosted) loadSyncedSettings(); });
 let ttsReported = false;
 function ttsFailed(why){
   ENV.ttsProbe = "blocked (" + why + ")";
-  if (ttsReported) return;
+  if (ttsReported || store.get("ttsNoteDismissed")) return;
   ttsReported = true;
   micNote(ENV.framed
     ? `<b>Spoken replies are switched off by the page hosting this one.</b> The embedding frame doesn't allow speech output, so Atlas will answer in text instead. Every panel and command still works.`
     : `<b>Spoken replies aren't playing</b> — the browser refused speech output${
         ENV.hasTTS && !speechSynthesis.getVoices().length ? ", and no system voices are installed" : ""
-      }. Atlas will answer in text.`);
+      }. Atlas will answer in text.`, "ttsNoteDismissed");
 }
 /* speak() — a new command reply, cuts off whatever Atlas was already
    saying (the normal "you spoke, it answers" override).
@@ -2284,8 +2319,19 @@ function setMeta(key, patch){
     ? `${SERVERS[key]}: ${m.detail}`
     : s==="stale" ? `${SERVERS[key]}: showing last good data, retrying automatically` : "";
   renderUpdated(key);
+  updatePillSum();
   checkPageCondition();
   renderDeck();          // gauges, Day Line and HUD follow every connector update
+}
+// one light for phones: all linked, which one is down, or still linking
+function updatePillSum(){
+  const sum = $("#pill-sum"); if (!sum) return;
+  const ps = [...document.querySelectorAll("#pills .pill:not(#pill-sum)")].filter(p => !p.hidden);
+  const bad = ps.filter(p => p.dataset.s === "err"), ok = ps.filter(p => p.dataset.s === "ok" || p.dataset.s === "stale");
+  sum.dataset.s = bad.length ? "err" : ps.length && ok.length === ps.length ? "ok" : "";
+  $("#pill-sum-t").textContent = bad.length === 1 ? bad[0].textContent.trim()
+    : bad.length ? `${bad.length} OFF` : sum.dataset.s === "ok" ? "LINKED" : "LINKING";
+  sum.title = bad.length ? `Not linked: ${bad.map(b => b.textContent.trim()).join(", ")} — tap to reconnect` : "Accounts";
 }
 function renderUpdated(key){
   const el = $("#p-"+key+" .upd"); if (!el) return;
@@ -2927,9 +2973,10 @@ function untilLabel(d){
   const tm = new Date(); tm.setDate(tm.getDate() + 1);
   return d.toDateString() === tm.toDateString() ? "tomorrow" : d.toLocaleDateString([], {weekday:"short"});
 }
+const needsFix = key => { const m = S.meta[key] || {}; return ATLAS.hosted && m.status === "err" && AUTHZ.has(m.code) && !S.data[key]; };
 function waitingCopy(key){
   const m = S.meta[key] || {};
-  if (m.status === "err") return AUTHZ.has(m.code) ? "Needs reconnecting" : "Offline — retrying";
+  if (m.status === "err") return AUTHZ.has(m.code) ? (ATLAS.hosted ? "Needs reconnecting — tap to fix" : "Needs reconnecting") : "Offline — retrying";
   return MCP() ? "Waiting…" : "Not linked here";
 }
 const loadWord = rd => rd.ratio > 1.35 ? "Recover" : rd.ratio < .75 ? "Fresh" : "Steady";
@@ -3333,7 +3380,7 @@ function renderDayLine(){
       style="left:${f(x)}%;max-width:${f(Math.max(room, 1.5))}%" title="${esc(p.t.content)} · due ${fmtT(p.at)}"><i></i>${
       room >= 3 ? `${esc(p.t.content)} · ${fmtT(p.at)}` : ""}</span>`;
   });
-  if (!S.data.cal) html += `<span class="dl-empty">${esc(waitingCopy("cal"))}</span>`;
+  if (!S.data.cal && needsFix("cal")) html += `<span class="dl-empty"><button type="button" class="actchip dl-fix">RECONNECT CALENDAR</button></span>`;
 
   // Only touch the DOM when the strip actually changed, so keyboard focus on
   // a block survives the 15-second clock tick. The needle moves on its own.
@@ -3345,6 +3392,7 @@ function renderDayLine(){
       it.kind === "ev" ? speakEvent(it.e) : speakActivity(it.a);
     }));
     $("#dl-block")?.addEventListener("click", () => focusBlock(0));
+    track.querySelector(".dl-fix")?.addEventListener("click", () => openAccounts());
     track.querySelectorAll(".dl-prop").forEach(b => b.addEventListener("click", () => openPlanPanel()));
   }
   const needle = $("#dl-now");
@@ -3531,7 +3579,7 @@ function uiIntent(text){
   if (ATLAS.hosted && /^(?:lock|sign out of|log out of) (?:atlas|the dashboard|this device)$/.test(q)){
     speak("Locking Atlas on this device."); setTimeout(lockAtlas, 900); return true;
   }
-  const nz = q.match(/^(?:turn |switch )?(on|off) (?:the )?nudges$|^(?:turn |switch )?(?:the )?nudges (on|off)$/);
+  const nz = q.match(/^(?:turn |switch )?(on|off) (?:the )?(?:nudges|alerts)$|^(?:turn |switch )?(?:the )?(?:nudges|alerts) (on|off)$/);
   if (nz){
     if ((nz[1] || nz[2]) === "on" ? !S.nudgesOn : S.nudgesOn) $("#nudgebtn").click();
     else speak(`Nudges are already ${S.nudgesOn ? "on" : "off"}.`);
@@ -3569,8 +3617,9 @@ function uiIntent(text){
 }
 
 document.querySelectorAll(".gauge").forEach(g => g.addEventListener("click", () =>
-  S.view === g.dataset.view ? closeView() : openView(g.dataset.view, {from:g})));
-document.querySelectorAll("#rail button").forEach(b => b.addEventListener("click", () => {
+  needsFix(g.dataset.view) ? openAccounts()
+  : S.view === g.dataset.view ? closeView() : openView(g.dataset.view, {from:g})));
+document.querySelectorAll("#rail button[data-view]").forEach(b => b.addEventListener("click", () => {
   const v = b.dataset.view;
   if (v === "deck" || v === S.view){ closeView({focus:false}); b.focus({preventScroll:true}); return; }
   openView(v, {from: S.view === "deck" ? $(`.gauge[data-view="${v}"]`) : null, opener:b});
@@ -3628,6 +3677,23 @@ async function refreshCompleted(){
   }catch(_){ /* streak/debrief simply stay unavailable */ }
 }
 addEventListener("pagehide", ()=> S.unsubs.forEach(u=>{ try{u()}catch(_){} }));
+
+/* coming back to the tab: fresh data straight away, not whenever the next timer fires
+   (also restarts today's calendar window if the day changed while away) */
+let hiddenAt = 0;
+function refreshAll(){
+  if (!S.unsubs.length) return;              // not awake yet
+  S.unsubs.forEach(u=>{ try{u()}catch(_){} }); S.unsubs = [];
+  startWatches();
+  if (typeof statusCheckedAt !== "undefined") statusCheckedAt = 0;   // re-check account links too
+  tickClock();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden){ hiddenAt = Date.now(); return; }
+  if (hiddenAt && Date.now() - hiddenAt > 60000) refreshAll();
+  hiddenAt = 0;
+});
+addEventListener("online", () => refreshAll());
 
 /* ================================================================
    THE BRAIN — intent routing over live snapshots
@@ -4772,13 +4838,40 @@ $("#nudgebtn").addEventListener("click", () => {
                    : "Nudges off.");
 });
 
+/* The greeting says what's actually linked: it waits (up to ~4s) for each
+   account's first answer, then names anything that's down. */
+function linkProblems(){
+  const out = [];
+  for (const [k, m] of Object.entries(S.meta))
+    if (m.status === "err") out.push(SERVERS[k] || k);
+  for (const p of Object.values(ATLAS.status?.providers || {}))
+    if (p.configured && p.connected === false && p.label && !out.some(n => n.toLowerCase().includes(String(p.label).toLowerCase()))) out.push(p.label);
+  return [...new Set(out)];
+}
+function linkLine(){
+  if (!MCP()) return "Nothing's linked here yet, so there's no live data to show.";
+  const bad = linkProblems();
+  if (!bad.length) return "";
+  const names = bad.length > 1 ? bad.slice(0, -1).join(", ") + " and " + bad.at(-1) : bad[0];
+  return `${names} ${bad.length > 1 ? "aren't" : "isn't"} linked right now${ATLAS.hosted ? ` — tap the account lights at the top to reconnect` : ""}. Everything else is.`;
+}
+function greetWhenSettled(say){
+  const keys = ["cal","gmail","todo","strava"].concat(ATLAS.hosted ? ["whoop"] : []), t0 = Date.now();
+  const go = () => {
+    const settled = !MCP() || keys.every(k => ["ok","stale","err"].includes(S.meta[k]?.status));
+    if (settled || Date.now() - t0 > 4000) speak(say(linkLine()));
+    else setTimeout(go, 250);
+  };
+  setTimeout(go, 900);
+}
+
 /* ================================================================
    CLOCK + BOOT SEQUENCE
    ================================================================ */
 function tickClock(){
   const d=new Date();
-  $("#clock").textContent = d.toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"})
-    .toUpperCase() + "  ·  " + fmtT(d);
+  $("#clock").innerHTML = `<span class="cd">${esc(d.toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"})
+    .toUpperCase())}  ·  </span>${esc(fmtT(d))}`;
   renderDeck();          // keeps "in 40m", the countdown and the NOW needle moving between fetches
   try{ checkNudges(); }catch(err){ console.warn("[Atlas] nudges:", err); }
 }
@@ -4871,9 +4964,9 @@ $("#wake").addEventListener("click", async ()=>{
     }, 3200);
   } else if (MCP() && h>=17 && store.get("debriefOffer")!==todayKey()){
     store.set("debriefOffer", todayKey());
-    setTimeout(()=>speak(`Good ${partOfDay()}. Systems linked. Say debrief when you're ready to close out the day.`), 900);
+    greetWhenSettled(link => `Good ${partOfDay()}. ${link || "Systems linked."} Say debrief when you're ready to close out the day.`);
   } else {
-    setTimeout(()=>speak(`Good ${partOfDay()}. Systems linked and watching your day. Ask me for your briefing whenever you're ready.`), 900);
+    greetWhenSettled(link => `Good ${partOfDay()}. ${link || "Systems linked and watching your day."} Ask me for your briefing whenever you're ready.`);
   }
 });
 </script>
