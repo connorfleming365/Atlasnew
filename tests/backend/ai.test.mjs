@@ -9,8 +9,8 @@ process.env.GOOGLE_CLIENT_ID = "gid"; process.env.GOOGLE_CLIENT_SECRET = "gsec";
 const imp = p => import(new URL(p, import.meta.url).href);
 const { grantOwner } = await imp("../../lib/owner.js");
 const { seal } = await imp("../../lib/session.js");
-const plan = await imp("../../api/plan.js");
-const triage = (await imp("../../api/triage.js")).default;
+const plan = await imp("../../lib/routes/plan.js");
+const triage = (await imp("../../lib/routes/triage.js")).default;
 
 const fails = [];
 const check = (name, ok, got) => { console.log((ok ? "PASS " : "FAIL ") + name + (ok ? "" : "  got: " + JSON.stringify(got))); if (!ok) fails.push(name); };

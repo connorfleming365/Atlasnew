@@ -16,9 +16,9 @@ const routes = {
   voices: (await imp("../../api/voices.js")).default,
   sync: (await imp("../../api/sync.js")).default,
   status: (await imp("../../api/status.js")).default,
-  start: (await imp("../../api/auth/start.js")).default,
-  callback: (await imp("../../api/auth/callback.js")).default,
-  disconnect: (await imp("../../api/auth/disconnect.js")).default,
+  start: (await imp("../../lib/routes/auth-start.js")).default,
+  callback: (await imp("../../lib/routes/auth-callback.js")).default,
+  disconnect: (await imp("../../lib/routes/auth-disconnect.js")).default,
   unlock: (await imp("../../api/unlock.js")).default,
 };
 

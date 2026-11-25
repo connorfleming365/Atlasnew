@@ -18,7 +18,11 @@ api/brain.js        the Claude-powered conversational brain
 api/voices.js       lists your ElevenLabs voices, if configured
 api/tts.js          turns a reply into an mp3 with a chosen cloud voice
 api/sync.js         cross-device voice choice + memory notes, if configured
-api/auth/*.js       OAuth start / callback / disconnect
+api/unlock.js       the access-code lock
+api/auth/[op].js    OAuth start / callback / disconnect
+api/ai/[op].js      plan my day, inbox triage
+api/launcher/[op].js  the Android launcher: summary, action, ask, speak
+lib/routes/*.js     the handlers those grouped entry points dispatch to
 lib/session.js      AES-256-GCM encrypted cookies
 lib/providers.js    OAuth config + token refresh
 lib/tools.js        provider REST → connector payload shapes
@@ -26,6 +30,11 @@ lib/brain.js        context assembly + tool-calling loop for the brain
 lib/tts.js          ElevenLabs voice list + speech synthesis
 lib/sync.js         Upstash Redis read/write for the synced settings
 ```
+
+Vercel's Hobby plan allows **12 serverless functions per deployment** — a
+13th makes the deploy fail outright. Related routes therefore share one file
+each (`[op].js`), and `tests/backend/routes.test.mjs` fails if `api/` grows
+past 12.
 
 ## Cloud voices
 
