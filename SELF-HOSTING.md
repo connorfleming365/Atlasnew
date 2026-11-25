@@ -300,9 +300,9 @@ only full verification removes that, and for `gmail.modify`'s restricted
 scope category that's a genuinely heavy process not worth it for a
 single-user dashboard. The one thing Testing mode's test-user list was also
 doing is gating *who* can even reach Google's consent screen; publishing
-removes that gate. If **Vercel Deployment Protection** (see Security model
-above) is on, that's moot — nothing behind it is reachable by anyone but you
-regardless.
+removes that gate — but Atlas's own access code (see **Security model**)
+already stops anyone else starting a connection through your deployment, and
+the consent screen only ever grants access to the account that signs in.
 
 ## 4. Todoist
 
