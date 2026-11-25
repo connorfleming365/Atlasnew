@@ -38,6 +38,14 @@ const sats = page => page.$$eval('#orbit .sat:not(.more)', els => els.map(e => (
   await page.waitForTimeout(1200);
   const p2 = await page.$eval('#orbit .sat:not(.more)', e => e.style.transform);
   check('satellites move along the orbit', p1 !== p2, { p1, p2 });
+  // hovering a planet holds the ring still, so it's easy to grab
+  const sb = await page.$eval('#orbit .sat:not(.more)', e => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(sb.x, sb.y); await page.waitForTimeout(150);
+  const h1 = await page.$eval('#orbit .sat:not(.more)', e => e.style.transform);
+  await page.waitForTimeout(600);
+  const h2 = await page.$eval('#orbit .sat:not(.more)', e => e.style.transform);
+  check('hovering a planet pauses the orbit', h1 === h2, { h1, h2 });
+  await page.mouse.move(5, 5); await page.waitForTimeout(100);
 
   // tap → card → DONE
   await page.click('#orbit .sat.p1', { force: true }); await page.waitForTimeout(200);

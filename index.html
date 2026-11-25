@@ -3865,6 +3865,7 @@ const Orbit = (() => {
   const sats = new Map();                       // id → {el, slot, a, r, state, t0, task}
   const moved = new Set();                      // ids rescheduled away (drift out, not absorbed)
   const done = new Set();                       // ids completed from this page
+  let hover = 0;                                // pointer over a planet: the ring holds still so it's easy to grab
   let layer = null, track = null, more = null, card = null, cardFor = null, t = 0, last = 0, running = false;
 
   function ensureLayer(){
@@ -3904,6 +3905,8 @@ const Orbit = (() => {
         el.style.setProperty("--band", `${-40 + Math.abs(hsh) % 50}deg`);
         el.addEventListener("click", e => { if (el.dataset.dragged){ delete el.dataset.dragged; e.preventDefault(); return; } openCard(id); });
         el.addEventListener("pointerdown", e => startDrag(e, id));
+        el.addEventListener("pointerenter", () => { hover++; });
+        el.addEventListener("pointerleave", () => { hover = Math.max(0, hover - 1); });
         layer.appendChild(el);
         s = { el, a: null, r: 1.7, state: "entering", t0: t };
         sats.set(id, s);
@@ -3923,7 +3926,8 @@ const Orbit = (() => {
 
   function frame(now){
     const dt = Math.min(.1, (now - last) / 1000); last = now;
-    if (!document.hidden) t += dt;
+    const holding = hover > 0 || [...sats.values()].some(x => x.drag) || cardFor;
+    if (!document.hidden && !holding) t += dt;
     const stage = $("#stage");
     if (!stage || !layer){ running = false; return; }
     const W = stage.clientWidth, H = stage.clientHeight;
@@ -3944,7 +3948,7 @@ const Orbit = (() => {
       if (s.a == null) s.a = target;
       // ease toward its slot so the ring re-spaces smoothly when tasks come and go
       let d = ((target - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-      s.a += d * Math.min(1, dt * 1.6);
+      if (!holding || s.state !== "orbit") s.a += d * Math.min(1, dt * 1.6);
       let r = 1, op = 1, sc = 1, k = 0;
       if (s.state === "entering"){
         k = REDUCED ? 1 : Math.min(1, (t - s.t0) / 1.2);

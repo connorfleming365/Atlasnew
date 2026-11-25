@@ -7,9 +7,12 @@ const check = (name, ok, got) => { console.log((ok ? 'PASS ' : 'FAIL ') + name +
 const said = page => page.evaluate(() => [...document.querySelectorAll('.msg.atlas')].pop()?.textContent || '');
 const say = async (page, t) => { await page.fill('#say', t); await page.press('#say', 'Enter'); await page.waitForTimeout(450); };
 
+// the ring pauses while the pointer is over a planet - hover first, then grab where it stopped
 async function dragTo(page, sel, tx, ty){
-  const b = await page.$eval(sel, e => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-  await page.mouse.move(b.x, b.y); await page.mouse.down();
+  const at = () => page.$eval(sel, e => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  let b = await at();
+  for (let i = 0; i < 5; i++){ await page.mouse.move(b.x, b.y); await page.waitForTimeout(80); const n = await at(); if (Math.hypot(n.x - b.x, n.y - b.y) < 2) break; b = n; }
+  await page.mouse.down();
   for (let i = 1; i <= 12; i++){ await page.mouse.move(b.x + (tx - b.x) * i / 12, b.y + (ty - b.y) * i / 12); await page.waitForTimeout(16); }
   return b;
 }
