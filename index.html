@@ -613,7 +613,7 @@
       <header><h2 id="h-todo" tabindex="-1">TASKS</h2><span class="src">Todoist</span><span class="upd"></span>
         <button type="button" class="vclose" aria-label="Close Tasks and return to the deck" title="Back to the deck (Esc)">×</button></header>
       <div class="body"><div class="empty">Waiting for tasks…</div></div>
-      <form id="addtask"><input id="newtask" placeholder="Capture a task… (or say “add task …”)"
+      <form id="addtask"><input id="newtask" placeholder="Capture a task…"
         autocomplete="off"><button type="submit">ADD</button></form>
     </section>
     <section class="panel" id="p-gmail" aria-labelledby="h-gmail" hidden>
@@ -655,7 +655,7 @@
       <button id="mic" aria-label="Toggle voice input" title="Talk to Atlas">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
       </button>
-      <input id="say" placeholder="Ask Atlas anything — “brief me”, “what’s next”, “add task…”"
+      <input id="say" placeholder="Ask Atlas anything…" aria-label="Ask Atlas"
              autocomplete="off">
       <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
       <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
@@ -669,7 +669,7 @@
       <div class="note">Only used by the real Claude brain (self-hosted, with a key set) — the fallback matcher can't read these.</div>
     </div>
     <div id="micnote" role="status"></div>
-    <div id="hint">BRIEF ME · WHAT’S NEXT · BLOCK TIME · SHOW INBOX · HEADS-UP MODE · ADD TASK …</div>
+    <div id="hint" hidden></div>
   </div>
 
   <div id="hud" role="region" aria-label="Heads-up readouts">
@@ -1889,14 +1889,18 @@ $("#flowbtn").addEventListener("click", ev=>{
   if (MIC_OFF){ ev.stopImmediatePropagation(); explainMicOff(); }
 }, true);
 
+// Only says something when there's a state worth knowing; no example
+// commands (saying "help" still lists them on request).
 function updateHint(){
-  $("#hint").textContent = MIC_OFF
-    ? "TYPE ANY COMMAND — ATLAS REPLIES ALOUD · BRIEF ME · WHAT’S NEXT · BLOCK TIME · INBOX · TASKS · TRAINING"
+  const el = $("#hint");
+  el.textContent = MIC_OFF
+    ? "TYPE TO ATLAS — IT REPLIES ALOUD"
     : !SR
-    ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE ANY COMMAND BELOW"
+    ? "VOICE INPUT ISN’T SUPPORTED IN THIS BROWSER — TYPE BELOW"
     : S.flowOn
       ? "HANDS-FREE — JUST SPEAK, NO WAKE WORD NEEDED · ATLAS PAUSES WHILE IT TALKS"
-      : "BRIEF ME · WHAT’S NEXT · BLOCK TIME · SHOW INBOX · HEADS-UP MODE · ADD TASK … · UNDO";
+      : "";
+  el.hidden = !el.textContent;
 }
 // The button stays enabled even without support: pressing it explains why,
 // which is far better than a dead control the user has to guess about.
