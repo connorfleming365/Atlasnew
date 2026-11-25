@@ -39,6 +39,8 @@ check("book_training creates a fixed-title event", r.body.ok && writes.at(-1).me
 r = await call({ action: "move_event", id: "ev1", start: iso(24), end: iso(25) });
 check("move_event patches that event's time", r.body.ok && writes.at(-1).method === "PATCH" && /events\/ev1/.test(writes.at(-1).u), writes.at(-1));
 
+r = await call({ action: "focus_block", title: "Write report\nwith newline", start: iso(3), end: iso(4) });
+check("focus_block creates a 'Focus:' event (title cleaned)", r.body.ok && writes.at(-1).body.summary === "Focus: Write report with newline", writes.at(-1).body);
 const before = writes.length;
 r = await call({ action: "book_training", start: iso(2), end: iso(7) });
 check("refuses events longer than 3 hours", r.code === 400, r.body);
