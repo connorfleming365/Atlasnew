@@ -4,8 +4,13 @@ import { PROVIDERS, SERVER_PROVIDER, configured, envVar, getToken } from "../lib
 import { brainConfigured } from "../lib/brain.js";
 import { ttsConfigured, pinnedVoice } from "../lib/tts.js";
 import { syncConfigured } from "../lib/sync.js";
+import { isOwner, gateConfigured } from "../lib/owner.js";
 
 export default async function handler(req, res){
+  res.setHeader("cache-control", "no-store");
+  // a locked browser learns only that it's locked - nothing about what's connected
+  if (!isOwner(req))
+    return res.json({ hosted: true, locked: true, gate: gateConfigured() ? "code" : "unset" });
   const hasSecret = Boolean(envVar("SESSION_SECRET"));
   const providers = {};
   // Actually exercises each token (refreshing it, or clearing it if the

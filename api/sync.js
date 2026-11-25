@@ -2,11 +2,13 @@
    memory notes, POST saves new ones. Same-origin only, same as /api/mcp,
    since a cross-site POST could otherwise overwrite your saved notes. */
 import { denyCrossSite } from "../lib/guard.js";
+import { denyUnlessOwner } from "../lib/owner.js";
 import { syncConfigured, getSettings, setSettings } from "../lib/sync.js";
 
 export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
   if (denyCrossSite(req, res)) return;
+  if (denyUnlessOwner(req, res)) return;
   if (!syncConfigured())
     return res.status(200).json({ configured:false, voiceName:null, memory:[] });
 

@@ -13,6 +13,7 @@
    their shape, so an older launcher build keeps working. */
 import { configured, envVar, getTokenForLauncher } from "../../lib/providers.js";
 import { runTool } from "../../lib/tools.js";
+import { sameToken } from "../../lib/session.js";
 
 const MAX_EVENTS = 12;
 const MAX_TASKS = 8;
@@ -21,7 +22,7 @@ const MAX_MAIL = 5;
 function authorized(req){
   const key = envVar("LAUNCHER_API_KEY");
   if (!key) return false;
-  return req.headers["x-launcher-key"] === key;
+  return sameToken(req.headers["x-launcher-key"], key);   // constant-time
 }
 
 // "Today" has to be the caller's local day, not the server's (Vercel

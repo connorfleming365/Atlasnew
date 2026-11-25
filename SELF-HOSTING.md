@@ -167,13 +167,27 @@ persisted server-side beyond that unless you've opted in with
 above for the two things that store (voice/memory settings, and a copy of
 provider tokens the launcher's endpoint reads), both sealed the same way.
 
-**The deployment is public, and that is the thing to understand.** There is no
-login. Anyone with the URL can load the dashboard — they will see the *connect*
-screen, not your data, because they don't have your cookies. But they could
-connect their own accounts through your deployment and use it as a free proxy.
-For a personal URL nobody knows, that's an acceptable risk. If you'd rather close
-it, put Vercel's Deployment Protection in front of the project (Settings →
-Deployment Protection), which gates the whole site behind your Vercel login.
+**The access code is what keeps everyone else out.** The URL is public, so
+Atlas has its own lock: set `ATLAS_ACCESS_CODE` to a passphrase only you know
+(a few unrelated words is plenty). Until a browser enters it, every endpoint
+that reads your saved notes, spends your Anthropic or ElevenLabs credit, or
+connects an account answers 401, and `/api/status` reveals nothing but "locked".
+Entering it sets an encrypted `HttpOnly` cookie good for a year on that device.
+Wrong codes are slowed and limited to 10 tries per 15 minutes per address (the
+limit is shared across servers when Upstash is set up). It fails closed: with
+no `ATLAS_ACCESS_CODE`, nothing unlocks. Say "lock Atlas" to sign a device out;
+change the code to sign *every* device out. The Android launcher has its own
+key (`LAUNCHER_API_KEY`) and isn't affected. For a second wall, you can also put
+Vercel's Deployment Protection in front (Settings → Deployment Protection) —
+note that it also blocks the launcher's endpoint unless you add a bypass.
+
+**Emails can't give Atlas orders.** The brain is told that text inside emails,
+events and tasks is data, never instructions, and it asks before archiving or
+deleting anything — so a message saying "delete your inbox" is at most
+mentioned, never acted on.
+
+**Headers.** `vercel.json` stops the site being framed by other pages
+(clickjacking), turns off MIME sniffing and pins HTTPS (HSTS).
 
 **Set `APP_URL`.** Without it the OAuth redirect is derived from the request's
 `Host` header. Providers reject redirect URIs that aren't on their registered
@@ -193,6 +207,20 @@ also revoke per provider at
 [Google](https://myaccount.google.com/permissions),
 [Todoist](https://todoist.com/prefs/integrations) and
 [Strava](https://www.strava.com/settings/apps).
+
+---
+
+## Installing it as an app
+
+Atlas is installable (a Progressive Web App): open your deployment in Chrome or
+Edge, click the install icon at the right of the address bar (or **⋮ → Cast,
+save and share → Install page as app**), and it gets its own window, a
+desktop/taskbar icon and a Start-menu entry. In the installed app's
+**App info / Settings** you can turn on **Start app when you sign in**. On a
+phone, use **Add to Home screen**. It always loads the live site — updates
+arrive on their own — and the service worker (`sw.js`) never touches `/api/`;
+it only keeps a copy of the page so a launch with no connection opens Atlas
+rather than an error.
 
 ---
 
@@ -218,7 +246,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 Add it in Vercel under **Settings → Environment Variables** as `SESSION_SECRET`.
 Add `APP_URL` at the same time, set to your deployment's URL
-(`https://YOUR-DOMAIN`, no trailing slash).
+(`https://YOUR-DOMAIN`, no trailing slash), and `ATLAS_ACCESS_CODE`, the
+passphrase you'll type to unlock Atlas on each device (see **Security model**).
 
 ## 3. Google (Gmail + Calendar)
 
