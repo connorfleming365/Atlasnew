@@ -349,6 +349,23 @@
   #tr-reply{display:flex;gap:8px} #tr-reply[hidden]{display:none}
   #tr-say{flex:1;min-width:0;font:14px var(--sans);color:var(--ink);background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:9px 12px}
   #tr-note{font-size:12px;color:var(--ink3)}
+  #accounts{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 48px);overflow:auto;padding:0;color:var(--ink);
+            background:rgba(7,13,23,.95);border:1px solid var(--line2);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  #accounts::backdrop{background:rgba(1,4,9,.6)}
+  #accounts > header{display:flex;align-items:baseline;gap:12px;padding:16px 18px 6px}
+  #accounts h2{margin:0;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--teal);font-weight:500}
+  #accounts h2:focus{outline:none}
+  #ac-sub{font-size:12px;color:var(--ink3);flex:1}
+  #ac-body{display:grid;gap:8px;padding:6px 18px 6px}
+  .ac-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:10px 12px;
+          border-radius:12px;background:var(--bg1);border:1px solid var(--line)}
+  .ac-name b{display:block;font-size:14px;font-weight:600} .ac-name span{font-size:12px;color:var(--ink3)}
+  .ac-state{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.08em}
+  .ac-state i{font-style:normal;padding:3px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--ink2)}
+  .ac-state i.ok{color:var(--teal);border-color:rgba(69,224,190,.45)} .ac-state i.bad{color:var(--serious);border-color:rgba(236,131,90,.45)}
+  .ac-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  #ac-note{margin:4px 18px 18px;font-size:12px;color:var(--ink3);line-height:1.5}
+  #pills{cursor:pointer}
   #weekbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
            border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
   #weekbtn:hover{color:var(--ink);border-color:rgba(69,224,190,.4)}
@@ -688,6 +705,12 @@
     <button type="button" class="actchip" data-act="next">NEXT</button>
   </footer>
 </dialog>
+<dialog id="accounts" aria-labelledby="ac-h">
+  <header><h2 id="ac-h" tabindex="-1" autofocus>ACCOUNTS</h2><span id="ac-sub"></span>
+    <button type="button" id="ac-close" class="dlg-x" aria-label="Close accounts">×</button></header>
+  <div id="ac-body"></div>
+  <p id="ac-note">Reconnect if something stops updating or the phone can't see an account. Disconnect removes the login here and on the phone.</p>
+</dialog>
 <dialog id="review" aria-labelledby="wr-h">
   <header><h2 id="wr-h" tabindex="-1" autofocus>WEEKLY REVIEW</h2><span id="wr-range"></span>
     <button type="button" id="wr-close" aria-label="Close weekly review">×</button></header>
@@ -702,7 +725,7 @@
       <button type="button" data-mode="hud" aria-pressed="false" title="Heads-up display: readouts on the window, no panels">HUD</button>
     </div>
     <button type="button" id="weekbtn" title="Weekly review: tasks, training, recovery, inbox and the week ahead">WEEK</button>
-    <div id="pills" aria-live="polite" aria-atomic="false">
+    <div id="pills" aria-live="polite" aria-atomic="false" title="Accounts: reconnect or disconnect">
       <span class="pill" id="pill-cal"><i></i>CALENDAR</span>
       <span class="pill" id="pill-gmail"><i></i>GMAIL</span>
       <span class="pill" id="pill-todo"><i></i>TODOIST</span>
@@ -3998,6 +4021,7 @@ function planTriageIntent(q){
     if (rep){ triageAct("reply", rep[1]); return true; }
     if (/^(stop|done|finish|exit|that's enough|end triage)$/.test(q)){ endTriage(); return true; }
   }
+  if (/^(?:(?:show|open|manage)(?: my)? )?accounts?$|^(?:reconnect|manage) (?:my )?(?:accounts|connections|whoop|strava|google|todoist)$/.test(q)){ openAccounts(); return true; }
   if (/^(?:triage|sort|go through|clear)(?: my| the)? (?:inbox|email|emails|mail)$|^inbox triage$/.test(q)){ startTriage(); return true; }
   if (/^(?:plan|organi[sz]e|schedule|map out|lay out)(?: out)? (?:my |the )?(?:day|today)$|^plan today$/.test(q)){ planDay(); return true; }
   if (S.proposal){
@@ -4009,6 +4033,42 @@ function planTriageIntent(q){
   }
   return false;
 }
+
+/* ---------------- accounts (self-hosted only) ----------------
+   Each provider: connected here or not, whether the phone launcher can
+   reach it, and Reconnect / Disconnect. Opened from the connection pills
+   in the top bar, or by saying "accounts". */
+async function openAccounts(){
+  if (!ATLAS.hosted){ speak("Accounts are managed on your Atlas site — here the connectors come from claude.ai."); return; }
+  const dlg = $("#accounts");
+  $("#ac-body").innerHTML = `<div class="empty">Checking…</div>`;
+  if (!dlg.open) dlg.showModal();
+  try{
+    const r = await fetch("/api/status", { credentials:"same-origin" });
+    if (r.ok) ATLAS.status = await r.json();
+  }catch(_){}
+  const provs = Object.entries(ATLAS.status?.providers || {});
+  const anyPhone = provs.some(([,p]) => p.phone !== null && p.phone !== undefined);
+  $("#ac-sub").textContent = `${provs.filter(([,p]) => p.connected).length} of ${provs.length} connected`;
+  $("#ac-body").innerHTML = provs.map(([id, p]) => {
+    const here = !p.configured ? `<i>NOT SET UP</i>` : p.connected ? `<i class="ok">CONNECTED</i>` : `<i class="bad">NOT CONNECTED</i>`;
+    const phone = !p.configured || !anyPhone ? "" : p.phone ? `<i class="ok">PHONE: LINKED</i>` : `<i class="bad">PHONE: NOT LINKED</i>`;
+    const acts = !p.configured ? `<span class="ac-name"><span>Needs API keys on Vercel</span></span>`
+      : `<a class="actchip" href="/api/auth/start?provider=${encodeURIComponent(id)}">${p.connected ? "RECONNECT" : "CONNECT"}</a>` +
+        (p.connected || p.phone ? `<button type="button" class="actchip crit" data-dc="${esc(id)}">DISCONNECT</button>` : "");
+    return `<div class="ac-row"><div class="ac-name"><b>${esc(p.label)}</b><span>${esc((p.servers || []).join(" · "))}</span></div>
+      <div class="ac-acts">${acts}</div><div class="ac-state">${here}${phone}</div></div>`;
+  }).join("") || `<div class="empty">No providers configured on this deployment.</div>`;
+  // disconnect asks once more before acting
+  $("#ac-body").querySelectorAll("[data-dc]").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.confirm){ location.href = `/api/auth/disconnect?provider=${encodeURIComponent(b.dataset.dc)}`; return; }
+    b.dataset.confirm = "1"; b.textContent = "TAP AGAIN TO DISCONNECT";
+    setTimeout(() => { if (b.isConnected){ delete b.dataset.confirm; b.textContent = "DISCONNECT"; } }, 4000);
+  }));
+}
+$("#ac-close").addEventListener("click", () => $("#accounts").close());
+$("#accounts").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+$("#pills").addEventListener("click", () => openAccounts());
 
 /* ================================================================
    WEEKLY REVIEW

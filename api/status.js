@@ -5,6 +5,7 @@ import { brainConfigured } from "../lib/brain.js";
 import { ttsConfigured, pinnedVoice } from "../lib/tts.js";
 import { syncConfigured } from "../lib/sync.js";
 import { isOwner, gateConfigured } from "../lib/owner.js";
+import { tokenStoreConfigured, getStoredToken } from "../lib/tokenStore.js";
 
 export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
@@ -27,6 +28,8 @@ export default async function handler(req, res){
       servers: p.servers,
       configured: configured(id),
       connected: Boolean(accessToken),
+      // can the phone launcher reach it? (null when there's no server-side store)
+      phone: tokenStoreConfigured() && configured(id) ? Boolean(await getStoredToken(id).catch(() => null)) : null,
     };
   }));
   const servers = {};
