@@ -410,6 +410,24 @@
   .dl-ghost{position:absolute;top:18px;height:20px;border-radius:7px;background:rgba(69,224,190,.35);border:1px solid var(--teal);
             font:600 10px var(--mono);color:#e9fffa;display:grid;place-items:center;white-space:nowrap;overflow:visible;z-index:3;min-width:28px}
   .dl-ghost[hidden]{display:none}
+  /* the next meeting, as a moon */
+  .moon{position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+        pointer-events:auto;will-change:transform;touch-action:none;cursor:pointer}
+  .moon[hidden]{display:none}
+  .moon::before{content:"";width:22px;height:22px;border-radius:50%;
+    background:radial-gradient(circle at 64% 60%,rgba(40,44,56,.55) 0 9%,transparent 11%),
+               radial-gradient(circle at 36% 66%,rgba(40,44,56,.45) 0 6%,transparent 8%),
+               radial-gradient(circle at 58% 32%,rgba(40,44,56,.4) 0 5%,transparent 7%),
+               radial-gradient(circle at 72% 78%,rgba(0,0,0,.55),transparent 60%),
+               radial-gradient(circle at 36% 32%,#f4f6fb 0,#b9c0ce 45%,#6c7487 100%);
+    box-shadow:inset -3px -4px 6px rgba(0,0,0,.45),0 0 10px rgba(200,210,235,.35),0 0 22px rgba(139,147,255,.25)}
+  .moon.soon::before{box-shadow:inset -3px -4px 6px rgba(0,0,0,.45),0 0 0 2px rgba(69,224,190,.6),0 0 16px rgba(69,224,190,.6),0 0 32px rgba(69,224,190,.3);
+    animation:moonpulse 1.6s ease-in-out infinite}
+  .moon.docked::before{box-shadow:inset -3px -4px 6px rgba(0,0,0,.45),0 0 0 2px var(--teal),0 0 20px rgba(69,224,190,.7)}
+  @keyframes moonpulse{50%{transform:scale(1.12)}}
+  .moon:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  .sat-card .sc-when{font-size:11.5px;color:var(--ink2)} .sat-card .sc-loc{font-size:12px;color:var(--ink3)}
+  @media (prefers-reduced-motion:reduce){ .moon.soon::before{animation:none} }
   #weekbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink2);padding:6px 12px;
            border:1px solid var(--line2);border-radius:999px;background:var(--bg1)}
   #weekbtn:hover{color:var(--ink);border-color:rgba(69,224,190,.4)}
@@ -1185,6 +1203,7 @@ try{
    A locked browser sees this screen and nothing else; the claude.ai artifact
    and a plain file never reach it. */
 function showLock(gate, expired){
+  clearSnaps();                     // a locked browser keeps none of your data
   if ($("#lock")) return;
   const el = document.createElement("div");
   el.id = "lock"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true");
@@ -1216,6 +1235,7 @@ function showLock(gate, expired){
   });
 }
 async function lockAtlas(){
+  clearSnaps();
   try{ await fetch("/api/unlock", { method:"POST", credentials:"same-origin",
     headers:{ "content-type":"application/json" }, body: JSON.stringify({ lock:true }) }); }catch(_){}
   location.reload();
@@ -2295,8 +2315,30 @@ function checkPageCondition(){
   } else b?.remove();
 }
 
+/* Instant start (self-hosted only): today's last good data for each section is
+   kept on this computer and drawn straight away on the next open, then replaced
+   by live data. Never yesterday's; never shown to a locked browser; "lock Atlas"
+   wipes it. */
+const SNAP_KEYS = ["cal", "gmail", "todo", "strava", "whoop"];
+function saveSnap(key, payload){
+  if (!ATLAS.hosted) return;
+  try{ store.set("snap." + key, { day: todayKey(), at: Date.now(), payload }); }catch(_){ /* storage full: skip */ }
+}
+function loadSnap(key){
+  const s = ATLAS.hosted ? store.get("snap." + key, null) : null;
+  return s && s.day === todayKey() ? s : null;
+}
+function clearSnaps(){ SNAP_KEYS.forEach(k => { try{ localStorage.removeItem("atlas.snap." + k); }catch(_){} }); }
+
 function watchSection(key, tool, input, render, opts={}){
   const mcp = MCP();
+  // draw today's saved copy at once, marked by its age, while the live fetch runs
+  const snap = !S.data[key] && mcp ? loadSnap(key) : null;
+  if (snap){
+    S.data[key] = snap.payload;
+    setMeta(key, { status: "stale", code: null, detail: "saved copy", storedAt: snap.at });
+    try{ render(snap.payload); }catch(err){ console.warn("[Atlas] saved copy:", err); }
+  }
   if (!mcp){
     setMeta(key,{status:"off"});
     $("#p-"+key+" .body").innerHTML =
@@ -2307,6 +2349,7 @@ function watchSection(key, tool, input, render, opts={}){
     if (ev.type==="data"){
       const res = ev.result;
       S.data[key] = res.payload;
+      saveSnap(key, res.payload);
       setMeta(key,{status: res.cache && !res.cache.revalidating &&
                    (Date.now()-res.cache.storedAt > 10*60000) ? "stale" : "ok",
                    code:null, detail:"",
@@ -3396,7 +3439,7 @@ function renderHud(){
 function renderDeck(){
   // decoration over the data, never in its way: a failure here must not
   // interrupt setMeta or the clock
-  try{ renderGauges(); renderDayLine(); renderHud(); if (S.data.whoop) renderWhoop(); }
+  try{ renderGauges(); renderDayLine(); renderHud(); if (S.data.whoop) renderWhoop(); if (S.data.cal) Orbit.kick(); }
   catch(err){ console.warn("[Atlas] deck render failed:", err); }
 }
 
@@ -3866,6 +3909,8 @@ const Orbit = (() => {
   const moved = new Set();                      // ids rescheduled away (drift out, not absorbed)
   const done = new Set();                       // ids completed from this page
   let hover = 0;                                // pointer over a planet: the ring holds still so it's easy to grab
+  // the next meeting, as a moon: drifts in from the ring as it gets closer, docks while it runs
+  let moon = null, moonEv = null, moonCheckedAt = -1, moonA = -Math.PI / 4, moonR = 1, moonState = "";
   let layer = null, track = null, more = null, card = null, cardFor = null, t = 0, last = 0, running = false;
 
   function ensureLayer(){
@@ -3875,6 +3920,11 @@ const Orbit = (() => {
     layer.setAttribute("aria-label", "Today's open tasks");
     stage.appendChild(layer);
     track = document.createElement("div"); track.className = "orbit-track"; layer.appendChild(track);
+    moon = document.createElement("button"); moon.type = "button"; moon.className = "moon"; moon.hidden = true;
+    moon.addEventListener("click", () => openMoonCard());
+    moon.addEventListener("pointerenter", () => { hover++; });
+    moon.addEventListener("pointerleave", () => { hover = Math.max(0, hover - 1); });
+    layer.appendChild(moon);
     more = document.createElement("button"); more.type = "button"; more.className = "sat more"; more.hidden = true;
     more.addEventListener("click", () => openView("todo", { from: $(`.gauge[data-view="todo"]`) }));
     layer.appendChild(more);
@@ -3927,6 +3977,7 @@ const Orbit = (() => {
   function frame(now){
     const dt = Math.min(.1, (now - last) / 1000); last = now;
     const holding = hover > 0 || [...sats.values()].some(x => x.drag) || cardFor;
+    if (t - moonCheckedAt > 1 || moonCheckedAt < 0){ moonCheckedAt = t; moonEv = nextMeeting(); }
     if (!document.hidden && !holding) t += dt;
     const stage = $("#stage");
     if (!stage || !layer){ running = false; return; }
@@ -3941,7 +3992,6 @@ const Orbit = (() => {
     // the ring always turns (slowly - this is the point of it); reduced motion only
     // drops the spiral-in and drift-in effects below
     const spin = t / PERIOD * Math.PI * 2;
-    track.hidden = !sats.size;
     track.style.cssText = `left:${(cx - rx).toFixed(1)}px;top:${(cy - ry).toFixed(1)}px;width:${(rx * 2).toFixed(1)}px;height:${(ry * 2).toFixed(1)}px;transform:rotate(${TILT}rad)`;
     for (const [id, s] of sats){
       const target = s.slot + spin;
@@ -3979,12 +4029,60 @@ const Orbit = (() => {
       }
       if (cardFor === id) placeCard(x, y);
     }
+    placeMoon(dt, cx, cy, R, rx, ry, holding);
     if (!more.hidden){                                              // sits at the front-right of the ring
       more.style.transform = `translate(${(cx + rx * 1.05 * CT).toFixed(1)}px,${(cy + rx * 1.05 * ST + ry * 1.1).toFixed(1)}px) translate(-50%,-50%)`;
     }
-    if (sats.size || !more.hidden) requestAnimationFrame(frame); else running = false;
+    if (sats.size || !more.hidden || moonEv) requestAnimationFrame(frame); else running = false;
   }
   const easeOut = k => 1 - Math.pow(1 - k, 3), easeIn = k => k * k * k;
+
+  // today's meeting that's on now, or the next one to start
+  function nextMeeting(){
+    if (!S.data.cal) return null;
+    const now = new Date(), tk = todayKey();
+    const evs = calEvents().filter(e => !e.allday && dayKey(e.start) === tk && e.end > now);
+    return evs.find(e => e.start <= now) || evs[0] || null;
+  }
+  function placeMoon(dt, cx, cy, R, rx, ry, holding){
+    const ev = moonEv;
+    moon.hidden = !ev;
+    track.hidden = !sats.size && !ev;
+    if (!ev){ if (cardFor === "moon") closeCard(); return; }
+    const mins = (ev.start - Date.now()) / 60000, on = mins <= 0;
+    // docked beside the character while it runs; otherwise further out the longer it is
+    // until it starts - on the ring two hours or more out, at the character's edge at the start
+    const target = on ? .42 : .48 + .52 * Math.min(1, mins / 120);
+    moonR += (target - moonR) * Math.min(1, dt * 1.2);
+    if (!holding && !on) moonA -= dt * Math.PI * 2 / 150;           // its own slow lap, the other way round
+    if (on) moonA += ((-Math.PI * .3) - moonA) * Math.min(1, dt * 1.5);  // settles at the upper right
+    const px = Math.cos(moonA) * rx * moonR, py = Math.sin(moonA) * ry * moonR;
+    const x = cx + px * CT - py * ST, y = cy + px * ST + py * CT, depth = Math.sin(moonA);
+    const behind = !on && depth < 0 && Math.hypot(x - cx, y - cy) < R * 1.1;
+    moon.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%) scale(${(.85 + .2 * (depth + 1) / 2).toFixed(3)})`;
+    moon.style.opacity = behind ? ".3" : "1";
+    moon.style.zIndex = depth > 0 || on ? 4 : 1;
+    const state = on ? "docked" : mins <= 10 ? "soon" : "";
+    if (state !== moonState){ moon.className = "moon" + (state ? " " + state : ""); moonState = state; }
+    moon.setAttribute("aria-label", `Next meeting: ${ev.title}, ${on ? "now" : "at " + fmtT(ev.start)}. Show details`);
+    if (cardFor === "moon") placeCard(x, y);
+  }
+  function openMoonCard(){
+    const ev = moonEv; if (!ev) return;
+    closeCard();
+    const mins = Math.round((ev.start - Date.now()) / 60000), on = mins <= 0;
+    card = document.createElement("div"); card.className = "sat-card"; card.setAttribute("role", "dialog");
+    card.setAttribute("aria-label", ev.title);
+    card.innerHTML = `<div class="sc-top"><span class="pri p3">${on ? "NOW" : "NEXT"}</span><span class="sc-when">${
+      on ? `until ${esc(fmtT(ev.end))}` : `${esc(fmtT(ev.start))} · in ${esc(durLabel(mins * 60000))}`}</span></div>
+      <b>${esc(ev.title)}</b>${ev.loc ? `<span class="sc-loc">${esc(ev.loc.split(",")[0])}</span>` : ""}
+      <div class="sc-acts"><button type="button" class="actchip" data-sc="today">OPEN TODAY</button></div>`;
+    layer.appendChild(card); cardFor = "moon";
+    card.querySelector('[data-sc="today"]').addEventListener("click", () => { closeCard(); openView("cal", { from: $(`.gauge[data-view="cal"]`) }); });
+    card.querySelector('[data-sc="today"]').focus({ preventScroll: true });
+  }
+  // the calendar changed: make sure the loop is running for the moon
+  function kick(){ if (!ensureLayer()) return; moonCheckedAt = -1; if (!running){ running = true; last = performance.now(); requestAnimationFrame(frame); } }
 
   function openCard(id){
     const s = sats.get(id); if (!s) return;
@@ -4007,7 +4105,8 @@ const Orbit = (() => {
     const left = Math.max(6, Math.min(W - cw - 6, x - cw / 2)), top = Math.max(6, y - ch - 18);
     card.style.transform = `translate(${left.toFixed(0)}px,${top.toFixed(0)}px)`;
   }
-  function closeCard(){ card?.remove(); card = null; const id = cardFor; cardFor = null; if (id) sats.get(id)?.el.focus?.({ preventScroll: true }); }
+  function closeCard(){ card?.remove(); card = null; const id = cardFor; cardFor = null;
+    if (id === "moon") moon?.focus?.({ preventScroll: true }); else if (id) sats.get(id)?.el.focus?.({ preventScroll: true }); }
 
   /* ---- drag a planet: onto the character = done; onto the Day Line = block that time ---- */
   let drop = null;   // {core, ghost}
@@ -4099,7 +4198,7 @@ const Orbit = (() => {
   const isOpenToday = x => { const d = String(x.dueDate || x.deadlineDate || "").slice(0, 10); return d && d <= todayKey(); };
   function refresh(){ if (S.data.todo){ const { overdue, today } = taskBuckets(); sync([...overdue, ...today]); } }
 
-  return { sync, refresh, markMoved: id => moved.add(String(id)), markDone: id => done.add(String(id)) };
+  return { sync, refresh, kick, markMoved: id => moved.add(String(id)), markDone: id => done.add(String(id)) };
 })();
 
 /* ================================================================
