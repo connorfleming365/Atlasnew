@@ -217,6 +217,21 @@
            color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:8px 12px}
   .dockbtn.on{color:var(--teal);border-color:rgba(69,224,190,.4)}
   .dockbtn.off,#mic.off{opacity:.4}
+  #nudges{position:fixed;z-index:40;top:64px;right:16px;width:min(340px,calc(100vw - 32px));
+          display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .nudge{pointer-events:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;
+         padding:10px 12px;border-radius:14px;background:rgba(7,13,23,.94);
+         -webkit-backdrop-filter:blur(var(--blur,14px));backdrop-filter:blur(var(--blur,14px));
+         border:1px solid var(--line);border-left:3px solid var(--teal);color:var(--ink);font-size:13px;
+         box-shadow:0 10px 30px rgba(0,0,0,.35);animation:nudgein .25s ease-out}
+  .nudge.warn{border-left-color:var(--serious)}
+  .nudge .nk{grid-column:1/-1;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--ink3)}
+  .nudge p{margin:0;min-width:0;overflow-wrap:anywhere}
+  .nudge .nx{color:var(--ink3);font-size:16px;line-height:1;padding:2px 4px}
+  .nudge .actchip{grid-column:1/-1;justify-self:start}
+  @keyframes nudgein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.nudge{animation:none}}
+  @media (max-width:660px){#nudges{top:10px;right:16px;left:16px;width:auto}}
   #voicesel{flex:none;appearance:none;-webkit-appearance:none;font-family:var(--mono);
             font-size:10px;letter-spacing:.06em;color:var(--ink3);background:var(--bg1);
             border:1px solid var(--line);border-radius:999px;padding:8px 22px 8px 12px;
@@ -566,6 +581,7 @@
   </div>
 </div>
 
+<div id="nudges" role="region" aria-label="Nudges" aria-live="polite"></div>
 <div id="app" data-mode="deck" data-view="deck">
   <header id="topbar">
     <div id="wordmark">ATL<b>A</b>S</div>
@@ -663,6 +679,7 @@
       <button class="dockbtn on" id="voicebtn" title="Spoken replies">VOICE</button>
       <button class="dockbtn" id="flowbtn" title="Hands-free: keep listening after each reply">FLOW</button>
       <select id="voicesel" title="Which voice Atlas speaks with"><option value="">Auto</option></select>
+      <button class="dockbtn on" id="nudgebtn" title="Nudges: heads-ups before meetings and deadlines, and for important mail">NUDGES</button>
       <button class="dockbtn" id="memorybtn" title="Notes Atlas always remembers">MEMORY</button>
     </div>
     <div id="memorypanel" role="dialog" aria-label="Standing notes for Atlas">
@@ -2763,6 +2780,7 @@ function offerPlan(queued){
   const p = trainingPlan();
   if (!p) return false;
   pendingPlan = p.action; if (p.action) pendingDelete = null;
+  if (p.action?.kind === "move") nudgeOnce(`plan:${todayKey()}`);   // said now: no nudge repeats it
   (queued ? speakWidget : speak)(p.say);
   return true;
 }
@@ -3192,6 +3210,12 @@ function uiIntent(text){
     if (/^(yes|yeah|yep|yup|sure|ok|okay|please|book it|move it|do it|go ahead|go for it)\b/.test(q)){ runPlan(a, true); return true; }
     if (/^(no|nope|not now|skip|cancel|leave it|don'?t)\b/.test(q)){ speak("Okay, leaving it."); return true; }
   }
+  const nz = q.match(/^(?:turn |switch )?(on|off) (?:the )?nudges$|^(?:turn |switch )?(?:the )?nudges (on|off)$/);
+  if (nz){
+    if ((nz[1] || nz[2]) === "on" ? !S.nudgesOn : S.nudgesOn) $("#nudgebtn").click();
+    else speak(`Nudges are already ${S.nudgesOn ? "on" : "off"}.`);
+    return true;
+  }
   if (/^(?:plan|book|schedule) (?:my |a |in )?(?:training|session|workout)(?: today)?$|^when should i (?:train|work out|run)|^should i (?:train|work out|run|go hard)|^(?:what|how) should i train/.test(q)){
     if (!offerPlan(false)) speak("I need a WHOOP recovery score or some Strava history to plan training around.");
     return true;
@@ -3540,6 +3564,103 @@ function handleUtteranceClassic(text){
 }
 
 /* ================================================================
+   NUDGES
+   Atlas speaks up on its own, at most once per thing:
+     · a meeting starting within 10 minutes
+     · a new important, unread email (arrived since Atlas woke)
+     · a task with a due time in the next 15 minutes
+     · from 3 pm, a P1 still open that's due today (once a day)
+     · a red recovery with a hard session still on today's calendar
+   Each shows as a card (top right) and is spoken when Atlas is awake and the
+   page is visible; when the tab is hidden it goes to a system notification
+   instead, if the browser has granted that. NUDGES in the dock turns them off.
+   ================================================================ */
+const NUDGE_TTL_MS = 90000;
+S.nudgesOn = store.get("nudges", true);
+let nudgeSeen = (() => { const s = store.get("nudgeSeen", null);
+                         return s && s.day === todayKey() ? s : { day: todayKey(), ids: [] }; })();
+let nudgeSince = null;   // set on wake: mail older than this is never "new"
+function nudgeOnce(id){
+  if (nudgeSeen.day !== todayKey()) nudgeSeen = { day: todayKey(), ids: [] };
+  if (nudgeSeen.ids.includes(id)) return false;
+  nudgeSeen.ids.push(id); nudgeSeen.ids = nudgeSeen.ids.slice(-200);
+  store.set("nudgeSeen", nudgeSeen);
+  return true;
+}
+function collectNudges(){
+  const out = [], now = new Date(), tk = todayKey();
+  for (const e of calEvents()){
+    if (e.allday) continue;
+    const mins = Math.round((e.start - now) / 60000);
+    if (mins > 0 && mins <= 10) out.push({ id: `ev:${e.id || e.title}:${e.start.getTime()}`, kind: "MEETING",
+      text: `${e.title} in ${mins} minute${mins === 1 ? "" : "s"}${e.loc ? `, ${e.loc.split(",")[0]}` : ""}.`,
+      act: { label: "OPEN TODAY", run: () => openView("cal") } });
+  }
+  if (nudgeSince) for (const m of mailItems()){
+    if (m.important && m.unread && !m.low && m.date && m.date >= nudgeSince)
+      out.push({ id: `mail:${m.threadId}`, kind: "IMPORTANT EMAIL",
+        text: `${m.from}: ${m.subj}`, say: `Important email from ${m.from}: ${m.subj}.`,
+        act: { label: "READ IT", run: () => readMail(m.threadId) } });
+  }
+  const { overdue, today } = taskBuckets();
+  for (const t of today){
+    const d = String(t.dueDate || "");
+    if (!d.includes("T")) continue;
+    const mins = Math.round((new Date(d) - now) / 60000);
+    if (mins > 0 && mins <= 15) out.push({ id: `task:${t.id}:${d}`, kind: "DEADLINE",
+      text: `“${t.content}” is due in ${mins} minute${mins === 1 ? "" : "s"}.`, warn: true,
+      act: { label: "OPEN TASKS", run: () => openView("todo") } });
+  }
+  if (now.getHours() >= 15){
+    const p1 = [...overdue, ...today].filter(t => t.priority === "p1");
+    if (p1.length) out.push({ id: `p1:${tk}`, kind: "DEADLINE", warn: true,
+      text: p1.length === 1 ? `Top priority still open: “${p1[0].content}”.`
+                            : `${p1.length} top-priority tasks still open, starting with “${p1[0].content}”.`,
+      act: { label: "OPEN TASKS", run: () => openView("todo") } });
+  }
+  const plan = whoopModel()?.today ? trainingPlan() : null;
+  if (plan?.action?.kind === "move") out.push({ id: `plan:${tk}`, kind: "RECOVERY", warn: true,
+    text: plan.say, short: plan.short, act: { label: plan.action.label, run: () => runPlan(plan.action, false) },
+    pend: plan.action });
+  return out;
+}
+function checkNudges(){
+  if (!S.awake || !S.nudgesOn || !MCP()) return;
+  for (const n of collectNudges()) if (nudgeOnce(n.id)) showNudge(n);
+}
+function showNudge(n){
+  const box = $("#nudges"); if (!box) return;
+  const el = document.createElement("div");
+  el.className = "nudge" + (n.warn ? " warn" : ""); el.dataset.id = n.id;
+  el.innerHTML = `<span class="nk">${esc(n.kind)}</span><p>${esc(n.short || n.text)}</p>
+    <button type="button" class="nx" aria-label="Dismiss">×</button>${
+    n.act ? `<button type="button" class="actchip">${esc(n.act.label)}</button>` : ""}`;
+  const close = () => el.remove();
+  el.querySelector(".nx").addEventListener("click", close);
+  el.querySelector(".actchip")?.addEventListener("click", () => { close(); n.act.run(); });
+  box.prepend(el);
+  while (box.children.length > 3) box.lastChild.remove();
+  setTimeout(close, NUDGE_TTL_MS);
+  if (document.hidden){
+    if (window.Notification?.permission === "granted"){
+      try{ new Notification(`Atlas · ${n.kind.toLowerCase()}`, { body: n.short || n.text, tag: n.id }); }catch(_){}
+    }
+    return;
+  }
+  if (n.pend){ pendingPlan = n.pend; pendingDelete = null; }
+  speakWidget(n.say || n.text);
+}
+$("#nudgebtn").classList.toggle("on", S.nudgesOn);
+$("#nudgebtn").addEventListener("click", () => {
+  S.nudgesOn = !S.nudgesOn; store.set("nudges", S.nudgesOn);
+  $("#nudgebtn").classList.toggle("on", S.nudgesOn);
+  // the click is the gesture browsers require before they'll ask
+  if (S.nudgesOn && window.Notification?.permission === "default") Notification.requestPermission().catch(()=>{});
+  speak(S.nudgesOn ? "Nudges on. I'll flag meetings, deadlines and important mail as they come up."
+                   : "Nudges off.");
+});
+
+/* ================================================================
    CLOCK + BOOT SEQUENCE
    ================================================================ */
 function tickClock(){
@@ -3547,6 +3668,7 @@ function tickClock(){
   $("#clock").textContent = d.toLocaleDateString([], {weekday:"short", day:"numeric", month:"short"})
     .toUpperCase() + "  ·  " + fmtT(d);
   renderDeck();          // keeps "in 40m", the countdown and the NOW needle moving between fetches
+  try{ checkNudges(); }catch(err){ console.warn("[Atlas] nudges:", err); }
 }
 tickClock(); setInterval(tickClock, 15000);
 
@@ -3600,6 +3722,7 @@ async function renderConnectBar(){
 
 $("#wake").addEventListener("click", async ()=>{
   if (S.awake) return; S.awake=true;
+  nudgeSince = new Date(Date.now() - 15*60000);
   // user gesture: prime TTS so later speech is allowed
   // Prime speech on the gesture, and use that same silent utterance to find
   // out whether this frame allows speech at all.
