@@ -40,6 +40,7 @@ let s = await buildSummary({ tokens, ...args, run: fake() });
 check("events keep the old time field and add start/end/allDay", s.todayEvents[0].time === "2026-11-26T09:30:00Z"
       && s.todayEvents[0].end === "2026-11-26T09:45:00Z" && !s.todayEvents[0].allDay && s.todayEvents[1].allDay
       && s.todayEvents[0].location === "Room 4", s.todayEvents);
+check("overdue tasks listed for the orbit", s.overdueTasks.length === 2 && s.overdueTasks[0].id === "o1", s.overdueTasks);
 check("tasks and overdue count unchanged in shape", s.todayTasks[0].title === "Send invoice" && s.todayTasks[0].priority === "p1"
       && s.todayTasks[0].due === "2026-11-26T15:00:00" && s.overdueTaskCount === 2, s);
 check("inbox: 3 threads, 2 unread, 1 important; important first, sender cleaned",
