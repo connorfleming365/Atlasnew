@@ -322,6 +322,22 @@ Add `http://localhost:3000/api/auth/callback` as an extra redirect URI on each
 provider, and put the variables in a local `.env` (see `.env.example`).
 `http://localhost` counts as a secure origin, so the microphone works there too.
 
+## Tests
+
+`npm test` runs every suite in `tests/`: backend checks (WHOOP, voice) need
+only Node; the browser suites (master view, WHOOP readiness, voice, layout)
+open `index.html` straight from disk in headless Chromium with sample data —
+no deployment, keys or accounts involved. The first time:
+
+```bash
+npm install --no-save playwright@1.56.1
+npx playwright install chromium
+npm test                 # or: npm test -- whoop   (just the WHOOP suites)
+```
+
+GitHub runs the same thing on every pull request and every push to the
+production branch (`.github/workflows/test.yml`).
+
 ## If something doesn't connect
 
 - **"That link expired"** — the state cookie timed out (10 minutes). Start again.
