@@ -76,6 +76,18 @@ async function dragTo(page, sel, tx, ty){
   await say(page, "just so you know I never take meetings before 9"); await page.waitForTimeout(200);
   check('a note saved by the brain lands in MEMORY', (await page.evaluate(() => store.get('memory', []))).includes('No meetings before 9am'));
 
+  // the brain added a task: the task list is fetched again straight away, so it joins the orbit
+  await page.evaluate(() => {
+    window.__inv = [];
+    const real = window.fetch;
+    window.claude.mcp.invalidate = async (server, tool) => { __inv.push(server + '/' + tool); };
+    window.fetch = async (u, o) => String(u) === '/api/brain'
+      ? new Response(JSON.stringify({ reply: "Added — call the bank, due today.", history: [], changed: ["todo"] }))
+      : real(u, o);
+  });
+  await say(page, "add a task to call the bank"); await page.waitForTimeout(200);
+  check('a task made by Atlas refreshes the task list at once', (await page.evaluate(() => __inv)).includes('Todoist/find-tasks-by-date'), await page.evaluate(() => __inv));
+
   // ---- connection health ----
   await page.evaluate(() => {
     document.querySelectorAll('#nudges .nudge').forEach(n => n.remove());
