@@ -404,6 +404,12 @@
   @media (prefers-reduced-motion:reduce){ .sat.od::before{animation:none} }
   .sat{touch-action:none;cursor:grab} .sat:active{cursor:grabbing}
   .orbit-fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+  .sat-lab,.moon-lab{display:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;max-width:120px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 11px/1.2 system-ui,sans-serif;letter-spacing:.02em;
+    color:var(--ink2);text-shadow:0 1px 4px #000,0 0 2px #000;pointer-events:none}
+  .moon-lab{color:var(--teal)}
+  #orbit.labels .sat-lab,#orbit.labels .moon-lab{display:block}
+  #orbit .sat[aria-hidden="true"] .sat-lab,#orbit .moon.falling .moon-lab{display:none}
   .moon.falling{pointer-events:none}
   .drop-core{position:absolute;left:50%;top:50%;width:min(48%,48vh);aspect-ratio:1;border-radius:50%;pointer-events:none;
              transform:translate(-50%,-50%);border:2px dashed rgba(69,224,190,.45);transition:border-color .15s,box-shadow .15s}
@@ -915,6 +921,7 @@
       <select id="voicesel" title="Which voice Atlas speaks with"><option value="">Voice: auto</option></select>
       <button class="dockbtn on" id="nudgebtn" title="Alerts: heads-ups before meetings and deadlines, and for important mail">ALERTS</button>
       <button class="dockbtn" id="memorybtn" title="Notes Atlas always remembers">MEMORY</button>
+      <button class="dockbtn" id="namesbtn" title="Names under the task planets and the meeting moon">NAMES</button>
       </div>
     </div>
     <div id="memorypanel" role="dialog" aria-label="Standing notes for Atlas">
@@ -3420,6 +3427,8 @@ function uiIntent(text){
   if (ATLAS.hosted && /^(?:lock|sign out of|log out of) (?:atlas|the dashboard|this device)$/.test(q)){
     speak("Locking Atlas on this device."); setTimeout(lockAtlas, 900); return true;
   }
+  const nm = q.match(/^(show|hide|turn on|turn off)(?: the)? (?:names|labels)(?: in the orbit| on the planets)?$/);
+  if (nm){ const on = /show|on/.test(nm[1]); Orbit.setLabels(on); speak(on ? "Names on." : "Names off."); return true; }
   const nz = q.match(/^(?:turn |switch )?(on|off) (?:the )?(?:nudges|alerts)$|^(?:turn |switch )?(?:the )?(?:nudges|alerts) (on|off)$/);
   if (nz){
     if ((nz[1] || nz[2]) === "on" ? !S.nudgesOn : S.nudgesOn) $("#nudgebtn").click();
@@ -3840,6 +3849,7 @@ const Orbit = (() => {
     if (layer) return layer;
     const stage = $("#stage"); if (!stage) return null;
     layer = document.createElement("div"); layer.id = "orbit"; layer.setAttribute("role", "group");
+    layer.classList.toggle("labels", !!store.get("orbitLabels", false));
     layer.setAttribute("aria-label", "Today's open tasks");
     stage.appendChild(layer);
     track = document.createElement("div"); track.className = "orbit-track"; layer.appendChild(track);
@@ -3890,6 +3900,9 @@ const Orbit = (() => {
       s.el.className = `sat ${p}${od ? " od" : ""}`;
       s.el.setAttribute("aria-label", `Task: ${task.content}, ${p.toUpperCase()}${od ? ", overdue" : ""}. Show actions`);
       s.el.title = task.content;
+      let lab = s.el.querySelector(".sat-lab");
+      if (!lab){ lab = document.createElement("span"); lab.className = "sat-lab"; lab.setAttribute("aria-hidden", "true"); s.el.appendChild(lab); }
+      if (lab.textContent !== task.content) lab.textContent = task.content;
     });
     const extra = list.length - shown.length;
     more.hidden = extra <= 0; more.textContent = extra > 0 ? `+${extra}` : "";
@@ -4063,6 +4076,9 @@ const Orbit = (() => {
     const state = on ? "docked" : mins <= 10 ? "soon" : "";
     if (state !== moonState){ moon.className = "moon" + (state ? " " + state : ""); moonState = state; }
     moon.setAttribute("aria-label", `Next meeting: ${ev.title}, ${on ? "now" : "at " + fmtT(ev.start)}. Show details`);
+    const mlab = moon.querySelector(".moon-lab") || moon.appendChild(Object.assign(document.createElement("span"), { className: "moon-lab" }));
+    const mtext = `${ev.title} · ${on ? "now" : fmtT(ev.start)}`;
+    if (mlab.textContent !== mtext){ mlab.textContent = mtext; mlab.setAttribute("aria-hidden", "true"); }
     if (cardFor === "moon") placeCard(x, y);
   }
   function openMoonCard(){
@@ -4198,7 +4214,9 @@ const Orbit = (() => {
   const isOpenToday = x => { const d = String(x.dueDate || x.deadlineDate || "").slice(0, 10); return d && d <= todayKey(); };
   function refresh(){ if (S.data.todo){ const { overdue, today } = taskBuckets(); sync([...overdue, ...today]); } }
 
-  return { sync, refresh, kick, markMoved: id => moved.add(String(id)), markDone: id => done.add(String(id)) };
+  // names under the planets and the moon (the NAMES button, or "show names")
+  function setLabels(on){ store.set("orbitLabels", !!on); layer?.classList.toggle("labels", !!on); $("#namesbtn")?.classList.toggle("on", !!on); }
+  return { sync, refresh, kick, setLabels, markMoved: id => moved.add(String(id)), markDone: id => done.add(String(id)) };
 })();
 
 /* ================================================================
@@ -4760,6 +4778,8 @@ function showNudge(n){
   speakWidget(n.say || n.text);
 }
 $("#nudgebtn").classList.toggle("on", S.nudgesOn);
+$("#namesbtn").classList.toggle("on", !!store.get("orbitLabels", false));
+$("#namesbtn").addEventListener("click", () => Orbit.setLabels(!store.get("orbitLabels", false)));
 $("#nudgebtn").addEventListener("click", () => {
   S.nudgesOn = !S.nudgesOn; store.set("nudges", S.nudgesOn);
   $("#nudgebtn").classList.toggle("on", S.nudgesOn);

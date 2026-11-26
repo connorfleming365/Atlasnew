@@ -47,6 +47,17 @@ const sats = page => page.$$eval('#orbit .sat:not(.more)', els => els.map(e => (
   check('hovering a planet pauses the orbit', h1 === h2, { h1, h2 });
   await page.mouse.move(5, 5); await page.waitForTimeout(100);
 
+  // NAMES: small text under each planet, off until asked for, remembered
+  check('names are off by default', !(await page.isVisible('#orbit .sat-lab')));
+  await page.click('#namesbtn'); await page.waitForTimeout(150);
+  const labs = await page.$$eval('#orbit .sat:not(.more) .sat-lab', els => els.filter(e => e.offsetParent).map(e => e.textContent));
+  check('NAMES shows each task under its planet', labs.length === 3 && labs.includes('Send invoice') && labs.includes('Renew passport'), labs);
+  check('…and is remembered', await page.evaluate(() => store.get('orbitLabels') === true && $('#namesbtn').classList.contains('on')));
+  await page.fill('#say', 'hide names'); await page.press('#say', 'Enter'); await page.waitForTimeout(300);
+  check('"hide names" turns them off', !(await page.isVisible('#orbit .sat-lab')) && await page.evaluate(() => store.get('orbitLabels') === false));
+  await page.click('#namesbtn'); await page.waitForTimeout(100);
+  await page.screenshot({ path: process.env.NAMES_SHOT || '/dev/null' }).catch(() => {});
+
   // tap → card → DONE
   await page.click('#orbit .sat.p1', { force: true }); await page.waitForTimeout(200);
   check('tap shows the task name and DONE', /Send invoice/.test(await page.innerText('.sat-card')) && await page.isVisible('.sat-card [data-sc="done"]'));

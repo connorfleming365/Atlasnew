@@ -45,6 +45,9 @@ const moonGeo = page => page.evaluate(() => {
   const near = await moonGeo(page);
   check('5 minutes out: closer to the character than at 90 minutes', near && near.d < far.d, { far: far?.d, near: near?.d });
   check('last 10 minutes: the moon glows', near && /soon/.test(near.cls), near);
+  await page.evaluate(() => Orbit.setLabels(true)); await page.waitForTimeout(150);
+  check('with names on, the moon shows the meeting and its time', /Design review · 11:30|Design review · 11.30/.test(await page.innerText('#orbit .moon .moon-lab')), await page.innerText('#orbit .moon .moon-lab').catch(() => ''));
+  await page.evaluate(() => Orbit.setLabels(false));
   await page.click('#orbit .moon', { force: true }); await page.waitForTimeout(200);
   const card = await page.innerText('.sat-card');
   check('tap shows title, time, location and OPEN TODAY', /Design review/.test(card) && /in 5m|in 5 m/.test(card) && /Room 4/.test(card) && /OPEN TODAY/.test(card), card);
