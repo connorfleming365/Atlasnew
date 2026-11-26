@@ -77,7 +77,9 @@
   .pill i{width:7px;height:7px;border-radius:50%;background:var(--ink3);flex:none}
   .pill[data-s="ok"] i{background:var(--teal);box-shadow:0 0 6px var(--teal)}
   .pill[data-s="stale"] i{background:var(--warn)}
-  .pill[data-s="err"] i{background:var(--crit)}
+  .pill[data-s="err"] i{background:var(--crit);animation:pillBlink 1.2s steps(2,start) infinite}
+  @keyframes pillBlink{to{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){.pill[data-s="err"] i{animation:none}}
 
   #condition{display:none;grid-area:top;/* replaced dynamically */}
   .banner{margin:10px 4px 0;background:var(--bg2);border:1px solid var(--line2);
@@ -363,6 +365,8 @@
   .ac-state{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;font-family:var(--mono);font-size:12px;letter-spacing:.08em}
   .ac-state i{font-style:normal;padding:3px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--ink2)}
   .ac-state i.ok{color:var(--teal);border-color:rgba(69,224,190,.45)} .ac-state i.bad{color:var(--serious);border-color:rgba(236,131,90,.45)}
+  .ac-state i.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+  .ac-why{grid-column:1/-1;font-size:12px;color:var(--ink3);line-height:1.4;overflow-wrap:anywhere}
   .ac-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   #ac-note{margin:4px 18px 18px;font-size:12px;color:var(--ink3);line-height:1.5}
   #pills{cursor:pointer}
@@ -2176,16 +2180,18 @@ function updatePillSum(){
   const sum = $("#pill-sum"); if (!sum) return;
   const ps = [...document.querySelectorAll("#pills .pill:not(#pill-sum)")].filter(p => !p.hidden);
   const bad = ps.filter(p => p.dataset.s === "err"), ok = ps.filter(p => p.dataset.s === "ok" || p.dataset.s === "stale");
-  sum.dataset.s = bad.length ? "err" : ps.length && ok.length === ps.length ? "ok" : "";
+  const retrying = ps.filter(p => S.meta[p.id.replace(/^pill-/, "")]?.trouble);
+  sum.dataset.s = bad.length ? "err" : retrying.length ? "stale" : ps.length && ok.length === ps.length ? "ok" : "";
   $("#pill-sum-t").textContent = bad.length === 1 ? bad[0].textContent.trim()
-    : bad.length ? `${bad.length} OFF` : sum.dataset.s === "ok" ? "LINKED" : "LINKING";
-  sum.title = bad.length ? `Not linked: ${bad.map(b => b.textContent.trim()).join(", ")} — tap to reconnect` : "Accounts";
+    : bad.length ? `${bad.length} OFF` : retrying.length ? "RETRYING" : sum.dataset.s === "ok" ? "LINKED" : "LINKING";
+  sum.title = bad.length ? `Not linked: ${bad.map(b => b.textContent.trim()).join(", ")} — tap to reconnect`
+    : retrying.length ? `Couldn't reach ${retrying.map(b => b.textContent.trim()).join(", ")} just now — retrying, nothing to do` : "Accounts";
 }
 function renderUpdated(key){
   const el = $("#p-"+key+" .upd"); if (!el) return;
   const m = S.meta[key];
   if (m.status==="err"){ el.textContent="OFFLINE"; return; }
-  if (!m.storedAt){ el.textContent=""; return; }
+  if (!m.storedAt){ el.textContent = m.trouble ? "RETRYING" : ""; return; }
   const mins = Math.round((Date.now()-m.storedAt)/60000);
   el.textContent = mins<1 ? "LIVE" : `${mins}M AGO`;
 }
@@ -2246,14 +2252,14 @@ function watchSection(key, tool, input, render, opts={}){
       saveSnap(key, res.payload);
       setMeta(key,{status: res.cache && !res.cache.revalidating &&
                    (Date.now()-res.cache.storedAt > 10*60000) ? "stale" : "ok",
-                   code:null, detail:"",
+                   code:null, detail:"", trouble:false,
                    storedAt: res.cache ? res.cache.storedAt : Date.now()});
       render(res.payload);
     } else {
       const code = ev.error?.code || "upstream_error";
       if (AUTHZ.has(code)){
         S.data[key]=null;                      // retract on authz denial
-        setMeta(key,{status:"err", code});
+        setMeta(key,{status:"err", code, trouble:false});
         $("#p-"+key+" .body").innerHTML =
           `<div class="degraded"><span class="ic">⚠</span><span>${esc(errCopy(code, SERVERS[key]))}</span></div>`;
       } else {
@@ -2264,7 +2270,8 @@ function watchSection(key, tool, input, render, opts={}){
         // discarding it.
         const detail = ev.error?.message ? ` (${ev.error.message})` : "";
         console.warn(`[Atlas] ${SERVERS[key]}/${tool} → ${code}${detail}`);
-        setMeta(key,{status: S.data[key] ? "stale" : "err", code,
+        // amber, not red: the account is still linked, this call just didn't get through
+        setMeta(key,{status:"stale", code, trouble:true,
           detail: ev.error?.message || ""});
         if (!S.data[key])
           $("#p-"+key+" .body").innerHTML =
@@ -2825,6 +2832,7 @@ const needsFix = key => { const m = S.meta[key] || {}; return ATLAS.hosted && m.
 function waitingCopy(key){
   const m = S.meta[key] || {};
   if (m.status === "err") return AUTHZ.has(m.code) ? (ATLAS.hosted ? "Needs reconnecting — tap to fix" : "Needs reconnecting") : "Offline — retrying";
+  if (m.trouble) return "Couldn't reach it — retrying";
   return MCP() ? "Waiting…" : "Not linked here";
 }
 const loadWord = rd => rd.ratio > 1.35 ? "Recover" : rd.ratio < .75 ? "Fresh" : "Steady";
@@ -4496,6 +4504,11 @@ function planTriageIntent(q){
    Each provider: connected here or not, whether the phone launcher can
    reach it, and Reconnect / Disconnect. Opened from the connection pills
    in the top bar, or by saying "accounts". */
+// "5 min ago", "3 h ago", "2 days ago"
+function agoLabel(at){
+  const m = Math.max(0, Math.round((Date.now() - at) / 60000));
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+}
 async function openAccounts(){
   if (!ATLAS.hosted){ speak("Accounts are managed on your Atlas site — here the connectors come from claude.ai."); return; }
   const dlg = $("#accounts");
@@ -4509,13 +4522,19 @@ async function openAccounts(){
   const anyPhone = provs.some(([,p]) => p.phone !== null && p.phone !== undefined);
   $("#ac-sub").textContent = `${provs.filter(([,p]) => p.connected).length} of ${provs.length} connected`;
   $("#ac-body").innerHTML = provs.map(([id, p]) => {
-    const here = !p.configured ? `<i>NOT SET UP</i>` : p.connected ? `<i class="ok">CONNECTED</i>` : `<i class="bad">NOT CONNECTED</i>`;
+    const here = !p.configured ? `<i>NOT SET UP</i>`
+      : p.trouble ? `<i class="warn">RETRYING</i>`
+      : p.connected ? `<i class="ok">CONNECTED</i>`
+      : p.needsReauth ? `<i class="bad">NEEDS RECONNECTING</i>` : `<i class="bad">NOT CONNECTED</i>`;
+    const lp = p.lastProblem;
+    const why = p.trouble ? `Couldn't renew the sign-in just now (${p.trouble}). The login is kept — nothing to do.`
+      : lp?.message ? `Last problem ${agoLabel(lp.at)}: ${lp.message}` : "";
     const phone = !p.configured || !anyPhone ? "" : p.phone ? `<i class="ok">PHONE: LINKED</i>` : `<i class="bad">PHONE: NOT LINKED</i>`;
     const acts = !p.configured ? `<span class="ac-name"><span>Needs API keys on Vercel</span></span>`
       : `<a class="actchip" href="/api/auth/start?provider=${encodeURIComponent(id)}">${p.connected ? "RECONNECT" : "CONNECT"}</a>` +
         (p.connected || p.phone ? `<button type="button" class="actchip crit" data-dc="${esc(id)}">DISCONNECT</button>` : "");
     return `<div class="ac-row"><div class="ac-name"><b>${esc(p.label)}</b><span>${esc((p.servers || []).join(" · "))}</span></div>
-      <div class="ac-acts">${acts}</div><div class="ac-state">${here}${phone}</div></div>`;
+      <div class="ac-acts">${acts}</div><div class="ac-state">${here}${phone}</div>${why ? `<div class="ac-why">${esc(why)}</div>` : ""}</div>`;
   }).join("") || `<div class="empty">No providers configured on this deployment.</div>`;
   // disconnect asks once more before acting
   $("#ac-body").querySelectorAll("[data-dc]").forEach(b => b.addEventListener("click", () => {

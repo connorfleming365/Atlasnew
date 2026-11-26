@@ -1,11 +1,11 @@
 /* What this deployment can currently do. The front-end probes this at
    load to decide whether to install the hosted connector shim. */
-import { PROVIDERS, SERVER_PROVIDER, configured, envVar, getToken } from "../lib/providers.js";
+import { PROVIDERS, SERVER_PROVIDER, configured, envVar, tokenState } from "../lib/providers.js";
 import { brainConfigured } from "../lib/brain.js";
 import { ttsConfigured, pinnedVoice } from "../lib/tts.js";
 import { syncConfigured } from "../lib/sync.js";
 import { isOwner, gateConfigured } from "../lib/owner.js";
-import { tokenStoreConfigured, getStoredToken } from "../lib/tokenStore.js";
+import { tokenStoreConfigured, getStoredToken, lastProblem } from "../lib/tokenStore.js";
 
 export default async function handler(req, res){
   res.setHeader("cache-control", "no-store");
@@ -14,20 +14,27 @@ export default async function handler(req, res){
     return res.json({ hosted: true, locked: true, gate: gateConfigured() ? "code" : "unset" });
   const hasSecret = Boolean(envVar("SESSION_SECRET"));
   const providers = {};
-  // Actually exercises each token (refreshing it, or clearing it if the
-  // refresh itself fails) rather than just checking a cookie exists — a
-  // cookie can be present and "connected" would still be a lie once the
-  // refresh token behind it has died (e.g. Google expires refresh tokens
-  // after 7 days for an app still in Testing publish status). getToken()
-  // only makes a real network call when the current access token is
-  // actually near expiry, so this stays cheap in the common case.
+  // Actually exercises each login (refreshing it when it's near expiry)
+  // rather than just checking one exists: "connected" would be a lie once
+  // the provider has rejected the refresh token (e.g. Google expires them
+  // after 7 days for an app still in Testing publish status). A refresh
+  // that fails only temporarily keeps the login and reports `trouble`.
+  // tokenState() shares one login and one refresh lock with every other
+  // browser and the phone (lib/providers.js), so this can't race them.
   await Promise.all(Object.entries(PROVIDERS).map(async ([id, p]) => {
-    const accessToken = hasSecret && configured(id) ? await getToken(id, req, res).catch(() => null) : null;
+    const st = hasSecret && configured(id)
+      ? await tokenState(id, req, res).catch(e => ({ token: null, reason: "temporary", error: String(e?.message || e) }))
+      : { token: null, reason: "not_connected" };
     providers[id] = {
       label: p.label,
       servers: p.servers,
       configured: configured(id),
-      connected: Boolean(accessToken),
+      // still connected while it's only in temporary trouble - the login is kept
+      connected: Boolean(st.token) || st.reason === "temporary",
+      trouble: st.reason === "temporary" ? String(st.error || "temporary trouble") : null,
+      needsReauth: st.reason === "needs_reauth",
+      // the last problem seen, {at, message} - shown in Accounts so a drop isn't a mystery
+      lastProblem: configured(id) ? await lastProblem(id) : null,
       // can the phone launcher reach it? (null when there's no server-side store)
       phone: tokenStoreConfigured() && configured(id) ? Boolean(await getStoredToken(id).catch(() => null)) : null,
     };

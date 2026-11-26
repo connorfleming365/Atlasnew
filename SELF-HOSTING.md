@@ -148,11 +148,15 @@ polls one small endpoint instead: `GET /api/launcher/summary`.
 That endpoint needs two things set:
 
 - **`UPSTASH_REDIS_REST_URL`** and **`UPSTASH_REDIS_REST_TOKEN`** (see
-  **Cross-device sync** above) — this is what lets the server hold a copy of
-  your Google, Todoist, WHOOP and Strava tokens to read from without a cookie
-  (copied each time you connect one; if a gauge says "not connected" on the
-  phone but works on the web, disconnect and reconnect that provider once). Sealed the same
-  way as everything else here.
+  **Cross-device sync** above) — this is what lets the server hold your
+  Google, Todoist, WHOOP and Strava logins so the phone can use them without
+  a cookie. With it set, that server copy is the one login for each account:
+  every browser and the phone share it, and only one of them renews it at a
+  time, so providers that replace the refresh token on every renewal (WHOOP)
+  can't end up with two copies fighting. A login is only dropped when the
+  provider actually rejects it; a timeout or outage shows amber ("retrying")
+  rather than red ("reconnect"), and **Accounts** shows the last problem seen
+  for each account. Sealed the same way as everything else here.
 - **`LAUNCHER_API_KEY`** — any long random string you make up yourself (a
   password manager's generator is fine). The launcher sends it back as an
   `x-launcher-key` header on every request; without a match, the endpoint
