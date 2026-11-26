@@ -33,6 +33,20 @@ const sats = page => page.$$eval('#orbit .sat:not(.more)', els => els.map(e => (
     return [...document.querySelectorAll('#orbit .sat:not(.more)')].map(e => { const r = e.getBoundingClientRect();
       return { x: r.left + r.width / 2 - st.left - st.width / 2, y: r.top + r.height / 2 - st.top - st.height / 2, w: st.width, h: st.height }; }); });
   check('satellites orbit the centre, within the stage', geo.every(g => Math.abs(g.x) < g.w / 2 && Math.abs(g.y) < g.h / 2 && Math.hypot(g.x, g.y) > 40), geo);
+  // overdue planets are pulled in towards the horizon: measure each one's place on the (tilted) ring
+  const ringR = await page.evaluate(() => {
+    const tr = document.querySelector('#orbit .orbit-track'), lay = $('#orbit').getBoundingClientRect();
+    const rx = parseFloat(tr.style.width) / 2, ry = parseFloat(tr.style.height) / 2;
+    const cx = parseFloat(tr.style.left) + rx, cy = parseFloat(tr.style.top) + ry, T = -22 * Math.PI / 180;
+    return [...document.querySelectorAll('#orbit .sat:not(.more)')].map(e => {
+      const b = e.getBoundingClientRect(), dx = b.left + b.width / 2 - lay.left - cx, dy = b.top + b.height / 2 - lay.top - cy;
+      const px = dx * Math.cos(T) + dy * Math.sin(T), py = -dx * Math.sin(T) + dy * Math.cos(T);
+      return { label: e.title, r: Math.hypot(px / rx, py / ry) };
+    });
+  });
+  const od = ringR.find(x => x.label === 'Renew passport'), ok = ringR.filter(x => x.label !== 'Renew passport');
+  check('an overdue planet orbits closer in (4 days overdue)', od && od.r < .85 && ok.every(x => x.r > .95), ringR);
+
   // they move
   const p1 = await page.$eval('#orbit .sat:not(.more)', e => e.style.transform);
   await page.waitForTimeout(1200);

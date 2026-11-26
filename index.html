@@ -3910,6 +3910,11 @@ const Orbit = (() => {
     if (!running){ running = true; last = performance.now(); requestAnimationFrame(frame); }
   }
   const isOverdue = task => { const d = String(task.dueDate || task.deadlineDate || "").slice(0, 10); return d && d < todayKey(); };
+  const overdueDays = task => {
+    const d = String(task.dueDate || task.deadlineDate || "").slice(0, 10);
+    const ms = new Date(todayKey() + "T00:00:00") - new Date(d + "T00:00:00");
+    return Math.max(1, Math.round(ms / 864e5) || 1);
+  };
 
   function frame(now){
     const dt = Math.min(.1, (now - last) / 1000); last = now;
@@ -3963,6 +3968,11 @@ const Orbit = (() => {
         k = REDUCED ? 1 : Math.min(1, (t - s.t0) / .9);
         r = 1 + .8 * k; op = 1 - k;
         if (k >= 1){ s.el.remove(); sats.delete(id); continue; }
+      }
+      // overdue: pulled in towards the horizon, and wobbling, the longer it's overdue
+      if ((s.state === "orbit" || s.state === "entering") && s.task && isOverdue(s.task) && !REDUCED){
+        const days = overdueDays(s.task), seed = [...String(s.task.id)].reduce((h, c) => h + c.charCodeAt(0), 0) % 7;
+        r *= 1 - Math.min(.25, .05 + .04 * days) + Math.sin(t * (2.2 + .5 * Math.min(days, 6)) + seed) * (.015 + .008 * Math.min(days, 5));
       }
       const px = Math.cos(s.a) * rx * r, py = Math.sin(s.a) * ry * r;   // on the flat ring…
       const x = cx + px * CT - py * ST, y = cy + px * ST + py * CT;    // …tilted diagonally
@@ -4517,6 +4527,10 @@ async function openAccounts(){
 $("#ac-close").addEventListener("click", () => $("#accounts").close());
 $("#accounts").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 $("#pills").addEventListener("click", () => openAccounts());
+// the launcher's account lights link here (…/#accounts) to reconnect an account
+hostedReady.then(hosted => {
+  if (hosted && location.hash === "#accounts"){ history.replaceState(null, "", location.pathname + location.search); openAccounts(); }
+});
 
 /* ================================================================
    WEEKLY REVIEW
