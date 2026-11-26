@@ -3706,10 +3706,22 @@ async function askBrain(promptText){
     if (Array.isArray(j.history)) brainHistory = j.history;
     if (Array.isArray(j.memory)) setMemory(j.memory, false);   // the brain saved or forgot a note
     speak(j.reply || "…");
+    if (Array.isArray(j.changed)) refreshChanged(j.changed);   // e.g. a new task joins the orbit at once
   }catch(err){
     console.warn("[Atlas] brain request failed:", err);
     speak("I couldn't reach my reasoning engine just now — try again, or type instead.");
   }
+}
+
+// The brain changed something (a task, the calendar, the inbox): fetch those
+// sections now rather than at their next poll.
+async function refreshChanged(kinds){
+  const mcp = MCP(); if (!mcp) return;
+  const jobs = [];
+  if (kinds.includes("todo")){ jobs.push(mcp.invalidate("Todoist","find-tasks-by-date")); refreshCompleted(); }
+  if (kinds.includes("cal")) jobs.push(mcp.invalidate("Google Calendar","list_events"));
+  if (kinds.includes("gmail")) jobs.push(mcp.invalidate("Gmail","search_threads"));
+  await Promise.all(jobs.map(p => Promise.resolve(p).catch(() => {})));
 }
 
 function handleUtteranceClassic(text){

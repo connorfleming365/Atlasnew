@@ -38,5 +38,19 @@ script = [textTurn("You're free at 2.")];
 out = await converse({ message: "when am I free", history: [], notes: ["x"] }, req, null);
 check("an ordinary reply carries no memory field", out.memory === undefined, out);
 
+// actions report what they changed, so the dashboard/phone refresh that part at once
+req = { headers: {} };
+script = [toolTurn("add_task", { tasks: [{ content: "Call the bank" }] }), textTurn("Added.")];
+out = await converse({ message: "add a task to call the bank", history: [], notes: [] }, req, null);
+check("creating a task reports changed: todo", JSON.stringify(out.changed) === JSON.stringify(["todo"]), out.changed);
+req = { headers: {} };
+script = [toolTurn("create_calendar_event", { title: "Gym", start: "2026-11-26T18:00:00Z", end: "2026-11-26T19:00:00Z" }), textTurn("Booked.")];
+out = await converse({ message: "book the gym at 6", history: [], notes: [] }, req, null);
+check("a calendar change reports changed: cal", JSON.stringify(out.changed) === JSON.stringify(["cal"]), out.changed);
+req = { headers: {} };
+script = [textTurn("You're free at 2.")];
+out = await converse({ message: "when am I free", history: [], notes: [] }, req, null);
+check("a plain answer reports no changes", out.changed === undefined, out.changed);
+
 console.log(fails.length ? `\n${fails.length} FAILED` : "\nALL PASS");
 process.exit(fails.length ? 1 : 0);
